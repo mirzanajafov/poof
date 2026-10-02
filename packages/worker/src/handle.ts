@@ -99,7 +99,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
     return new Promise((resolve, reject) => {
       const child = fork(this.entry, [], {
         execArgv: this.execArgv,
-        env: { ...process.env, POOF_HEARTBEAT_MS: String(this.limits.heartbeatMs) },
+        env: { MALLOC_ARENA_MAX: '2', ...process.env, POOF_HEARTBEAT_MS: String(this.limits.heartbeatMs) },
         stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       })
       this.child = child
