@@ -1,0 +1,77 @@
+{
+  "env": {
+    "label": "server",
+    "platform": "linux",
+    "cpuModel": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "cpuLimit": 1.5,
+    "memoryGb": 7.8,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T12:09:43.004Z"
+  },
+  "cpus": 1.5,
+  "preset": "webp-1600",
+  "source": "synthetic",
+  "durationMs": 15000,
+  "warmupMs": 3000,
+  "knee": 2,
+  "rows": [
+    {
+      "k": 1,
+      "items": 48,
+      "effectiveCores": 0.975,
+      "efficiency": 0.975,
+      "wallInflation": 1.007,
+      "peakRssMb": 241.953,
+      "medianPeakRssMb": 241.953,
+      "cgroupAnonMeanMb": 186.387,
+      "cgroupAnonPeakMb": 205.512
+    },
+    {
+      "k": 2,
+      "items": 65,
+      "effectiveCores": 1.322,
+      "efficiency": 0.881,
+      "wallInflation": 1.478,
+      "peakRssMb": 236.684,
+      "medianPeakRssMb": 232.762,
+      "cgroupAnonMeanMb": 305.899,
+      "cgroupAnonPeakMb": 369.355
+    },
+    {
+      "k": 3,
+      "items": 64,
+      "effectiveCores": 1.242,
+      "efficiency": 0.828,
+      "wallInflation": 2.395,
+      "peakRssMb": 223.844,
+      "medianPeakRssMb": 208.832,
+      "cgroupAnonMeanMb": 419.266,
+      "cgroupAnonPeakMb": 497.043
+    },
+    {
+      "k": 4,
+      "items": 64,
+      "effectiveCores": 1.264,
+      "efficiency": 0.843,
+      "wallInflation": 3.183,
+      "peakRssMb": 218.773,
+      "medianPeakRssMb": 208.135,
+      "cgroupAnonMeanMb": 492.577,
+      "cgroupAnonPeakMb": 635.84
+    },
+    {
+      "k": 5,
+      "items": 65,
+      "effectiveCores": 1.234,
+      "efficiency": 0.822,
+      "wallInflation": 4.299,
+      "peakRssMb": 211.211,
+      "medianPeakRssMb": 199.32,
+      "cgroupAnonMeanMb": 532.744,
+      "cgroupAnonPeakMb": 732.27
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "env": {
+    "label": "server",
+    "platform": "linux",
+    "cpuModel": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "cpuLimit": 2,
+    "memoryGb": 7.8,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T12:11:59.200Z"
+  },
+  "reps": 5000,
+  "ipcRoundTripUs": {
+    "n": 5000,
+    "mean": 360.2,
+    "p50": 250.9,
+    "p95": 976.6,
+    "p99": 1744.3,
+    "max": 11545.7
+  },
+  "redis": {
+    "claimUs": {
+      "n": 5000,
+      "mean": 543.1,
+      "p50": 387.9,
+      "p95": 1407.7,
+      "p99": 2893.1,
+      "max": 89738.5
+    },
+    "shrinkUs": {
+      "n": 5000,
+      "mean": 380.8,
+      "p50": 235.7,
+      "p95": 1037.7,
+      "p99": 1967.6,
+      "max": 14537.6
+    },
+    "checkpointUs": {
+      "n": 5000,
+      "mean": 328.1,
+      "p50": 157.4,
+      "p95": 970,
+      "p99": 2278.7,
+      "max": 28769
+    }
+  }
+}
