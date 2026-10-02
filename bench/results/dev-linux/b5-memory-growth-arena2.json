@@ -1,0 +1,324 @@
+{
+  "env": {
+    "label": "dev-linux",
+    "platform": "linux",
+    "cpuModel": "12th Gen Intel(R) Core(TM) i7-1270P",
+    "logicalCpus": 16,
+    "cpuLimit": null,
+    "memoryGb": 9.6,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T12:49:12.229Z",
+    "mallocArenaMax": "2"
+  },
+  "preset": "webp-1600",
+  "seconds": 410.7,
+  "samples": [
+    {
+      "items": 0,
+      "rssMb": 69.004,
+      "anonMb": 16.80078125
+    },
+    {
+      "items": 25,
+      "rssMb": 158.418,
+      "anonMb": 104.973
+    },
+    {
+      "items": 50,
+      "rssMb": 175.203,
+      "anonMb": 121.695
+    },
+    {
+      "items": 75,
+      "rssMb": 158.676,
+      "anonMb": 104.43
+    },
+    {
+      "items": 100,
+      "rssMb": 184.191,
+      "anonMb": 130.738
+    },
+    {
+      "items": 125,
+      "rssMb": 196.191,
+      "anonMb": 142.852
+    },
+    {
+      "items": 150,
+      "rssMb": 207.191,
+      "anonMb": 153.809
+    },
+    {
+      "items": 175,
+      "rssMb": 170.465,
+      "anonMb": 117.289
+    },
+    {
+      "items": 200,
+      "rssMb": 190.859,
+      "anonMb": 137.637
+    },
+    {
+      "items": 225,
+      "rssMb": 205.234,
+      "anonMb": 152.043
+    },
+    {
+      "items": 250,
+      "rssMb": 216.109,
+      "anonMb": 162.996
+    },
+    {
+      "items": 275,
+      "rssMb": 172.34,
+      "anonMb": 119.105
+    },
+    {
+      "items": 300,
+      "rssMb": 195.938,
+      "anonMb": 142.586
+    },
+    {
+      "items": 325,
+      "rssMb": 197.938,
+      "anonMb": 144.621
+    },
+    {
+      "items": 350,
+      "rssMb": 203.688,
+      "anonMb": 150.52
+    },
+    {
+      "items": 375,
+      "rssMb": 172.27,
+      "anonMb": 119.012
+    },
+    {
+      "items": 400,
+      "rssMb": 190.102,
+      "anonMb": 136.93
+    },
+    {
+      "items": 425,
+      "rssMb": 202.227,
+      "anonMb": 149.043
+    },
+    {
+      "items": 450,
+      "rssMb": 213.227,
+      "anonMb": 160
+    },
+    {
+      "items": 475,
+      "rssMb": 165.164,
+      "anonMb": 112.043
+    },
+    {
+      "items": 500,
+      "rssMb": 192.664,
+      "anonMb": 139.445
+    },
+    {
+      "items": 525,
+      "rssMb": 204.789,
+      "anonMb": 151.578
+    },
+    {
+      "items": 550,
+      "rssMb": 204.789,
+      "anonMb": 151.578
+    },
+    {
+      "items": 575,
+      "rssMb": 164.793,
+      "anonMb": 111.559
+    },
+    {
+      "items": 600,
+      "rssMb": 198.293,
+      "anonMb": 145.234
+    },
+    {
+      "items": 625,
+      "rssMb": 198.293,
+      "anonMb": 145.234
+    },
+    {
+      "items": 650,
+      "rssMb": 203.168,
+      "anonMb": 150.129
+    },
+    {
+      "items": 675,
+      "rssMb": 170.758,
+      "anonMb": 117.777
+    },
+    {
+      "items": 700,
+      "rssMb": 197.883,
+      "anonMb": 144.863
+    },
+    {
+      "items": 725,
+      "rssMb": 197.883,
+      "anonMb": 144.863
+    },
+    {
+      "items": 750,
+      "rssMb": 206.633,
+      "anonMb": 153.559
+    },
+    {
+      "items": 775,
+      "rssMb": 164.629,
+      "anonMb": 111.563
+    },
+    {
+      "items": 800,
+      "rssMb": 194.254,
+      "anonMb": 141.258
+    },
+    {
+      "items": 825,
+      "rssMb": 206.379,
+      "anonMb": 153.371
+    },
+    {
+      "items": 850,
+      "rssMb": 206.379,
+      "anonMb": 153.371
+    },
+    {
+      "items": 875,
+      "rssMb": 206.379,
+      "anonMb": 153.371
+    },
+    {
+      "items": 900,
+      "rssMb": 193.867,
+      "anonMb": 140.758
+    },
+    {
+      "items": 925,
+      "rssMb": 205.992,
+      "anonMb": 152.871
+    },
+    {
+      "items": 950,
+      "rssMb": 205.992,
+      "anonMb": 152.871
+    },
+    {
+      "items": 975,
+      "rssMb": 173.316,
+      "anonMb": 120.145
+    },
+    {
+      "items": 1000,
+      "rssMb": 194.883,
+      "anonMb": 141.801
+    },
+    {
+      "items": 1025,
+      "rssMb": 207.008,
+      "anonMb": 153.914
+    },
+    {
+      "items": 1050,
+      "rssMb": 218.008,
+      "anonMb": 164.871
+    },
+    {
+      "items": 1075,
+      "rssMb": 169.625,
+      "anonMb": 116.504
+    },
+    {
+      "items": 1100,
+      "rssMb": 194.523,
+      "anonMb": 141.805
+    },
+    {
+      "items": 1125,
+      "rssMb": 206.648,
+      "anonMb": 153.918
+    },
+    {
+      "items": 1150,
+      "rssMb": 206.648,
+      "anonMb": 153.918
+    },
+    {
+      "items": 1175,
+      "rssMb": 172.684,
+      "anonMb": 119.758
+    },
+    {
+      "items": 1200,
+      "rssMb": 199.309,
+      "anonMb": 146.523
+    },
+    {
+      "items": 1225,
+      "rssMb": 211.434,
+      "anonMb": 158.641
+    },
+    {
+      "items": 1250,
+      "rssMb": 211.434,
+      "anonMb": 158.641
+    },
+    {
+      "items": 1275,
+      "rssMb": 166.141,
+      "anonMb": 113.059
+    },
+    {
+      "items": 1300,
+      "rssMb": 194.898,
+      "anonMb": 141.809
+    },
+    {
+      "items": 1325,
+      "rssMb": 207.023,
+      "anonMb": 153.922
+    },
+    {
+      "items": 1350,
+      "rssMb": 187.531,
+      "anonMb": 134.473
+    },
+    {
+      "items": 1375,
+      "rssMb": 164.906,
+      "anonMb": 111.57
+    },
+    {
+      "items": 1400,
+      "rssMb": 198.281,
+      "anonMb": 145.242
+    },
+    {
+      "items": 1425,
+      "rssMb": 210.531,
+      "anonMb": 157.359
+    },
+    {
+      "items": 1450,
+      "rssMb": 210.531,
+      "anonMb": 157.359
+    },
+    {
+      "items": 1475,
+      "rssMb": 171.559,
+      "anonMb": 118.238
+    },
+    {
+      "items": 1500,
+      "rssMb": 198.434,
+      "anonMb": 145.242
+    }
+  ]
+}
