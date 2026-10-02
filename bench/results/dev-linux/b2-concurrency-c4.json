@@ -1,0 +1,154 @@
+{
+  "env": {
+    "label": "dev-linux",
+    "platform": "linux",
+    "cpuModel": "12th Gen Intel(R) Core(TM) i7-1270P",
+    "logicalCpus": 16,
+    "cpuLimit": 4,
+    "memoryGb": 9.6,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T11:47:01.070Z"
+  },
+  "cpus": 4,
+  "preset": "webp-1600",
+  "source": "synthetic",
+  "durationMs": 15000,
+  "warmupMs": 3000,
+  "knee": 4,
+  "rows": [
+    {
+      "k": 1,
+      "items": 61,
+      "effectiveCores": 1.299,
+      "efficiency": 1.299,
+      "wallInflation": 0.666,
+      "peakRssMb": 257.016,
+      "medianPeakRssMb": 257.016,
+      "cgroupAnonMeanMb": 193.1,
+      "cgroupAnonPeakMb": 220.059
+    },
+    {
+      "k": 2,
+      "items": 114,
+      "effectiveCores": 2.328,
+      "efficiency": 1.164,
+      "wallInflation": 0.765,
+      "peakRssMb": 255.844,
+      "medianPeakRssMb": 254.111,
+      "cgroupAnonMeanMb": 364.092,
+      "cgroupAnonPeakMb": 419.023
+    },
+    {
+      "k": 3,
+      "items": 120,
+      "effectiveCores": 2.514,
+      "efficiency": 0.838,
+      "wallInflation": 1.113,
+      "peakRssMb": 248.664,
+      "medianPeakRssMb": 238.961,
+      "cgroupAnonMeanMb": 489.677,
+      "cgroupAnonPeakMb": 573.641
+    },
+    {
+      "k": 4,
+      "items": 197,
+      "effectiveCores": 3.94,
+      "efficiency": 0.985,
+      "wallInflation": 0.943,
+      "peakRssMb": 260.684,
+      "medianPeakRssMb": 258.475,
+      "cgroupAnonMeanMb": 698.652,
+      "cgroupAnonPeakMb": 825.563
+    },
+    {
+      "k": 5,
+      "items": 149,
+      "effectiveCores": 3.012,
+      "efficiency": 0.753,
+      "wallInflation": 1.608,
+      "peakRssMb": 240.215,
+      "medianPeakRssMb": 226.18,
+      "cgroupAnonMeanMb": 734.737,
+      "cgroupAnonPeakMb": 851.906
+    },
+    {
+      "k": 6,
+      "items": 141,
+      "effectiveCores": 2.973,
+      "efficiency": 0.743,
+      "wallInflation": 1.934,
+      "peakRssMb": 233.98,
+      "medianPeakRssMb": 222.596,
+      "cgroupAnonMeanMb": 810.672,
+      "cgroupAnonPeakMb": 962.203
+    },
+    {
+      "k": 7,
+      "items": 161,
+      "effectiveCores": 3.37,
+      "efficiency": 0.842,
+      "wallInflation": 2.006,
+      "peakRssMb": 230.301,
+      "medianPeakRssMb": 221.574,
+      "cgroupAnonMeanMb": 934.489,
+      "cgroupAnonPeakMb": 1089.719
+    },
+    {
+      "k": 8,
+      "items": 161,
+      "effectiveCores": 3.447,
+      "efficiency": 0.862,
+      "wallInflation": 2.232,
+      "peakRssMb": 231.855,
+      "medianPeakRssMb": 219.527,
+      "cgroupAnonMeanMb": 1053.915,
+      "cgroupAnonPeakMb": 1232.648
+    },
+    {
+      "k": 9,
+      "items": 139,
+      "effectiveCores": 2.799,
+      "efficiency": 0.7,
+      "wallInflation": 3.087,
+      "peakRssMb": 222.203,
+      "medianPeakRssMb": 212.543,
+      "cgroupAnonMeanMb": 1082.016,
+      "cgroupAnonPeakMb": 1337.301
+    },
+    {
+      "k": 10,
+      "items": 140,
+      "effectiveCores": 2.791,
+      "efficiency": 0.698,
+      "wallInflation": 3.338,
+      "peakRssMb": 218.145,
+      "medianPeakRssMb": 211.113,
+      "cgroupAnonMeanMb": 1158.759,
+      "cgroupAnonPeakMb": 1505.18
+    },
+    {
+      "k": 11,
+      "items": 130,
+      "effectiveCores": 2.698,
+      "efficiency": 0.674,
+      "wallInflation": 3.888,
+      "peakRssMb": 209.539,
+      "medianPeakRssMb": 196.125,
+      "cgroupAnonMeanMb": 1190.842,
+      "cgroupAnonPeakMb": 1560.098
+    },
+    {
+      "k": 12,
+      "items": 141,
+      "effectiveCores": 2.8,
+      "efficiency": 0.7,
+      "wallInflation": 4.082,
+      "peakRssMb": 213.324,
+      "medianPeakRssMb": 195.918,
+      "cgroupAnonMeanMb": 1299.54,
+      "cgroupAnonPeakMb": 1709.887
+    }
+  ]
+}

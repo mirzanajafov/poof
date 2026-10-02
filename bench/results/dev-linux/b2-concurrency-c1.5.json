@@ -1,0 +1,77 @@
+{
+  "env": {
+    "label": "dev-linux",
+    "platform": "linux",
+    "cpuModel": "12th Gen Intel(R) Core(TM) i7-1270P",
+    "logicalCpus": 16,
+    "cpuLimit": 1.5,
+    "memoryGb": 9.6,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T11:41:18.016Z"
+  },
+  "cpus": 1.5,
+  "preset": "webp-1600",
+  "source": "synthetic",
+  "durationMs": 15000,
+  "warmupMs": 3000,
+  "knee": 2,
+  "rows": [
+    {
+      "k": 1,
+      "items": 49,
+      "effectiveCores": 0.989,
+      "efficiency": 0.989,
+      "wallInflation": 0.866,
+      "peakRssMb": 254.488,
+      "medianPeakRssMb": 254.488,
+      "cgroupAnonMeanMb": 193.726,
+      "cgroupAnonPeakMb": 218.551
+    },
+    {
+      "k": 2,
+      "items": 70,
+      "effectiveCores": 1.48,
+      "efficiency": 0.987,
+      "wallInflation": 1.314,
+      "peakRssMb": 245.52,
+      "medianPeakRssMb": 235.426,
+      "cgroupAnonMeanMb": 289.494,
+      "cgroupAnonPeakMb": 380.258
+    },
+    {
+      "k": 3,
+      "items": 69,
+      "effectiveCores": 1.47,
+      "efficiency": 0.98,
+      "wallInflation": 1.952,
+      "peakRssMb": 230.824,
+      "medianPeakRssMb": 224.051,
+      "cgroupAnonMeanMb": 405.264,
+      "cgroupAnonPeakMb": 506.715
+    },
+    {
+      "k": 4,
+      "items": 87,
+      "effectiveCores": 1.75,
+      "efficiency": 1.167,
+      "wallInflation": 2.147,
+      "peakRssMb": 232.25,
+      "medianPeakRssMb": 224.594,
+      "cgroupAnonMeanMb": 541.344,
+      "cgroupAnonPeakMb": 674.914
+    },
+    {
+      "k": 5,
+      "items": 72,
+      "effectiveCores": 1.338,
+      "efficiency": 0.892,
+      "wallInflation": 3.391,
+      "peakRssMb": 212.336,
+      "medianPeakRssMb": 207.891,
+      "cgroupAnonMeanMb": 587.513,
+      "cgroupAnonPeakMb": 750.492
+    }
+  ]
+}
