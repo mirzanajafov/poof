@@ -1,13 +1,8 @@
+import type { CostModel } from '@poof/core'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { linearFit, powerFit, quantile } from './stats.ts'
-
-export interface TypeCost {
-  coefMs: number
-  exponent: number
-  logResidualSd: number
-}
 
 export interface Curve {
   cpus: number
@@ -17,7 +12,7 @@ export interface Curve {
 
 export interface Calibration {
   label: string
-  types: Record<string, TypeCost>
+  types: Record<string, CostModel>
   spawnMs: number
   spawnCpuMs: number
   baseRssMb: number
@@ -45,7 +40,7 @@ function read<T>(dir: string, name: string): T {
   return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8')) as T
 }
 
-function typeCosts(b1: B1, sources: readonly string[]): Record<string, TypeCost> {
+function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel> {
   const byImage = new Map<string, { preset: string; mp: number; walls: number[] }>()
   for (const s of b1.samples) {
     if (!sources.includes(s.source)) continue
@@ -54,7 +49,7 @@ function typeCosts(b1: B1, sources: readonly string[]): Record<string, TypeCost>
     entry.walls.push(s.wallMs)
     byImage.set(key, entry)
   }
-  const types: Record<string, TypeCost> = {}
+  const types: Record<string, CostModel> = {}
   for (const preset of new Set([...byImage.values()].map((e) => e.preset))) {
     const images = [...byImage.values()].filter((e) => e.preset === preset)
     const fit = powerFit(

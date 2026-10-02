@@ -4,6 +4,7 @@ import {
   Breaker,
   decide,
   emptyEstimate,
+  expectedCostMs,
   planSplit,
   updateEstimate,
   type BreakerState,
@@ -19,7 +20,7 @@ import {
   type View,
 } from '@poof/core'
 import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
-import { expectedCost, inWindow, Workload, type Scenario, type TaskPlan } from './workload.ts'
+import { inWindow, Workload, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
   name: string
@@ -258,7 +259,7 @@ export class Simulation {
     let predictedMs = 0
     for (let i = 0; i < items; i++) {
       remainingMs += plan.costs[i]!
-      predicted[i] = expectedCost(cost, plan.mp[i]!)
+      predicted[i] = expectedCostMs(cost, plan.mp[i]!)
       predictedMs += predicted[i]!
     }
     const task: SimTask = {

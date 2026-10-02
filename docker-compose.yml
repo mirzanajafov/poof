@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: poof-postgres
+    environment:
+      POSTGRES_USER: poof
+      POSTGRES_PASSWORD: poof
+      POSTGRES_DB: poof
+    ports:
+      - "5447:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "poof"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: poof-redis
+    ports:
+      - "6387:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:

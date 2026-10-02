@@ -1,4 +1,4 @@
-import type { TypeCost } from './calibration.ts'
+import { expectedCostMs, medianCostMs, type CostModel } from '@poof/core'
 import { Rng } from './rng.ts'
 
 export interface Window {
@@ -59,28 +59,20 @@ export const profiles: ReadonlyArray<{ weight: number; value: Profile }> = [
   { weight: 10, value: { name: 'mixed', mp: mixed } },
 ]
 
-export function medianCost(cost: TypeCost, mp: number): number {
-  return cost.coefMs * mp ** cost.exponent
-}
-
-export function expectedCost(cost: TypeCost, mp: number): number {
-  return medianCost(cost, mp) * Math.exp(cost.logResidualSd ** 2 / 2)
-}
-
-export function itemCost(cost: TypeCost, mp: number, rng: Rng): number {
-  return Math.max(1, medianCost(cost, mp) * Math.exp(cost.logResidualSd * rng.normal()))
+export function itemCost(cost: CostModel, mp: number, rng: Rng): number {
+  return Math.max(1, medianCostMs(cost, mp) * Math.exp(cost.logResidualSd * rng.normal()))
 }
 
 const profileCosts = new Map<string, number>()
 
-export function expectedItemCost(cost: TypeCost, profile: Profile): number {
+export function expectedItemCost(cost: CostModel, profile: Profile): number {
   const key = `${cost.coefMs}|${cost.exponent}|${cost.logResidualSd}|${profile.name}`
   let value = profileCosts.get(key)
   if (value === undefined) {
     const rng = Rng.of('profile-cost', profile.name)
     let sum = 0
     const samples = 20_000
-    for (let i = 0; i < samples; i++) sum += expectedCost(cost, profile.mp(rng))
+    for (let i = 0; i < samples; i++) sum += expectedCostMs(cost, profile.mp(rng))
     value = sum / samples
     profileCosts.set(key, value)
   }
@@ -92,7 +84,7 @@ export interface WorkloadStats {
   meanItems: number
 }
 
-export function workloadStats(scenario: Scenario, types: Record<string, TypeCost>): WorkloadStats {
+export function workloadStats(scenario: Scenario, types: Record<string, CostModel>): WorkloadStats {
   const rng = Rng.of('stats', scenario.name)
   const [lo, hi] = scenario.items
   const meanItems = (hi - lo) / Math.log(hi / lo)
@@ -100,7 +92,7 @@ export function workloadStats(scenario: Scenario, types: Record<string, TypeCost
   const samples = 20_000
   for (let i = 0; i < samples; i++) {
     const type = types[rng.weighted(scenario.types)]!
-    cost += expectedCost(type, rng.weighted(profiles).mp(rng))
+    cost += expectedCostMs(type, rng.weighted(profiles).mp(rng))
   }
   return { meanTaskWorkMs: (cost / samples) * meanItems, meanItems }
 }
@@ -111,7 +103,7 @@ export function inWindow(window: Window | undefined, now: number): boolean {
 
 export class Workload {
   readonly scenario: Scenario
-  readonly types: Record<string, TypeCost>
+  readonly types: Record<string, CostModel>
   readonly stats: WorkloadStats
   private readonly seed: number
   private readonly baseRate: number
@@ -120,7 +112,7 @@ export class Workload {
   private clock = 0
   private count = 0
 
-  constructor(scenario: Scenario, types: Record<string, TypeCost>, cores: number, seed: number) {
+  constructor(scenario: Scenario, types: Record<string, CostModel>, cores: number, seed: number) {
     this.scenario = scenario
     this.types = types
     this.seed = seed

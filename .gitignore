@@ -8,3 +8,4 @@ data/
 *.log
 *.tsbuildinfo
 packages/sim/results/*/raw/
+packages/db/src/generated/
