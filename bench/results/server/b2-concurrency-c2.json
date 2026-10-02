@@ -1,0 +1,88 @@
+{
+  "env": {
+    "label": "server",
+    "platform": "linux",
+    "cpuModel": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "cpuLimit": 2,
+    "memoryGb": 7.8,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-02T12:11:38.214Z"
+  },
+  "cpus": 2,
+  "preset": "webp-1600",
+  "source": "synthetic",
+  "durationMs": 15000,
+  "warmupMs": 3000,
+  "knee": 2,
+  "rows": [
+    {
+      "k": 1,
+      "items": 46,
+      "effectiveCores": 0.921,
+      "efficiency": 0.921,
+      "wallInflation": 1.04,
+      "peakRssMb": 243.641,
+      "medianPeakRssMb": 243.641,
+      "cgroupAnonMeanMb": 183.799,
+      "cgroupAnonPeakMb": 208.828
+    },
+    {
+      "k": 2,
+      "items": 91,
+      "effectiveCores": 1.858,
+      "efficiency": 0.929,
+      "wallInflation": 1.15,
+      "peakRssMb": 248.664,
+      "medianPeakRssMb": 242.59,
+      "cgroupAnonMeanMb": 311.986,
+      "cgroupAnonPeakMb": 388.578
+    },
+    {
+      "k": 3,
+      "items": 78,
+      "effectiveCores": 1.563,
+      "efficiency": 0.781,
+      "wallInflation": 1.831,
+      "peakRssMb": 248.996,
+      "medianPeakRssMb": 226.996,
+      "cgroupAnonMeanMb": 441.368,
+      "cgroupAnonPeakMb": 525
+    },
+    {
+      "k": 4,
+      "items": 88,
+      "effectiveCores": 1.776,
+      "efficiency": 0.888,
+      "wallInflation": 2.202,
+      "peakRssMb": 257.93,
+      "medianPeakRssMb": 232.891,
+      "cgroupAnonMeanMb": 595.005,
+      "cgroupAnonPeakMb": 737.434
+    },
+    {
+      "k": 5,
+      "items": 81,
+      "effectiveCores": 1.567,
+      "efficiency": 0.784,
+      "wallInflation": 3.424,
+      "peakRssMb": 223.262,
+      "medianPeakRssMb": 209.09,
+      "cgroupAnonMeanMb": 584.907,
+      "cgroupAnonPeakMb": 791.227
+    },
+    {
+      "k": 6,
+      "items": 88,
+      "effectiveCores": 1.721,
+      "efficiency": 0.86,
+      "wallInflation": 3.629,
+      "peakRssMb": 227.102,
+      "medianPeakRssMb": 214.375,
+      "cgroupAnonMeanMb": 697.504,
+      "cgroupAnonPeakMb": 933.281
+    }
+  ]
+}
