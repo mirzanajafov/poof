@@ -5,6 +5,7 @@ label="${1:?usage: bench/run-linux.sh <label>}"
 steps="${STEPS:-dataset b1 b2 b3 b4}"
 cpu_limits="${CPU_LIMITS:-1.5 2 4}"
 presets="${PRESETS:-webp-1600,thumb-320}"
+memory="${MEMORY:-6g}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 host_root="$(cd "$root" && (pwd -W 2>/dev/null || pwd))"
 export MSYS_NO_PATHCONV=1
@@ -21,7 +22,7 @@ trap cleanup EXIT
 run() {
   local cpus="$1"
   shift
-  docker run --rm --cpus "$cpus" --memory 6g --pids-limit 256 -e CPU_LIMIT="$cpus" \
+  docker run --rm --cpus "$cpus" --memory "$memory" --pids-limit 256 -e CPU_LIMIT="$cpus" \
     -e REDIS_URL=redis://poof-bench-redis:6379 --network poof-bench \
     -v "$host_root/data:/app/data" -v "$host_root/bench/results:/app/bench/results" \
     poof-bench node "$@"
