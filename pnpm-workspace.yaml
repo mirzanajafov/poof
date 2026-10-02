@@ -4,4 +4,6 @@ packages:
   - "bench"
 
 allowBuilds:
+  "@prisma/engines": true
+  prisma: true
   sharp: true

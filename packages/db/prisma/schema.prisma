@@ -1,0 +1,114 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TaskStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  REJECTED
+}
+
+enum LeaseState {
+  PENDING
+  RUNNING
+  DONE
+}
+
+enum WorkerExit {
+  NORMAL
+  CRASH
+  MEMORY
+  TIMEOUT
+  HEARTBEAT
+  KILLED
+}
+
+model Task {
+  id           String       @id @default(uuid()) @db.Uuid
+  dataset      String
+  offset       Int          @default(0)
+  preset       String
+  items        Int
+  policy       String
+  status       TaskStatus   @default(QUEUED)
+  predictedMs  Float
+  done         Int          @default(0)
+  deadLettered Int          @default(0)
+  submittedAt  DateTime     @default(now())
+  deadline     DateTime
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  leases       Lease[]
+  deadLetters  DeadLetter[]
+  decisions    Decision[]
+
+  @@index([status])
+  @@index([submittedAt])
+}
+
+model Lease {
+  id        String     @id @default(uuid()) @db.Uuid
+  taskId    String     @db.Uuid
+  task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  parentId  String?    @db.Uuid
+  depth     Int        @default(0)
+  lo        Int
+  hi        Int
+  cursor    Int
+  state     LeaseState @default(PENDING)
+  workerId  String?    @db.Uuid
+  worker    Worker?    @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([taskId, state])
+}
+
+model Worker {
+  id        String      @id @default(uuid()) @db.Uuid
+  pid       Int
+  startedAt DateTime    @default(now())
+  endedAt   DateTime?
+  exit      WorkerExit?
+  items     Int         @default(0)
+  leases    Lease[]
+}
+
+model DeadLetter {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  item      Int
+  attempts  Int
+  error     String
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, item])
+}
+
+model Decision {
+  id     BigInt   @id @default(autoincrement())
+  at     DateTime @default(now())
+  kind   String
+  taskId String?  @db.Uuid
+  task   Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  detail Json
+
+  @@index([taskId])
+  @@index([at])
+}
+
+model BreakerEvent {
+  id     BigInt   @id @default(autoincrement())
+  at     DateTime @default(now())
+  type   String
+  state  String
+}
