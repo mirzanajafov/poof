@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="898" height="364" viewBox="0 0 898 364">
+<style>
+  .surface { fill: #fcfcfb }
+  .ink { fill: #0b0b0b }
+  .ink-2 { fill: #52514e }
+  .muted { fill: #898781 }
+  .grid { stroke: #e1e0d9; stroke-width: 1 }
+  .axis { stroke: #c3c2b7; stroke-width: 1 }
+  .band { fill: #f0efec }
+  .other { fill: #898781; stroke: #898781 }
+  .s1 { fill: #2a78d6; stroke: #2a78d6 }
+  .s2 { fill: #eb6834; stroke: #eb6834 }
+  .s3 { fill: #1baf7a; stroke: #1baf7a }
+  .s4 { fill: #eda100; stroke: #eda100 }
+  .line { fill: none; stroke-width: 2; stroke-linejoin: round }
+  .ref { fill: none; stroke: #52514e; stroke-width: 1.5; stroke-dasharray: 5 4 }
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px }
+  .title { font-size: 14px; font-weight: 600 }
+  .small { font-size: 11px }
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19 }
+    .ink { fill: #ffffff }
+    .ink-2 { fill: #c3c2b7 }
+    .grid { stroke: #2c2c2a }
+    .axis { stroke: #383835 }
+    .band { fill: #262624 }
+    .s1 { fill: #3987e5; stroke: #3987e5 }
+    .s2 { fill: #d95926; stroke: #d95926 }
+    .s3 { fill: #199e70; stroke: #199e70 }
+    .s4 { fill: #c98500; stroke: #c98500 }
+    .ref { stroke: #c3c2b7 }
+  }
+</style>
+<rect class="surface" width="898" height="364" rx="8"/>
+<text class="ink title" x="16" y="24">Deadline hit rate by policy (c4)</text>
+<text class="ink-2 small" x="16" y="42">Share of submitted tasks finished by their deadline, mean and 95% interval over seeds. Rejected tasks count as misses.</text>
+<text class="ink-2" x="120" y="81" text-anchor="end">never</text>
+<text class="ink-2" x="120" y="107" text-anchor="end">static-4</text>
+<text class="ink-2" x="120" y="133" text-anchor="end">pool-10</text>
+<text class="ink-2" x="120" y="159" text-anchor="end">box</text>
+<text class="ink-2" x="120" y="185" text-anchor="end">timer+budget</text>
+<text class="ink-2" x="120" y="211" text-anchor="end">forecast</text>
+<text class="ink" x="120" y="237" text-anchor="end">forecast+budget</text>
+<text class="ink-2" x="120" y="263" text-anchor="end">perfect</text>
+<text class="ink-2" x="120" y="289" text-anchor="end">forecast+idle</text>
+<text class="ink-2" x="120" y="315" text-anchor="end">forecast+preempt</text>
+<text class="ink" x="189" y="56" text-anchor="middle">calm</text>
+<line class="grid" x1="130" x2="130" y1="64" y2="324"/>
+<text class="muted small" x="130" y="340" text-anchor="middle">0%</text>
+<line class="grid" x1="189" x2="189" y1="64" y2="324"/>
+<text class="muted small" x="189" y="340" text-anchor="middle">50%</text>
+<line class="grid" x1="248" x2="248" y1="64" y2="324"/>
+<text class="muted small" x="248" y="340" text-anchor="middle">100%</text>
+<line class="other" x1="187.78188067547518" x2="193.76988090242122" y1="77" y2="77" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="190.83238896482277" cy="77" r="4.5" stroke="none"/>
+<line class="other" x1="230.00764835344268" x2="235.13926763062943" y1="103" y2="103" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="232.56120516994514" cy="103" r="4.5" stroke="none"/>
+<line class="other" x1="246.67583086808537" x2="247.82555210060804" y1="129" y2="129" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="247.3125029996412" cy="129" r="4.5" stroke="none"/>
+<line class="other" x1="135.40247249191873" x2="144.52788318438328" y1="155" y2="155" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="139.50966608221938" cy="155" r="4.5" stroke="none"/>
+<line class="other" x1="188.50239368209657" x2="193.7519223925207" y1="181" y2="181" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="191.08567583857217" cy="181" r="4.5" stroke="none"/>
+<line class="other" x1="154.8750108882707" x2="182.9187652979357" y1="207" y2="207" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="167.97321698750937" cy="207" r="4.5" stroke="none"/>
+<line class="s1" x1="227.52051950116424" x2="234.19848497941882" y1="233" y2="233" stroke-width="2" stroke-linecap="round"/>
+<circle class="s1" cx="230.7210628426613" cy="233" r="4.5" stroke="none"/>
+<line class="other" x1="227.18541963224447" x2="233.80742371062024" y1="259" y2="259" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="230.46416514451624" cy="259" r="4.5" stroke="none"/>
+<line class="other" x1="225.9765326260588" x2="232.65319871779667" y1="285" y2="285" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="229.34143848242059" cy="285" r="4.5" stroke="none"/>
+<line class="other" x1="245.62279863005296" x2="247.4561717083112" y1="311" y2="311" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="246.6365094061878" cy="311" r="4.5" stroke="none"/>
+<text class="ink" x="341" y="56" text-anchor="middle">skew</text>
+<line class="grid" x1="282" x2="282" y1="64" y2="324"/>
+<text class="muted small" x="282" y="340" text-anchor="middle">0%</text>
+<line class="grid" x1="341" x2="341" y1="64" y2="324"/>
+<text class="muted small" x="341" y="340" text-anchor="middle">50%</text>
+<line class="grid" x1="400" x2="400" y1="64" y2="324"/>
+<text class="muted small" x="400" y="340" text-anchor="middle">100%</text>
+<line class="other" x1="320.1125893978344" x2="329.4680517741642" y1="77" y2="77" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="324.85470108186485" cy="77" r="4.5" stroke="none"/>
+<line class="other" x1="347.33548550473296" x2="360.37944890591405" y1="103" y2="103" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="354.047399275615" cy="103" r="4.5" stroke="none"/>
+<line class="other" x1="374.31834337984867" x2="383.61521521730526" y1="129" y2="129" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="379.08622575311534" cy="129" r="4.5" stroke="none"/>
+<line class="other" x1="287.4198028872763" x2="292.8982830605575" y1="155" y2="155" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="289.9013081588118" cy="155" r="4.5" stroke="none"/>
+<line class="other" x1="323.716980952998" x2="331.66261203235814" y1="181" y2="181" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="327.60573400547173" cy="181" r="4.5" stroke="none"/>
+<line class="other" x1="289.5709191007518" x2="301.42290138088225" y1="207" y2="207" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="295.07967592509704" cy="207" r="4.5" stroke="none"/>
+<line class="s1" x1="347.82153948720145" x2="359.204271382362" y1="233" y2="233" stroke-width="2" stroke-linecap="round"/>
+<circle class="s1" cx="353.7757281666973" cy="233" r="4.5" stroke="none"/>
+<line class="other" x1="350.3491077253795" x2="362.6691413405566" y1="259" y2="259" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="356.50928801964636" cy="259" r="4.5" stroke="none"/>
+<line class="other" x1="349.5016167829699" x2="362.6463142800051" y1="285" y2="285" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="356.33861493134475" cy="285" r="4.5" stroke="none"/>
+<line class="other" x1="365.49659304530917" x2="378.69552728334054" y1="311" y2="311" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="372.5890372981006" cy="311" r="4.5" stroke="none"/>
+<text class="ink" x="493" y="56" text-anchor="middle">neighbour</text>
+<line class="grid" x1="434" x2="434" y1="64" y2="324"/>
+<text class="muted small" x="434" y="340" text-anchor="middle">0%</text>
+<line class="grid" x1="493" x2="493" y1="64" y2="324"/>
+<text class="muted small" x="493" y="340" text-anchor="middle">50%</text>
+<line class="grid" x1="552" x2="552" y1="64" y2="324"/>
+<text class="muted small" x="552" y="340" text-anchor="middle">100%</text>
+<line class="other" x1="487.5726313324977" x2="493.0513167020722" y1="77" y2="77" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="490.344517647914" cy="77" r="4.5" stroke="none"/>
+<line class="other" x1="526.0571409393659" x2="533.2747057807046" y1="103" y2="103" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="529.5349564886048" cy="103" r="4.5" stroke="none"/>
+<line class="other" x1="544.9192386639711" x2="548.9070822201519" y1="129" y2="129" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="546.9292285040779" cy="129" r="4.5" stroke="none"/>
+<line class="other" x1="443.3918879834942" x2="449.2707844868269" y1="155" y2="155" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="446.3812052578125" cy="155" r="4.5" stroke="none"/>
+<line class="other" x1="486.26806705712596" x2="491.9043541046757" y1="181" y2="181" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="489.05671900719375" cy="181" r="4.5" stroke="none"/>
+<line class="other" x1="449.00854381833756" x2="466.60736168098714" y1="207" y2="207" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="457.615837910481" cy="207" r="4.5" stroke="none"/>
+<line class="s1" x1="521.6848911047132" x2="528.8873611294626" y1="233" y2="233" stroke-width="2" stroke-linecap="round"/>
+<circle class="s1" cx="525.4127025142409" cy="233" r="4.5" stroke="none"/>
+<line class="other" x1="522.6989487367377" x2="529.9484074527268" y1="259" y2="259" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="526.2998115741553" cy="259" r="4.5" stroke="none"/>
+<line class="other" x1="521.8652691278238" x2="529.5135862695415" y1="285" y2="285" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="525.7263235810059" cy="285" r="4.5" stroke="none"/>
+<line class="other" x1="542.0343245907382" x2="546.6143337570818" y1="311" y2="311" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="544.289152618894" cy="311" r="4.5" stroke="none"/>
+<text class="ink" x="645" y="56" text-anchor="middle">burst</text>
+<line class="grid" x1="586" x2="586" y1="64" y2="324"/>
+<text class="muted small" x="586" y="340" text-anchor="middle">0%</text>
+<line class="grid" x1="645" x2="645" y1="64" y2="324"/>
+<text class="muted small" x="645" y="340" text-anchor="middle">50%</text>
+<line class="grid" x1="704" x2="704" y1="64" y2="324"/>
+<text class="muted small" x="704" y="340" text-anchor="middle">100%</text>
+<line class="other" x1="636.9537896706328" x2="643.1662902514327" y1="77" y2="77" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="640.172669370609" cy="77" r="4.5" stroke="none"/>
+<line class="other" x1="677.5093507434567" x2="682.4428185370458" y1="103" y2="103" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="680.0127237387924" cy="103" r="4.5" stroke="none"/>
+<line class="other" x1="699.012547127962" x2="702.4838629606501" y1="129" y2="129" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="700.943219732628" cy="129" r="4.5" stroke="none"/>
+<line class="other" x1="592.450908593456" x2="599.9380511722344" y1="155" y2="155" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="596.2231859141704" cy="155" r="4.5" stroke="none"/>
+<line class="other" x1="637.7147512457592" x2="643.246789630935" y1="181" y2="181" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="640.4290950303046" cy="181" r="4.5" stroke="none"/>
+<line class="other" x1="598.6024752897067" x2="608.0234344708325" y1="207" y2="207" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="603.2276202168154" cy="207" r="4.5" stroke="none"/>
+<line class="s1" x1="669.3655338039376" x2="676.4555199720306" y1="233" y2="233" stroke-width="2" stroke-linecap="round"/>
+<circle class="s1" cx="673.036543392368" cy="233" r="4.5" stroke="none"/>
+<line class="other" x1="670.1713167002293" x2="677.1954823372457" y1="259" y2="259" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="673.7188809377803" cy="259" r="4.5" stroke="none"/>
+<line class="other" x1="669.0619902644337" x2="675.1909559567325" y1="285" y2="285" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="672.1159805645252" cy="285" r="4.5" stroke="none"/>
+<line class="other" x1="696.9779234392558" x2="701.3558416013407" y1="311" y2="311" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="699.4363234294693" cy="311" r="4.5" stroke="none"/>
+<text class="ink" x="797" y="56" text-anchor="middle">poison</text>
+<line class="grid" x1="738" x2="738" y1="64" y2="324"/>
+<text class="muted small" x="738" y="340" text-anchor="middle">0%</text>
+<line class="grid" x1="797" x2="797" y1="64" y2="324"/>
+<text class="muted small" x="797" y="340" text-anchor="middle">50%</text>
+<line class="grid" x1="856" x2="856" y1="64" y2="324"/>
+<text class="muted small" x="856" y="340" text-anchor="middle">100%</text>
+<line class="other" x1="791.5353329712184" x2="799.160333953256" y1="77" y2="77" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="795.282749660861" cy="77" r="4.5" stroke="none"/>
+<line class="other" x1="827.8641336746753" x2="835.0923047800281" y1="103" y2="103" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="831.407156604176" cy="103" r="4.5" stroke="none"/>
+<line class="other" x1="848.4339967334355" x2="851.6632631190308" y1="129" y2="129" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="850.0358817177041" cy="129" r="4.5" stroke="none"/>
+<line class="other" x1="745.9490383496695" x2="758.6530437161705" y1="155" y2="155" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="751.7327626150644" cy="155" r="4.5" stroke="none"/>
+<line class="other" x1="791.8875906099505" x2="798.9225134564574" y1="181" y2="181" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="795.4569407079341" cy="181" r="4.5" stroke="none"/>
+<line class="other" x1="755.0805955766374" x2="771.4957436359626" y1="207" y2="207" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="762.629232075702" cy="207" r="4.5" stroke="none"/>
+<line class="s1" x1="825.9700349238146" x2="833.0519518467348" y1="233" y2="233" stroke-width="2" stroke-linecap="round"/>
+<circle class="s1" cx="829.4211137991235" cy="233" r="4.5" stroke="none"/>
+<line class="other" x1="826.0632741017829" x2="833.0974114487705" y1="259" y2="259" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="829.6361121534815" cy="259" r="4.5" stroke="none"/>
+<line class="other" x1="822.7509375099174" x2="829.2882110742291" y1="285" y2="285" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="825.8735353696809" cy="285" r="4.5" stroke="none"/>
+<line class="other" x1="844.2955169064161" x2="847.2524191781722" y1="311" y2="311" stroke-width="2" stroke-linecap="round"/>
+<circle class="other" cx="845.7871588007404" cy="311" r="4.5" stroke="none"/>
+</svg>
