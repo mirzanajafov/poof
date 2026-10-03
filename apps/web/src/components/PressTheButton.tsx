@@ -65,10 +65,13 @@ export function PressTheButton({ datasets }: { datasets: Dataset[] }) {
           >
             {datasets.map((d) => (
               <option key={d.name} value={d.name}>
-                {d.name}, {d.items} photos, ~{Math.round(d.meanMp)} MP
+                {d.name} ({d.items})
               </option>
             ))}
           </select>
+          <span className="tabular text-xs text-muted">
+            about {Math.round(datasets.find((d) => d.name === dataset)?.meanMp ?? 0)} MP per photo
+          </span>
         </label>
         <label className="text-sm">
           <span className="text-muted">Output</span>
