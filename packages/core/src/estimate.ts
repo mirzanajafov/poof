@@ -13,6 +13,23 @@ export function updateEstimate(estimate: Estimate, sample: number, alpha = 0.2):
   }
 }
 
+export interface WorkRatio {
+  actual: number
+  predicted: number
+  items: number
+}
+
+export const emptyWorkRatio: WorkRatio = { actual: 0, predicted: 0, items: 0 }
+
+export function updateWorkRatio(ratio: WorkRatio, actual: number, predicted: number, window = 200): WorkRatio {
+  const keep = 1 - 1 / window
+  return { actual: ratio.actual * keep + actual, predicted: ratio.predicted * keep + predicted, items: ratio.items + 1 }
+}
+
+export function workRatio(ratio: WorkRatio, fallback = 1, minItems = 5): number {
+  return ratio.items >= minItems && ratio.predicted > 0 ? ratio.actual / ratio.predicted : fallback
+}
+
 export function upperMean(estimate: Estimate, z: number, alpha = 0.2): number {
   if (z === 0 || estimate.count < 2) return estimate.mean
   const effective = Math.min(estimate.count, (2 - alpha) / alpha)

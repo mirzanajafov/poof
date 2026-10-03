@@ -38,7 +38,7 @@ async function manifest(taskDir: string): Promise<Manifest> {
   return cached
 }
 
-async function processOne(assignment: Assignment, item: number): Promise<ItemDone | ItemDead> {
+async function processOne(assignment: Assignment, item: number, since: NodeJS.CpuUsage): Promise<ItemDone | ItemDead> {
   const preset = presets[assignment.preset]
   let error = ''
   for (let attempt = 1; attempt <= assignment.maxAttempts; attempt++) {
@@ -55,6 +55,7 @@ async function processOne(assignment: Assignment, item: number): Promise<ItemDon
       const temp = `${target}.${process.pid}.tmp`
       await writeFile(temp, output)
       await rename(temp, target)
+      const step = process.cpuUsage(since)
       return {
         type: 'item',
         lease: assignment.lease,
@@ -62,6 +63,7 @@ async function processOne(assignment: Assignment, item: number): Promise<ItemDon
         ok: true,
         wallMs,
         cpuMs: (used.user + used.system) / 1000,
+        stepCpuMs: (step.user + step.system) / 1000,
         outBytes: output.length,
       }
     } catch (failure) {
@@ -77,8 +79,11 @@ async function drain(): Promise<void> {
   while (queue.length > 0) {
     const assignment = queue.shift()!
     current = { assignment, cursor: assignment.lo, hi: assignment.hi }
+    let mark = process.cpuUsage()
     while (current.cursor < current.hi) {
-      await send(await processOne(assignment, current.cursor))
+      const result = await processOne(assignment, current.cursor, mark)
+      mark = process.cpuUsage()
+      await send(result)
       current.cursor++
     }
     await send({ type: 'leaseDone', lease: assignment.lease, hi: current.hi })

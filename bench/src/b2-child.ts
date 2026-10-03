@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled } from './dataset.ts'
@@ -9,6 +11,7 @@ const { values } = parseArgs({
     data: { type: 'string', default: 'data/synthetic' },
     preset: { type: 'string', default: 'webp-1600' },
     seed: { type: 'string', default: '1' },
+    write: { type: 'boolean', default: false },
   },
 })
 
@@ -18,6 +21,8 @@ const dataset = await loadDataset(values.data!)
 const order = shuffled(dataset.items, Number(values.seed))
 const completions: Array<{ file: string; at: number; wallMs: number }> = []
 let stopped = false
+const outDir = join(tmpdir(), `b2-out-${process.pid}`)
+if (values.write) await mkdir(outDir, { recursive: true })
 
 async function run(): Promise<void> {
   const cpuStart = process.cpuUsage()
@@ -25,7 +30,12 @@ async function run(): Promise<void> {
     const item = order[i % order.length]!
     const input = await readFile(itemPath(dataset, item))
     const started = performance.now()
-    await processItem(input, preset)
+    const output = await processItem(input, preset)
+    if (values.write) {
+      const target = join(outDir, `${i % 50}.${preset.ext}`)
+      await writeFile(`${target}.tmp`, output)
+      await rename(`${target}.tmp`, target)
+    }
     completions.push({ file: item.file, at: Date.now(), wallMs: performance.now() - started })
   }
   const cpu = process.cpuUsage(cpuStart)

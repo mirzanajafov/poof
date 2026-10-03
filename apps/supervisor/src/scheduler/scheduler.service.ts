@@ -7,7 +7,7 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { admits, Breaker, emptyEstimate, expectedCostMs, itemTimeoutMs, serverCostModels, updateEstimate, type Estimate } from '@poof/core'
+import { admits, Breaker, emptyWorkRatio, expectedCostMs, itemTimeoutMs, serverCostModels, updateWorkRatio, workRatio, type WorkRatio } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
@@ -30,7 +30,7 @@ export type SubmitResult =
 type Settings = Pick<
   Env,
   | 'BUDGET'
-  | 'CAPACITY_CORES'
+  | 'WORKER_CPU_CORES'
   | 'CHUNK_ITEMS'
   | 'MAX_ATTEMPTS'
   | 'DEAD_LETTER_SHARE'
@@ -87,7 +87,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private readonly tasks = new Map<string, TaskState>()
   private readonly workers = new Set<PoolWorker>()
   private readonly breakers = new Map<string, Breaker>()
-  private readonly ratios = new Map<string, Estimate>()
+  private readonly ratios = new Map<string, WorkRatio>()
   private writes: Promise<unknown> = Promise.resolve()
   private timers: NodeJS.Timeout[] = []
   private stopping = false
@@ -101,7 +101,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   ) {
     this.settings = {
       BUDGET: config.get('BUDGET', { infer: true }),
-      CAPACITY_CORES: config.get('CAPACITY_CORES', { infer: true }),
+      WORKER_CPU_CORES: config.get('WORKER_CPU_CORES', { infer: true }),
       CHUNK_ITEMS: config.get('CHUNK_ITEMS', { infer: true }),
       MAX_ATTEMPTS: config.get('MAX_ATTEMPTS', { infer: true }),
       DEAD_LETTER_SHARE: config.get('DEAD_LETTER_SHARE', { infer: true }),
@@ -159,9 +159,9 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       submittedAt: new Date(now),
       deadline: new Date(deadline),
     }
-    if (!admits(candidate, backlog, now, this.settings.CAPACITY_CORES)) {
+    if (!admits(candidate, backlog, now, this.settings.WORKER_CPU_CORES)) {
       const backlogMs = backlog.reduce((sum, w) => sum + w.workMs, 0)
-      const retryAfterSeconds = Math.max(1, Math.ceil(backlogMs / this.settings.CAPACITY_CORES / 1000))
+      const retryAfterSeconds = Math.max(1, Math.ceil(backlogMs / this.settings.WORKER_CPU_CORES / 1000))
       await this.db.client.task.create({ data: { ...base, status: 'REJECTED' } })
       await this.db.client.decision.create({
         data: { kind: 'reject', taskId: id, detail: { workMs: candidate.workMs, backlogMs, retryAfterSeconds } },
@@ -260,8 +260,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private ratio(preset: string): number {
-    const estimate = this.ratios.get(preset)
-    return estimate && estimate.count >= 5 ? estimate.mean : 1
+    const ratio = this.ratios.get(preset)
+    return ratio ? workRatio(ratio) : 1
   }
 
   private breaker(preset: string): Breaker {
@@ -363,8 +363,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     worker.items++
     if (message.ok) {
       task.done++
-      const ratio = this.ratios.get(task.preset) ?? emptyEstimate
-      this.ratios.set(task.preset, updateEstimate(ratio, message.cpuMs / task.predicted[message.item]!, 0.05))
+      const ratio = this.ratios.get(task.preset) ?? emptyWorkRatio
+      this.ratios.set(task.preset, updateWorkRatio(ratio, message.stepCpuMs, task.predicted[message.item]!))
       this.record(task.preset, true)
     } else {
       this.deadLetter(task, message.item, message.attempts, message.error)
