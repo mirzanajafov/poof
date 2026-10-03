@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { defaultTimeoutRule } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems, type ExhibitRun } from './replay.ts'
@@ -12,7 +13,7 @@ const { values } = parseArgs({
     calibration: { type: 'string', default: 'server' },
     manifest: { type: 'string' },
     'steady-rss': { type: 'string' },
-    'base-anon': { type: 'string' },
+    'timeout-growth': { type: 'string', default: '2' },
     out: { type: 'string' },
   },
 })
@@ -29,7 +30,7 @@ interface Numbers {
 
 const calibration = loadCalibration(values.calibration!)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
-if (values['base-anon']) calibration.baseRssMb = Number(values['base-anon'])
+const timeoutRule = { ...defaultTimeoutRule, growth: Number(values['timeout-growth']) }
 const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
@@ -71,7 +72,7 @@ function real(run: ExhibitRun): Numbers {
 
 const rows = runs.map((run) => {
   const items = replayItems(manifest, measured(run.params.preset), run.params.preset)
-  return { policy: run.policy, seed: run.params.seed, real: real(run), sim: simulated(replay(run, items, calibration)) }
+  return { policy: run.policy, seed: run.params.seed, real: real(run), sim: simulated(replay(run, items, calibration, timeoutRule)) }
 })
 
 const keys: Array<keyof Numbers> = ['submitted', 'rejected', 'met', 'peakProcesses', 'spawns', 'timeouts', 'items']
@@ -102,4 +103,7 @@ for (const s of summary) {
     [s.policy.padEnd(16), s.runs, f(s.metShare, true), f(s.peakProcesses), f(s.spawns), f(s.timeouts), f(s.items)].join('\t'),
   )
 }
-if (values.out) writeFileSync(values.out, `${JSON.stringify({ steadyRssMb: calibration.steadyRssMb, rows, summary }, null, 2)}\n`)
+if (values.out) {
+  const memory = { baseMb: calibration.baseRssMb, steadyMb: calibration.steadyRssMb }
+  writeFileSync(values.out, `${JSON.stringify({ memory, timeoutRule, rows, summary }, null, 2)}\n`)
+}

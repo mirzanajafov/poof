@@ -26,6 +26,7 @@ parentPort!.on('message', (job: Job) => {
     seed: job.seed,
     dtMs: job.dtMs,
     recordSeries: true,
+    itemTimeouts: true,
     checkInvariants: job.checkInvariants,
   })
   const started = performance.now()

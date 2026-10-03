@@ -7,6 +7,7 @@ import {
   decide,
   emptyEstimate,
   expectedCostMs,
+  itemTimeoutMs,
   planSplit,
   serverCostModels,
   updateEstimate,
@@ -450,8 +451,7 @@ export class LeaseEngine {
       task.status = 'RUNNING'
       this.persist(() => this.db.client.task.update({ where: { id: task.info.id }, data: { status: 'RUNNING', startedAt: new Date() } }))
     }
-    let timeoutMs = 5000
-    for (let i = lease.cursor; i < lease.hi; i++) timeoutMs = Math.max(timeoutMs, 10 * task.predicted[i]!)
+    const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, 1, (i) => task.attempts.get(i) ?? 0)
     worker.handle.assign(
       {
         lease: lease.id,
