@@ -17,6 +17,7 @@ interface Ready {
   importMs: number
   cpuMs: number
   rssMb: number
+  anonMb: number | null
 }
 
 type Run = Ready & { wallMs: number; exitMs: number }
@@ -35,8 +36,10 @@ for (let i = 0; i < Number(values.reps); i++) {
 }
 
 const warm = runs.slice(1)
-const pick = (key: keyof Run) =>
-  Object.fromEntries(Object.entries(summary(warm.map((r) => r[key]))).map(([k, v]) => [k, round(v, 1)]))
+const describe = (values: number[]) =>
+  Object.fromEntries(Object.entries(summary(values)).map(([k, v]) => [k, round(v, 1)]))
+const pick = (key: Exclude<keyof Run, 'anonMb'>) => describe(warm.map((r) => r[key]))
+const anon = warm.map((r) => r.anonMb).filter((v): v is number => v !== null)
 
 const result = {
   env: environment(values.label!),
@@ -47,6 +50,7 @@ const result = {
     importMs: pick('importMs'),
     cpuMs: pick('cpuMs'),
     rssMb: pick('rssMb'),
+    anonMb: anon.length === warm.length ? describe(anon) : null,
     exitMs: pick('exitMs'),
   },
 }

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { rssMb } from './memory.ts'
 
 const started = performance.now()
@@ -13,5 +14,12 @@ process.send!({
   importMs: performance.now() - started,
   cpuMs: (cpu.user + cpu.system) / 1000,
   rssMb: rssMb(),
+  anonMb: anonMb(),
 })
+
+function anonMb(): number | null {
+  if (process.platform !== 'linux') return null
+  const match = /RssAnon:\s+(\d+) kB/.exec(readFileSync('/proc/self/status', 'utf8'))
+  return match ? Number(match[1]) / 1024 : null
+}
 process.on('message', () => process.exit(0))
