@@ -29,6 +29,11 @@ export class Env {
   CAPACITY_CORES: number = 1.32
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  WORKER_CPU_CORES: number = 1.45
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   CHUNK_ITEMS: number = 10

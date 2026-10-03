@@ -22,7 +22,7 @@ trap cleanup EXIT
 run() {
   local cpus="$1"
   shift
-  docker run --rm --cpus "$cpus" --memory "$memory" --pids-limit "${PIDS:-256}" -e CPU_LIMIT="$cpus" \
+  docker run --rm --cpus "$cpus" --memory "$memory" --pids-limit "${PIDS:-256}" -e CPU_LIMIT="$cpus" ${MALLOC_ARENA_MAX:+-e MALLOC_ARENA_MAX="$MALLOC_ARENA_MAX"} \
     -e REDIS_URL=redis://poof-bench-redis:6379 --network poof-bench \
     -v "$host_root/data:/app/data" -v "$host_root/bench/results:/app/bench/results" \
     poof-bench node "$@"

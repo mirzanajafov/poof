@@ -1,0 +1,33 @@
+{
+  "env": {
+    "label": "server",
+    "platform": "linux",
+    "cpuModel": "AMD EPYC Processor (with IBPB)",
+    "logicalCpus": 4,
+    "cpuLimit": 1.5,
+    "memoryGb": 7.8,
+    "node": "v24.21.0",
+    "sharp": "0.35.5",
+    "vips": "8.18.7",
+    "at": "2026-10-03T11:33:04.341Z"
+  },
+  "cpus": 1.5,
+  "preset": "webp-1600",
+  "source": "synthetic",
+  "durationMs": 60000,
+  "warmupMs": 5000,
+  "knee": 1,
+  "rows": [
+    {
+      "k": 2,
+      "items": 238,
+      "effectiveCores": 1.235,
+      "efficiency": 0.824,
+      "wallInflation": 1.604,
+      "peakRssMb": 285.816,
+      "medianPeakRssMb": 285.053,
+      "cgroupAnonMeanMb": 404.091,
+      "cgroupAnonPeakMb": 482.273
+    }
+  ]
+}

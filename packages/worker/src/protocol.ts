@@ -41,6 +41,7 @@ export interface ItemDone {
   ok: true
   wallMs: number
   cpuMs: number
+  stepCpuMs: number
   outBytes: number
 }
 

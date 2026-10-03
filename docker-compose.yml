@@ -49,6 +49,7 @@ services:
       DATA_DIR: /data
       BUDGET: "2"
       CAPACITY_CORES: "1.32"
+      WORKER_CPU_CORES: "1.45"
       EXHIBIT_MAX_PROCESSES: "35"
     volumes:
       - ./data/poof:/data

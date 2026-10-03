@@ -1,0 +1,179 @@
+{
+  "method": "bench/src/cage-sample.ts piped into the supervisor container with docker exec while the pool runs. usefulB1Ms is the B1 median cost of every image finished, the unit the simulator uses.",
+  "runs": [
+    {
+      "kind": "pool exhibit, seed 3, 60 s, 1.2x",
+      "note": "first sampler version, process states not recorded",
+      "items": 199,
+      "rejected": 4,
+      "usefulB1Ms": 65994,
+      "usefulCores": 1.1,
+      "sample": {
+        "wallMs": 62003,
+        "groups": {
+          "supervisor": {
+            "processes": 1,
+            "cpuMs": 1920
+          },
+          "workers": {
+            "processes": 2,
+            "cpuMs": 77750
+          }
+        },
+        "samplerCpuMs": 593,
+        "cgroup": {
+          "usageMs": 80199,
+          "throttledMs": 25589,
+          "periods": 611,
+          "throttledPeriods": 482
+        },
+        "commands": [
+          "node dist/main.js",
+          "/usr/local/bin/node /app/packages/worker/dist/worker.js"
+        ]
+      }
+    },
+    {
+      "kind": "pool exhibit, seed 3, 60 s, 1.2x",
+      "note": "sampled every 50 ms, main-thread states only (not usable, dropped)",
+      "items": 209,
+      "rejected": 4,
+      "usefulB1Ms": 69454,
+      "usefulCores": 1.158,
+      "sample": {
+        "wallMs": 60003,
+        "everyMs": 50,
+        "groups": {
+          "supervisor": {
+            "processes": 1,
+            "cpuMs": 1420
+          },
+          "workers": {
+            "processes": 2,
+            "cpuMs": 78530
+          }
+        },
+        "samplerCpuMs": 1447,
+        "cgroup": {
+          "usageMs": 81311,
+          "throttledMs": 25972,
+          "periods": 600,
+          "throttledPeriods": 489
+        }
+      }
+    },
+    {
+      "kind": "pool exhibit, seed 3, 60 s, 1.2x",
+      "note": "thread states, sampled every 100 ms",
+      "items": 194,
+      "rejected": 4,
+      "usefulB1Ms": 62939,
+      "usefulCores": 1.049,
+      "sample": {
+        "wallMs": 60005,
+        "everyMs": 100,
+        "groups": {
+          "supervisor": {
+            "processes": 1,
+            "cpuMs": 2000,
+            "states": {
+              "runnable": 57,
+              "idle": 488,
+              "disk": 6
+            }
+          },
+          "workers": {
+            "processes": 2,
+            "cpuMs": 76480,
+            "states": {
+              "runnable": 997,
+              "disk": 28,
+              "idle": 77
+            }
+          }
+        },
+        "samplerCpuMs": 2915,
+        "cgroup": {
+          "usageMs": 81275,
+          "throttledMs": 27342,
+          "periods": 599,
+          "throttledPeriods": 489
+        }
+      }
+    },
+    {
+      "kind": "pool exhibit, seed 3, 60 s, 1.2x",
+      "note": "committed sampler, 200 ms; a 72-image task was turned away and the queue sat empty for 28% of the run",
+      "items": 142,
+      "rejected": 5,
+      "usefulB1Ms": 46340,
+      "usefulCores": 0.772,
+      "sample": {
+        "wallMs": 60005,
+        "everyMs": 200,
+        "groups": {
+          "supervisor": {
+            "processes": 1,
+            "cpuMs": 1400,
+            "states": {
+              "idle": 272,
+              "runnable": 20
+            }
+          },
+          "workers": {
+            "processes": 2,
+            "cpuMs": 53670,
+            "states": {
+              "runnable": 363,
+              "idle": 221
+            }
+          }
+        },
+        "samplerCpuMs": 1668,
+        "cgroup": {
+          "usageMs": 56624,
+          "throttledMs": 19876,
+          "periods": 599,
+          "throttledPeriods": 342
+        }
+      }
+    },
+    {
+      "kind": "saturated pool: two 100-image tasks, 900 s deadline",
+      "items": 200,
+      "spanMs": 61291,
+      "usefulB1Ms": 66410,
+      "usefulCores": 1.084,
+      "sample": {
+        "wallMs": 45041,
+        "everyMs": 200,
+        "groups": {
+          "supervisor": {
+            "processes": 1,
+            "cpuMs": 1020,
+            "states": {
+              "idle": 202,
+              "runnable": 17
+            }
+          },
+          "workers": {
+            "processes": 2,
+            "cpuMs": 63900,
+            "states": {
+              "runnable": 436,
+              "idle": 2
+            }
+          }
+        },
+        "samplerCpuMs": 1243,
+        "cgroup": {
+          "usageMs": 65995,
+          "throttledMs": 22337,
+          "periods": 451,
+          "throttledPeriods": 409
+        }
+      },
+      "note": "sample covers 45 s in the middle of the run"
+    }
+  ]
+}
