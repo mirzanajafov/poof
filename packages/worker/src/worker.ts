@@ -4,6 +4,7 @@ import { configureSharp, presets, processItem } from '@poof/imaging'
 import type { Assignment, FromWorker, ItemDead, ItemDone, Manifest, ToWorker } from './protocol.ts'
 
 configureSharp()
+if (process.platform === 'linux') await writeFile('/proc/self/oom_score_adj', '1000').catch(() => undefined)
 
 interface Current {
   assignment: Assignment

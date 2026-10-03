@@ -1,4 +1,4 @@
-import { Rng } from './rng.ts'
+import { Rng } from '@poof/core'
 
 export function quantile(values: readonly number[], q: number): number {
   if (values.length === 0) return Number.NaN

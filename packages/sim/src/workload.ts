@@ -1,5 +1,4 @@
-import { expectedCostMs, medianCostMs, type CostModel } from '@poof/core'
-import { Rng } from './rng.ts'
+import { expectedCostMs, medianCostMs, Rng, type CostModel } from '@poof/core'
 
 export interface Window {
   from: number

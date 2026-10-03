@@ -30,8 +30,8 @@ export class Events implements OnApplicationShutdown {
     void this.redis.publish('poof:events', JSON.stringify({ kind, at: Date.now(), ...payload })).catch(() => undefined)
   }
 
-  snapshot(value: unknown): void {
-    void this.redis.set('poof:live', JSON.stringify(value), 'EX', 30).catch(() => undefined)
+  snapshot(key: string, value: unknown): void {
+    void this.redis.set(key, JSON.stringify(value), 'EX', 30).catch(() => undefined)
   }
 
   async onApplicationShutdown(): Promise<void> {

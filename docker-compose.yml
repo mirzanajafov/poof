@@ -25,5 +25,45 @@ services:
       interval: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/supervisor/Dockerfile
+      target: build
+    profiles: ["app"]
+    working_dir: /app/packages/db
+    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  supervisor:
+    build:
+      context: .
+      dockerfile: apps/supervisor/Dockerfile
+    container_name: poof-supervisor
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
+      REDIS_URL: redis://redis:6379
+      DATA_DIR: /data
+      BUDGET: "2"
+      CAPACITY_CORES: "1.32"
+      EXHIBIT_MAX_PROCESSES: "35"
+    volumes:
+      - ./data/poof:/data
+    ports:
+      - "3110:3110"
+    cpus: 1.5
+    mem_limit: 1536m
+    pids_limit: 512
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
 volumes:
   pgdata:
