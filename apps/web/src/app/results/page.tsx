@@ -39,9 +39,10 @@ export default async function Results() {
           Before writing the service, I simulated this box 5,100 times, an hour of arrivals each (5 scenarios, 3 machine sizes,
           17 policies, 20 seeds), calibrated on benchmarks from the server it runs on. The plan was to show that splitting late work with a good
           forecast and a budget beats splitting on a timer. It does. But a plain pool that hands out ten images at a time,
-          earliest deadline first, beats every splitting policy, and the reason is preemption: the pool reconsiders who gets a
-          core every few seconds, while a worker that owns a task keeps its core until the task is done. That is why the box you
-          press runs a pool, and why the splitting policies are exhibits.
+          earliest deadline first, beats every splitting policy except the one I taught to preempt, and that one still loses
+          when a heavy block of images needs every core at once. The reason is preemption: the pool reconsiders who gets a core
+          every few seconds, while a worker that owns a task keeps its core until the task is done. That is why the box you press
+          runs a pool, and why the splitting policies are exhibits.
         </p>
       </header>
       <section>
