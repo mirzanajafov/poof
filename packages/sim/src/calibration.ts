@@ -31,7 +31,7 @@ interface B2 {
 }
 
 interface B3 {
-  warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number } }
+  warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number }; anonMb?: { p50: number } | null }
 }
 
 export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
@@ -86,7 +86,7 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
     types: typeCosts(b1, sources),
     spawnMs: b3.warm.wallMs.p50,
     spawnCpuMs: b3.warm.cpuMs.p50,
-    baseRssMb: b3.warm.rssMb.p50,
+    baseRssMb: b3.warm.anonMb?.p50 ?? b3.warm.rssMb.p50,
     steadyRssMb,
     curves: b2s.map((b2) => ({
       cpus: b2.cpus,

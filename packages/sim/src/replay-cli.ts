@@ -12,6 +12,7 @@ const { values } = parseArgs({
     calibration: { type: 'string', default: 'server' },
     manifest: { type: 'string' },
     'steady-rss': { type: 'string' },
+    'base-anon': { type: 'string' },
     out: { type: 'string' },
   },
 })
@@ -28,6 +29,7 @@ interface Numbers {
 
 const calibration = loadCalibration(values.calibration!)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
+if (values['base-anon']) calibration.baseRssMb = Number(values['base-anon'])
 const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }

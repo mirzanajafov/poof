@@ -1,0 +1,457 @@
+{
+  "steadyRssMb": 91,
+  "rows": [
+    {
+      "policy": "pool",
+      "seed": 1,
+      "real": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 104
+      },
+      "sim": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 115
+      }
+    },
+    {
+      "policy": "forecast+preempt",
+      "seed": 1,
+      "real": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 4,
+        "timeouts": 0,
+        "items": 108
+      },
+      "sim": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 4,
+        "timeouts": 0,
+        "items": 112
+      }
+    },
+    {
+      "policy": "forecast+budget",
+      "seed": 1,
+      "real": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 91
+      },
+      "sim": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 102
+      }
+    },
+    {
+      "policy": "forecast",
+      "seed": 1,
+      "real": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 96
+      },
+      "sim": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 102
+      }
+    },
+    {
+      "policy": "box",
+      "seed": 1,
+      "real": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 91
+      },
+      "sim": {
+        "submitted": 2,
+        "rejected": 0,
+        "met": 1,
+        "peakProcesses": 1,
+        "spawns": 2,
+        "timeouts": 0,
+        "items": 102
+      }
+    },
+    {
+      "policy": "pool",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 8,
+        "met": 2,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 177
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 7,
+        "met": 3,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 220
+      }
+    },
+    {
+      "policy": "forecast+preempt",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 7,
+        "met": 2,
+        "peakProcesses": 2,
+        "spawns": 9,
+        "timeouts": 0,
+        "items": 178
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 7,
+        "met": 2,
+        "peakProcesses": 2,
+        "spawns": 10,
+        "timeouts": 0,
+        "items": 207
+      }
+    },
+    {
+      "policy": "forecast+budget",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 7,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 3,
+        "timeouts": 0,
+        "items": 195
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 7,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 4,
+        "timeouts": 0,
+        "items": 212
+      }
+    },
+    {
+      "policy": "forecast",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 31,
+        "spawns": 81,
+        "timeouts": 50,
+        "items": 136
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 22,
+        "spawns": 76,
+        "timeouts": 41,
+        "items": 134
+      }
+    },
+    {
+      "policy": "box",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 35,
+        "spawns": 102,
+        "timeouts": 74,
+        "items": 90
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 29,
+        "spawns": 88,
+        "timeouts": 34,
+        "items": 118
+      }
+    },
+    {
+      "policy": "pool",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 3,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 204
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 0,
+        "timeouts": 0,
+        "items": 252
+      }
+    },
+    {
+      "policy": "forecast+preempt",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 2,
+        "peakProcesses": 2,
+        "spawns": 10,
+        "timeouts": 0,
+        "items": 195
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 3,
+        "peakProcesses": 2,
+        "spawns": 9,
+        "timeouts": 0,
+        "items": 217
+      }
+    },
+    {
+      "policy": "forecast+budget",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 4,
+        "timeouts": 0,
+        "items": 213
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 4,
+        "met": 1,
+        "peakProcesses": 2,
+        "spawns": 4,
+        "timeouts": 0,
+        "items": 221
+      }
+    },
+    {
+      "policy": "forecast",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 35,
+        "spawns": 133,
+        "timeouts": 111,
+        "items": 69
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 25,
+        "spawns": 103,
+        "timeouts": 46,
+        "items": 84
+      }
+    },
+    {
+      "policy": "box",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 35,
+        "spawns": 133,
+        "timeouts": 100,
+        "items": 102
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 27,
+        "spawns": 79,
+        "timeouts": 38,
+        "items": 124
+      }
+    }
+  ],
+  "summary": [
+    {
+      "policy": "pool",
+      "runs": 3,
+      "metShare": {
+        "real": 0.35833333333333334,
+        "sim": 0.30833333333333335
+      },
+      "peakProcesses": {
+        "real": 2,
+        "sim": 2
+      },
+      "spawns": {
+        "real": 0,
+        "sim": 0
+      },
+      "timeouts": {
+        "real": 0,
+        "sim": 0
+      },
+      "items": {
+        "real": 161.66666666666666,
+        "sim": 195.66666666666666
+      }
+    },
+    {
+      "policy": "forecast+preempt",
+      "runs": 3,
+      "metShare": {
+        "real": 0.31666666666666665,
+        "sim": 0.35833333333333334
+      },
+      "peakProcesses": {
+        "real": 2,
+        "sim": 2
+      },
+      "spawns": {
+        "real": 7.666666666666667,
+        "sim": 7.666666666666667
+      },
+      "timeouts": {
+        "real": 0,
+        "sim": 0
+      },
+      "items": {
+        "real": 160.33333333333334,
+        "sim": 178.66666666666666
+      }
+    },
+    {
+      "policy": "forecast+budget",
+      "runs": 3,
+      "metShare": {
+        "real": 0.24166666666666667,
+        "sim": 0.24166666666666667
+      },
+      "peakProcesses": {
+        "real": 1.6666666666666667,
+        "sim": 1.6666666666666667
+      },
+      "spawns": {
+        "real": 3,
+        "sim": 3.3333333333333335
+      },
+      "timeouts": {
+        "real": 0,
+        "sim": 0
+      },
+      "items": {
+        "real": 166.33333333333334,
+        "sim": 178.33333333333334
+      }
+    },
+    {
+      "policy": "forecast",
+      "runs": 3,
+      "metShare": {
+        "real": 0.16666666666666666,
+        "sim": 0.16666666666666666
+      },
+      "peakProcesses": {
+        "real": 22.333333333333332,
+        "sim": 16
+      },
+      "spawns": {
+        "real": 72,
+        "sim": 60.333333333333336
+      },
+      "timeouts": {
+        "real": 53.666666666666664,
+        "sim": 29
+      },
+      "items": {
+        "real": 100.33333333333333,
+        "sim": 106.66666666666667
+      }
+    },
+    {
+      "policy": "box",
+      "runs": 3,
+      "metShare": {
+        "real": 0.16666666666666666,
+        "sim": 0.16666666666666666
+      },
+      "peakProcesses": {
+        "real": 23.666666666666668,
+        "sim": 19
+      },
+      "spawns": {
+        "real": 79,
+        "sim": 56.333333333333336
+      },
+      "timeouts": {
+        "real": 58,
+        "sim": 24
+      },
+      "items": {
+        "real": 94.33333333333333,
+        "sim": 114.66666666666667
+      }
+    }
+  ]
+}
