@@ -19,6 +19,7 @@ services:
 
   supervisor:
     ports: !reset []
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:
       DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
       LOG_JSON: "true"
@@ -26,6 +27,7 @@ services:
 
   api:
     ports: !reset []
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:
       DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN}
