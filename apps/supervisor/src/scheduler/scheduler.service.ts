@@ -7,7 +7,7 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { admits, Breaker, emptyEstimate, expectedCostMs, serverCostModels, updateEstimate, type Estimate } from '@poof/core'
+import { admits, Breaker, emptyEstimate, expectedCostMs, itemTimeoutMs, serverCostModels, updateEstimate, type Estimate } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
@@ -337,8 +337,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       task.status = 'RUNNING'
       this.persist(() => this.db.client.task.update({ where: { id: task.id }, data: { status: 'RUNNING', startedAt: new Date() } }))
     }
-    let timeoutMs = 5000
-    for (let i = lease.cursor; i < lease.hi; i++) timeoutMs = Math.max(timeoutMs, 10 * task.predicted[i]! * this.ratio(task.preset))
+    const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, this.ratio(task.preset), (i) => task.attempts.get(i) ?? 0)
     worker.handle.assign(
       {
         lease: lease.id,

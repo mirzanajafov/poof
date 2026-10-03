@@ -1,5 +1,13 @@
 {
-  "steadyRssMb": 91,
+  "memory": {
+    "baseMb": 17.9,
+    "steadyMb": 91
+  },
+  "timeoutRule": {
+    "floorMs": 5000,
+    "multiple": 10,
+    "growth": 1
+  },
   "rows": [
     {
       "policy": "pool",
@@ -150,7 +158,7 @@
         "rejected": 7,
         "met": 2,
         "peakProcesses": 2,
-        "spawns": 10,
+        "spawns": 9,
         "timeouts": 0,
         "items": 207
       }
@@ -194,9 +202,9 @@
         "rejected": 0,
         "met": 0,
         "peakProcesses": 22,
-        "spawns": 76,
-        "timeouts": 41,
-        "items": 134
+        "spawns": 64,
+        "timeouts": 15,
+        "items": 141
       }
     },
     {
@@ -216,9 +224,9 @@
         "rejected": 0,
         "met": 0,
         "peakProcesses": 29,
-        "spawns": 88,
-        "timeouts": 34,
-        "items": 118
+        "spawns": 74,
+        "timeouts": 20,
+        "items": 126
       }
     },
     {
@@ -260,7 +268,7 @@
         "rejected": 4,
         "met": 3,
         "peakProcesses": 2,
-        "spawns": 9,
+        "spawns": 10,
         "timeouts": 0,
         "items": 217
       }
@@ -304,9 +312,9 @@
         "rejected": 0,
         "met": 0,
         "peakProcesses": 25,
-        "spawns": 103,
-        "timeouts": 46,
-        "items": 84
+        "spawns": 89,
+        "timeouts": 29,
+        "items": 86
       }
     },
     {
@@ -325,10 +333,10 @@
         "submitted": 8,
         "rejected": 0,
         "met": 0,
-        "peakProcesses": 27,
-        "spawns": 79,
-        "timeouts": 38,
-        "items": 124
+        "peakProcesses": 29,
+        "spawns": 81,
+        "timeouts": 31,
+        "items": 122
       }
     }
   ],
@@ -418,15 +426,15 @@
       },
       "spawns": {
         "real": 72,
-        "sim": 60.333333333333336
+        "sim": 51.666666666666664
       },
       "timeouts": {
         "real": 53.666666666666664,
-        "sim": 29
+        "sim": 14.666666666666666
       },
       "items": {
         "real": 100.33333333333333,
-        "sim": 106.66666666666667
+        "sim": 109.66666666666667
       }
     },
     {
@@ -438,19 +446,19 @@
       },
       "peakProcesses": {
         "real": 23.666666666666668,
-        "sim": 19
+        "sim": 19.666666666666668
       },
       "spawns": {
         "real": 79,
-        "sim": 56.333333333333336
+        "sim": 52.333333333333336
       },
       "timeouts": {
         "real": 58,
-        "sim": 24
+        "sim": 17
       },
       "items": {
         "real": 94.33333333333333,
-        "sim": 114.66666666666667
+        "sim": 116.66666666666667
       }
     }
   ]

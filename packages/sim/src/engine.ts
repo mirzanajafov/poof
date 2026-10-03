@@ -4,7 +4,9 @@ import {
   Breaker,
   decide,
   emptyEstimate,
+  defaultTimeoutRule,
   expectedCostMs,
+  itemTimeoutMs,
   planSplit,
   updateEstimate,
   type BreakerState,
@@ -17,6 +19,7 @@ import {
   type SplitRequest,
   type StartRequest,
   type TaskInfo,
+  type TimeoutRule,
   type View,
 } from '@poof/core'
 import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
@@ -46,6 +49,7 @@ export interface SimOptions {
   checkInvariants?: boolean
   itemTimeouts?: boolean
   warmPool?: boolean
+  timeoutRule?: TimeoutRule
   arrivals?: Arrivals
 }
 
@@ -133,6 +137,7 @@ interface SimLease {
   inflight: boolean
   inflightLeft: number
   inflightStart: number
+  timeoutMs: number
   state: LeaseState
   process: SimProcess | null
   startedAt: number | null
@@ -204,6 +209,7 @@ export class Simulation {
       checkInvariants: false,
       itemTimeouts: false,
       warmPool: false,
+      timeoutRule: defaultTimeoutRule,
       ...options,
       budget: options.budget ?? defaultBudget(options.calibration, options.machine),
     }
@@ -320,6 +326,7 @@ export class Simulation {
       inflight: false,
       inflightLeft: 0,
       inflightStart: 0,
+      timeoutMs: 0,
       state: 'pending',
       process: null,
       startedAt: null,
@@ -355,6 +362,7 @@ export class Simulation {
     this.peaks.processes = Math.max(this.peaks.processes, this.processes.size)
     if (lease) {
       lease.process = process
+      lease.timeoutMs = this.itemTimeout(lease)
       lease.state = 'starting'
     }
     return process
@@ -525,12 +533,17 @@ export class Simulation {
     if (this.options.itemTimeouts) this.enforceTimeouts()
   }
 
+  private itemTimeout(lease: SimLease): number {
+    const scale = this.policy.engine === 'pool' ? this.correction(lease.task.info.type) : 1
+    const task = lease.task
+    return itemTimeoutMs(task.predicted, lease.cursor, lease.hi, scale, (i) => task.attempts[i]!, this.options.timeoutRule)
+  }
+
   private enforceTimeouts(): void {
     for (const process of [...this.processes]) {
       const lease = process.lease
       if (process.state !== 'busy' || !lease?.inflight) continue
-      const limit = Math.max(5000, 10 * lease.task.predicted[lease.cursor]!)
-      if (this.now - lease.inflightStart > limit) this.crash(process, 'timeout')
+      if (this.now - lease.inflightStart > lease.timeoutMs) this.crash(process, 'timeout')
     }
   }
 
@@ -668,6 +681,7 @@ export class Simulation {
       this.counts.adoptions++
       next.state = 'running'
       next.process = process
+      next.timeoutMs = this.itemTimeout(next)
       process.lease = next
       next.startedAt ??= lease.startedAt
       if (next.itemsDone === 0) {
@@ -699,6 +713,7 @@ export class Simulation {
     this.counts.claims++
     best.state = 'running'
     best.process = process
+    best.timeoutMs = this.itemTimeout(best)
     best.startedAt ??= this.now
     process.lease = best
     process.state = 'busy'

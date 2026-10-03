@@ -1,4 +1,4 @@
-import { exhibitSchedule, expectedCostMs, policies, serverCostModels, type Arrival, type PolicyConfig } from '@poof/core'
+import { exhibitSchedule, expectedCostMs, policies, serverCostModels, type Arrival, type PolicyConfig, type TimeoutRule } from '@poof/core'
 import type { Calibration } from './calibration.ts'
 import { Simulation, type MachineSpec, type RunResult } from './engine.ts'
 import type { Arrivals, Scenario, TaskPlan } from './workload.ts'
@@ -132,7 +132,7 @@ export class ReplayArrivals implements Arrivals {
   }
 }
 
-export function replay(run: ExhibitRun, items: ReplayItem[], calibration: Calibration): RunResult {
+export function replay(run: ExhibitRun, items: ReplayItem[], calibration: Calibration, timeoutRule?: TimeoutRule): RunResult {
   return new Simulation({
     scenario: new ReplayArrivals(run.params, items).scenario,
     arrivals: new ReplayArrivals(run.params, items),
@@ -143,5 +143,6 @@ export function replay(run: ExhibitRun, items: ReplayItem[], calibration: Calibr
     budget: 2,
     itemTimeouts: true,
     warmPool: true,
+    ...(timeoutRule ? { timeoutRule } : {}),
   }).run()
 }
