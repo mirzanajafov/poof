@@ -38,6 +38,8 @@ model Task {
   preset       String
   items        Int
   policy       String
+  exhibitId    String?      @db.Uuid
+  exhibit      Exhibit?     @relation(fields: [exhibitId], references: [id], onDelete: SetNull)
   status       TaskStatus   @default(QUEUED)
   predictedMs  Float
   done         Int          @default(0)
@@ -106,9 +108,26 @@ model Decision {
   @@index([at])
 }
 
+enum ExhibitStatus {
+  RUNNING
+  DONE
+  ABORTED
+}
+
+model Exhibit {
+  id        String        @id @default(uuid()) @db.Uuid
+  policy    String
+  params    Json
+  status    ExhibitStatus @default(RUNNING)
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+  stats     Json?
+  tasks     Task[]
+}
+
 model BreakerEvent {
-  id     BigInt   @id @default(autoincrement())
-  at     DateTime @default(now())
-  type   String
-  state  String
+  id    BigInt   @id @default(autoincrement())
+  at    DateTime @default(now())
+  type  String
+  state String
 }

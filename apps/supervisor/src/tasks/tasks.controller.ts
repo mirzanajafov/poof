@@ -36,7 +36,7 @@ export class TasksController {
   async submit(@Body() body: SubmitTask, @Res({ passthrough: true }) res: Response): Promise<SubmitResult> {
     const result = await this.scheduler.submit(body)
     if (!result.accepted) {
-      res.status(429)
+      res.status(result.code)
       res.setHeader('Retry-After', String(result.retryAfterSeconds))
     }
     return result

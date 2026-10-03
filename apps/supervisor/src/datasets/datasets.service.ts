@@ -39,6 +39,10 @@ export class Datasets {
     return dataset
   }
 
+  select(dataset: Dataset, offset: number, count: number): DatasetItem[] {
+    return Array.from({ length: count }, (_, i) => dataset.items[(offset + i) % dataset.items.length]!)
+  }
+
   taskDir(taskId: string): string {
     return join(this.root, 'tasks', taskId)
   }

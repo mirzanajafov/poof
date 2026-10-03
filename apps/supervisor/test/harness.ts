@@ -19,6 +19,7 @@ export async function makeData(): Promise<string> {
   await dataset(root, 'small', 40, [])
   await dataset(root, 'broken', 10, [2, 5, 7])
   await dataset(root, 'mostly-good', 40, [17])
+  await noisy(root, 'noisy', 30)
   return root
 }
 
@@ -35,6 +36,19 @@ async function dataset(root: string, name: string, count: number, corrupt: numbe
           .toBuffer()
     await writeFile(join(dir, file), body)
     items.push({ file, width: 640, height: 480 })
+  }
+  await writeFile(join(dir, 'manifest.json'), JSON.stringify({ items }))
+}
+
+async function noisy(root: string, name: string, count: number): Promise<void> {
+  const dir = join(root, 'datasets', name)
+  await mkdir(dir, { recursive: true })
+  const items = []
+  for (let i = 0; i < count; i++) {
+    const file = `${i}.jpg`
+    const image = sharp({ create: { width: 2000, height: 1500, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 120 + i, sigma: 40 } } })
+    await writeFile(join(dir, file), await image.jpeg({ quality: 90 }).toBuffer())
+    items.push({ file, width: 2000, height: 1500 })
   }
   await writeFile(join(dir, 'manifest.json'), JSON.stringify({ items }))
 }

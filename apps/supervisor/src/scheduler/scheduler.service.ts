@@ -9,10 +9,11 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { admits, Breaker, emptyEstimate, expectedCostMs, serverCostModels, updateEstimate, type Estimate } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
-import { WorkerHandle, type ExitReason, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
+import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
-import { Datasets, type DatasetItem } from '../datasets/datasets.service.js'
+import { Datasets } from '../datasets/datasets.service.js'
 import { Database, Events } from '../infra/infra.module.js'
+import { exitColumn } from '../workers/exit.js'
 
 export interface SubmitRequest {
   dataset: string
@@ -24,7 +25,7 @@ export interface SubmitRequest {
 
 export type SubmitResult =
   | { accepted: true; id: string; items: number; predictedSeconds: number }
-  | { accepted: false; id: string; reason: string; retryAfterSeconds: number }
+  | { accepted: false; id: string | null; reason: string; retryAfterSeconds: number; code: 429 | 503 }
 
 type Settings = Pick<
   Env,
@@ -78,14 +79,6 @@ interface PoolWorker {
   retiring: boolean
 }
 
-const exitColumn: Record<ExitReason, 'NORMAL' | 'CRASH' | 'MEMORY' | 'TIMEOUT' | 'HEARTBEAT' | 'KILLED'> = {
-  normal: 'NORMAL',
-  crash: 'CRASH',
-  memory: 'MEMORY',
-  timeout: 'TIMEOUT',
-  heartbeat: 'HEARTBEAT',
-  killed: 'KILLED',
-}
 
 @Injectable()
 export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutdown {
@@ -98,6 +91,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private writes: Promise<unknown> = Promise.resolve()
   private timers: NodeJS.Timeout[] = []
   private stopping = false
+  private pausedUntil = 0
 
   constructor(
     config: ConfigService<Env, true>,
@@ -121,7 +115,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   async onApplicationBootstrap(): Promise<void> {
     await this.recover()
     this.timers.push(setInterval(() => this.checkpoint(), this.settings.CHECKPOINT_MS))
-    this.timers.push(setInterval(() => this.events.snapshot(this.snapshot()), 1000))
+    this.timers.push(setInterval(() => this.events.snapshot('poof:live', this.snapshot()), 1000))
     for (let i = 0; i < this.settings.BUDGET; i++) void this.spawn()
   }
 
@@ -136,12 +130,16 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   async submit(request: SubmitRequest): Promise<SubmitResult> {
+    if (this.pausedUntil > 0) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((this.pausedUntil - Date.now()) / 1000))
+      return { accepted: false, id: null, reason: 'an exhibit is running', retryAfterSeconds, code: 503 }
+    }
     const dataset = await this.datasets.get(request.dataset)
     const model = serverCostModels[request.preset]
     if (!model) throw new NotFoundException(`no cost model for ${request.preset}`)
     const offset = request.offset ?? 0
     const count = Math.min(request.count ?? dataset.items.length, this.settings.MAX_TASK_ITEMS)
-    const items = pick(dataset.items, offset, count)
+    const items = this.datasets.select(dataset, offset, count)
     const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
     const predictedMs = predicted.reduce((sum, v) => sum + v, 0)
     const now = Date.now()
@@ -168,7 +166,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         data: { kind: 'reject', taskId: id, detail: { workMs: candidate.workMs, backlogMs, retryAfterSeconds } },
       })
       this.events.publish('task.rejected', { task: id, retryAfterSeconds })
-      return { accepted: false, id, reason: 'the box cannot finish this before its deadline', retryAfterSeconds }
+      return { accepted: false, id, reason: 'the box cannot finish this before its deadline', retryAfterSeconds, code: 429 }
     }
     const dir = await this.datasets.createTask(id, dataset, items)
     const task: TaskState = {
@@ -203,8 +201,33 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return { accepted: true, id, items: task.items, predictedSeconds: Math.round(predictedMs / 1000) }
   }
 
+  async pause(untilMs: number): Promise<void> {
+    this.pausedUntil = untilMs
+    const exits = [...this.workers].map((w) => new Promise<void>((resolve) => w.handle.once('exit', () => resolve())))
+    for (const worker of this.workers) {
+      worker.retiring = true
+      if (!worker.lease) worker.handle.stop()
+    }
+    await Promise.all(exits)
+  }
+
+  resume(): void {
+    this.pausedUntil = 0
+    for (let i = this.workers.size; i < this.settings.BUDGET; i++) void this.spawn()
+  }
+
+  get paused(): boolean {
+    return this.pausedUntil > 0
+  }
+
   health() {
-    return { ok: !this.stopping, workers: this.workers.size, budget: this.settings.BUDGET, tasks: this.active().length }
+    return {
+      ok: !this.stopping,
+      paused: this.paused,
+      workers: this.workers.size,
+      budget: this.settings.BUDGET,
+      tasks: this.active().length,
+    }
   }
 
   snapshot() {
@@ -302,7 +325,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private claim(worker: PoolWorker): void {
-    if (this.stopping || worker.lease || worker.retiring) return
+    if (this.stopping || this.paused || worker.lease || worker.retiring) return
     const lease = this.next()
     if (!lease) return
     const task = lease.task
@@ -371,7 +394,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     worker.lease = null
     this.persist(() => this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.cursor } }))
     this.settle(lease.task)
-    if (worker.items >= this.settings.RECYCLE_ITEMS) {
+    if (worker.retiring || worker.items >= this.settings.RECYCLE_ITEMS) {
       worker.retiring = true
       worker.handle.stop()
       return
@@ -390,7 +413,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     this.events.publish('worker.exit', { worker: worker.id, reason: exit.reason, inflight: exit.inflight })
     const lease = worker.lease
     if (lease) this.release(lease, exit)
-    if (!this.stopping) void this.spawn()
+    if (!this.stopping && !this.paused) void this.spawn()
   }
 
   private release(lease: Lease, exit: WorkerExit): void {
@@ -502,7 +525,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         ])
         continue
       }
-      const items = pick(dataset.items, row.offset, row.items)
+      const items = this.datasets.select(dataset, row.offset, row.items)
       const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
       const task: TaskState = {
         id: row.id,
@@ -541,6 +564,3 @@ function rank(task: TaskState, now: number): number {
   return (task.deadline <= now ? 1e15 : 0) + task.deadline
 }
 
-function pick(items: DatasetItem[], offset: number, count: number): DatasetItem[] {
-  return Array.from({ length: count }, (_, i) => items[(offset + i) % items.length]!)
-}

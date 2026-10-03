@@ -63,6 +63,12 @@ export class Env {
   @IsInt()
   @Min(1)
   MAX_TASK_ITEMS: number = 2000
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(256)
+  EXHIBIT_MAX_PROCESSES: number = 35
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
