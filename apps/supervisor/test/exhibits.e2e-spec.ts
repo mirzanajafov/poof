@@ -75,6 +75,24 @@ describe('exhibits', () => {
     expect(open).toBe(0)
   })
 
+  it('runs the same kind of load through the pool without pausing it', async () => {
+    running = await start(dataDir, { BUDGET: '2' })
+    const res = await http()
+      .post('/exhibits')
+      .send({ policy: 'pool', durationSeconds: 12, dataset: 'noisy', utilization: 0.8, minItems: 15, maxItems: 30, slackMin: 0.9, slackMax: 2 })
+    expect(res.status).toBe(201)
+    expect((await http().get('/health')).body.paused).toBe(false)
+    const exhibit = await ended(res.body.id)
+    const stats = exhibit.stats as { submitted: number; done: number; peakProcesses: number }
+    expect(stats.submitted).toBeGreaterThan(0)
+    expect(stats.peakProcesses).toBe(2)
+    const tasks = await running.db.task.findMany({ where: { exhibitId: exhibit.id } })
+    expect(tasks).toHaveLength(stats.submitted)
+    expect(tasks.every((t) => t.policy === 'pool')).toBe(true)
+    expect(tasks.filter((t) => t.status === 'QUEUED' || t.status === 'RUNNING')).toHaveLength(0)
+    expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
+  })
+
   it('aborts a running exhibit', async () => {
     running = await start(dataDir)
     const res = await http().post('/exhibits').send({ policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' })

@@ -100,7 +100,13 @@ export function inWindow(window: Window | undefined, now: number): boolean {
   return window !== undefined && now >= window.from && now < window.to
 }
 
-export class Workload {
+export interface Arrivals {
+  readonly scenario: Scenario
+  nextArrival(): number | null
+  task(submittedAt: number): TaskPlan
+}
+
+export class Workload implements Arrivals {
   readonly scenario: Scenario
   readonly types: Record<string, CostModel>
   readonly stats: WorkloadStats

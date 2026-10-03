@@ -20,7 +20,7 @@ import {
   type View,
 } from '@poof/core'
 import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
-import { inWindow, Workload, type Scenario, type TaskPlan } from './workload.ts'
+import { inWindow, Workload, type Arrivals, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
   name: string
@@ -44,6 +44,9 @@ export interface SimOptions {
   deadLetterShare?: number
   recordSeries?: boolean
   checkInvariants?: boolean
+  itemTimeouts?: boolean
+  warmPool?: boolean
+  arrivals?: Arrivals
 }
 
 export interface TaskOutcome {
@@ -59,6 +62,7 @@ export interface TaskOutcome {
   met: boolean
   lateness: number
   deadLettered: number
+  done: number
   workers: number
 }
 
@@ -90,6 +94,7 @@ export interface RunResult {
     claims: number
     crashes: number
     oomKills: number
+    timeouts: number
     deadLettered: number
     breakerOpened: number
     preemptions: number
@@ -151,8 +156,8 @@ const DONE = 1
 const DEAD = 2
 
 export class Simulation {
-  readonly options: Required<Omit<SimOptions, 'budget'>> & { budget: number }
-  private readonly workload: Workload
+  readonly options: Required<Omit<SimOptions, 'budget' | 'arrivals'>> & { budget: number }
+  private readonly workload: Arrivals
   private readonly curve: Curve
   private readonly policy: PolicyConfig
   private readonly machine: MachineSpec
@@ -174,6 +179,7 @@ export class Simulation {
     claims: 0,
     crashes: 0,
     oomKills: 0,
+    timeouts: 0,
     deadLettered: 0,
     breakerOpened: 0,
     preemptions: 0,
@@ -186,7 +192,8 @@ export class Simulation {
     this.policy = options.policy
     this.machine = options.machine
     this.curve = curveFor(options.calibration, options.machine.cores)
-    this.workload = new Workload(options.scenario, options.calibration.types, options.machine.cores, options.seed)
+    this.workload =
+      options.arrivals ?? new Workload(options.scenario, options.calibration.types, options.machine.cores, options.seed)
     this.options = {
       dtMs: 10,
       tickMs: 250,
@@ -195,6 +202,8 @@ export class Simulation {
       deadLetterShare: 0.05,
       recordSeries: false,
       checkInvariants: false,
+      itemTimeouts: false,
+      warmPool: false,
       ...options,
       budget: options.budget ?? defaultBudget(options.calibration, options.machine),
     }
@@ -206,7 +215,7 @@ export class Simulation {
     let nextArrival = this.workload.nextArrival()
     let nextTick = 0
     let nextSample = sampleMs
-    if (this.policy.engine === 'pool') this.fillPool()
+    if (this.policy.engine === 'pool') this.fillPool(this.options.warmPool)
     for (this.now = dtMs; this.now <= end; this.now += dtMs) {
       while (nextArrival !== null && nextArrival <= this.now) {
         this.arrive(nextArrival)
@@ -351,9 +360,15 @@ export class Simulation {
     return process
   }
 
-  private fillPool(): void {
+  private fillPool(warm = false): void {
     while (this.processes.size < this.options.budget) {
-      if (!this.spawn(null)) break
+      const process = this.spawn(null)
+      if (!process) break
+      if (warm) {
+        this.counts.spawns--
+        process.spawnLeft = 0
+        process.state = 'idle'
+      }
     }
   }
 
@@ -507,6 +522,16 @@ export class Simulation {
         this.advance(process, work)
       }
     }
+    if (this.options.itemTimeouts) this.enforceTimeouts()
+  }
+
+  private enforceTimeouts(): void {
+    for (const process of [...this.processes]) {
+      const lease = process.lease
+      if (process.state !== 'busy' || !lease?.inflight) continue
+      const limit = Math.max(5000, 10 * lease.task.predicted[lease.cursor]!)
+      if (this.now - lease.inflightStart > limit) this.crash(process, 'timeout')
+    }
   }
 
   private ready(process: SimProcess): void {
@@ -557,7 +582,7 @@ export class Simulation {
     const task = lease.task
     const item = lease.cursor
     if (this.crashesOn(task, item)) {
-      this.crash(process, false)
+      this.crash(process, 'crash')
       return
     }
     const cost = task.plan.costs[item]!
@@ -578,10 +603,11 @@ export class Simulation {
     this.startItem(process, lease)
   }
 
-  private crash(process: SimProcess, oom: boolean): void {
+  private crash(process: SimProcess, cause: 'crash' | 'oom' | 'timeout'): void {
     const lease = process.lease
     const starting = process.state === 'starting'
-    if (oom) this.counts.oomKills++
+    if (cause === 'oom') this.counts.oomKills++
+    else if (cause === 'timeout') this.counts.timeouts++
     else this.counts.crashes++
     this.removeProcess(process)
     if (lease) this.releaseAfterCrash(lease, starting)
@@ -713,7 +739,7 @@ export class Simulation {
       let victim: SimProcess | null = null
       for (const process of this.processes) if (!victim || process.rss > victim.rss) victim = process
       total -= victim!.rss
-      this.crash(victim!, true)
+      this.crash(victim!, 'oom')
     }
   }
 
@@ -781,6 +807,7 @@ export class Simulation {
         met,
         lateness: task.rejected ? Number.NaN : (finished - task.info.submittedAt) / allowed,
         deadLettered: task.dead,
+        done: task.done,
         workers: task.leases.length,
       }
     })
