@@ -1,6 +1,6 @@
 import { policies } from '@poof/core'
 import { describe, expect, it } from 'vitest'
-import { Simulation } from '../src/engine.ts'
+import { Simulation, workerMemoryMb } from '../src/engine.ts'
 import { mainPolicies } from '../src/scenarios.ts'
 import { burstScenario, calibration, machine, poisonScenario, shortScenario } from './fixture.ts'
 
@@ -71,5 +71,16 @@ describe('Simulation', () => {
     const box = run({ policy: policies.box, scenario: poisonScenario })
     expect(box.counts.deadLettered).toBe(0)
     expect(box.counts.crashes).toBeGreaterThan(managed.counts.crashes)
+  })
+})
+
+describe('workerMemoryMb', () => {
+  it('grows from the spawn memory to the plateau over the first hundred items, like B5', () => {
+    expect(workerMemoryMb(calibration, 0)).toBe(69)
+    expect(workerMemoryMb(calibration, 100)).toBeCloseTo(150)
+    expect(workerMemoryMb(calibration, 5000)).toBeCloseTo(150)
+    expect(workerMemoryMb(calibration, 3)).toBeGreaterThan(80)
+    expect(workerMemoryMb(calibration, 3)).toBeLessThan(100)
+    expect(workerMemoryMb(calibration, 25)).toBeGreaterThan(workerMemoryMb(calibration, 3))
   })
 })

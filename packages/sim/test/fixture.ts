@@ -12,6 +12,7 @@ export const calibration: Calibration = {
   spawnCpuMs: 190,
   baseRssMb: 69,
   steadyRssMb: 150,
+  memoryRampItems: 100,
   curves: [
     {
       cpus: 2,

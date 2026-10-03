@@ -22,7 +22,7 @@ trap cleanup EXIT
 run() {
   local cpus="$1"
   shift
-  docker run --rm --cpus "$cpus" --memory "$memory" --pids-limit 256 -e CPU_LIMIT="$cpus" \
+  docker run --rm --cpus "$cpus" --memory "$memory" --pids-limit "${PIDS:-256}" -e CPU_LIMIT="$cpus" \
     -e REDIS_URL=redis://poof-bench-redis:6379 --network poof-bench \
     -v "$host_root/data:/app/data" -v "$host_root/bench/results:/app/bench/results" \
     poof-bench node "$@"
@@ -39,7 +39,7 @@ for step in $steps; do
       ;;
     b2)
       for cpus in $cpu_limits; do
-        run "$cpus" bench/dist/b2-concurrency.js --cpus "$cpus" --label "$label"
+        run "$cpus" bench/dist/b2-concurrency.js --cpus "$cpus" --label "$label" ${B2_ARGS:-}
       done
       ;;
     b3)
