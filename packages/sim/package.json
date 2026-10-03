@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "sim": "node dist/cli.js"
+    "sim": "node dist/cli.js",
+    "replay": "node dist/replay-cli.js"
   },
   "dependencies": {
     "@poof/core": "workspace:*"

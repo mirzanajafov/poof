@@ -129,7 +129,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     await this.writes
   }
 
-  async submit(request: SubmitRequest): Promise<SubmitResult> {
+  async submit(request: SubmitRequest, options: { exhibitId?: string } = {}): Promise<SubmitResult> {
     if (this.pausedUntil > 0) {
       const retryAfterSeconds = Math.max(1, Math.ceil((this.pausedUntil - Date.now()) / 1000))
       return { accepted: false, id: null, reason: 'an exhibit is running', retryAfterSeconds, code: 503 }
@@ -154,6 +154,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       preset: request.preset,
       items: items.length,
       policy: 'pool',
+      exhibitId: options.exhibitId ?? null,
       predictedMs,
       submittedAt: new Date(now),
       deadline: new Date(deadline),
@@ -444,7 +445,22 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     this.dispatch()
   }
 
-  private fail(task: TaskState, reason: string): void {
+  cancel(ids: readonly string[], reason: string): number {
+    let cancelled = 0
+    for (const id of ids) {
+      const task = this.tasks.get(id)
+      if (!task || (task.status !== 'QUEUED' && task.status !== 'RUNNING')) continue
+      this.fail(task, reason, 'cancel')
+      cancelled++
+    }
+    return cancelled
+  }
+
+  flush(): Promise<unknown> {
+    return this.writes
+  }
+
+  private fail(task: TaskState, reason: string, kind = 'fail'): void {
     if (task.status === 'DONE' || task.status === 'FAILED') return
     task.status = 'FAILED'
     for (const lease of task.leases) {
@@ -458,7 +474,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
           data: { status: 'FAILED', finishedAt: new Date(), done: task.done, deadLettered: task.dead },
         }),
         this.db.client.lease.updateMany({ where: { taskId: task.id, state: 'PENDING' }, data: { state: 'DONE' } }),
-        this.db.client.decision.create({ data: { kind: 'fail', taskId: task.id, detail: { reason, dead: task.dead } } }),
+        this.db.client.decision.create({ data: { kind, taskId: task.id, detail: { reason, dead: task.dead } } }),
       ]),
     )
     this.events.publish('task.failed', { task: task.id, reason })
