@@ -225,7 +225,7 @@ export class LeaseEngine {
     return {
       policy: this.options.policy.name,
       budget: this.options.policy.budget ? this.options.budget : null,
-      processes: this.processes,
+      processes: this.workers.size,
       stats: this.stats,
       tasks: this.active().map((t) => ({
         id: t.info.id,
