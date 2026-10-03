@@ -80,7 +80,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <section>
           <h2 className="text-sm font-semibold">Results</h2>
           <p className="text-xs text-muted">
-            The first {shown} images. Each one is resized and re-encoded by whichever worker had that chunk.
+            The first {shown} images. Each one is resized and re-encoded by whichever worker had that chunk. Results are kept
+            for 24 hours.
           </p>
           <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-10">
             {Array.from({ length: shown }, (_, i) => {
