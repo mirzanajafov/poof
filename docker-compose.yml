@@ -90,5 +90,22 @@ services:
       redis:
         condition: service_healthy
 
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_LIVE_URL: http://localhost:3111
+    container_name: poof-web
+    profiles: ["app"]
+    environment:
+      API_URL: http://api:3111
+    ports:
+      - "3113:3112"
+    cpus: 0.5
+    mem_limit: 256m
+    depends_on:
+      - api
+
 volumes:
   pgdata:
