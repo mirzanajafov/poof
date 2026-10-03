@@ -11,3 +11,4 @@ packages/sim/results/*/raw/
 packages/db/src/generated/
 .next/
 next-env.d.ts
+backups/

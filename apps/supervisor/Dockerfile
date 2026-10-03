@@ -8,6 +8,12 @@ COPY packages/imaging/package.json packages/imaging/
 COPY packages/worker/package.json packages/worker/
 COPY apps/supervisor/package.json apps/supervisor/
 
+FROM manifests AS migrate
+RUN pnpm install --frozen-lockfile --filter "@poof/db"
+COPY packages/db packages/db
+WORKDIR /app/packages/db
+CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
+
 FROM manifests AS build
 RUN pnpm install --frozen-lockfile --filter "@poof/supervisor..."
 COPY packages/core packages/core
