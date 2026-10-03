@@ -65,5 +65,30 @@ services:
       redis:
         condition: service_healthy
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: poof-api
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
+      REDIS_URL: redis://redis:6379
+      SUPERVISOR_URL: http://supervisor:3110
+      DATA_DIR: /data
+      ADMIN_TOKEN: local-admin-token-not-for-production
+      WEB_ORIGIN: http://localhost:3112
+    volumes:
+      - ./data/poof:/data:ro
+    ports:
+      - "3111:3111"
+    cpus: 0.5
+    mem_limit: 256m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
 volumes:
   pgdata:
