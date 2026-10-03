@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyEstimate, emptyWorkRatio, updateEstimate, updateWorkRatio, workRatio } from '../src/estimate.ts'
+import { emptyEstimate, emptyWorkRatio, priorWorkRatio, updateEstimate, updateWorkRatio, workRatio } from '../src/estimate.ts'
 import { Rng } from '../src/rng.ts'
 
 describe('workRatio', () => {
@@ -9,6 +9,15 @@ describe('workRatio', () => {
     expect(workRatio(ratio)).toBe(1)
     ratio = updateWorkRatio(ratio, 300, 200)
     expect(workRatio(ratio)).toBeCloseTo(1.5)
+  })
+
+  it('starts from a prior that one odd image cannot swing and that fades as images come in', () => {
+    let ratio = priorWorkRatio(1.2, 6000)
+    expect(workRatio(ratio)).toBeCloseTo(1.2)
+    ratio = updateWorkRatio(ratio, 1200, 400)
+    expect(workRatio(ratio)).toBeLessThan(1.5)
+    for (let i = 0; i < 1000; i++) ratio = updateWorkRatio(ratio, 300, 300)
+    expect(workRatio(ratio)).toBeCloseTo(1, 2)
   })
 
   it('weighs images by their predicted work, not one vote each', () => {

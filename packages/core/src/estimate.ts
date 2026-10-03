@@ -21,6 +21,10 @@ export interface WorkRatio {
 
 export const emptyWorkRatio: WorkRatio = { actual: 0, predicted: 0, items: 0 }
 
+export function priorWorkRatio(ratio: number, predictedMs: number, minItems = 5): WorkRatio {
+  return { actual: ratio * predictedMs, predicted: predictedMs, items: minItems }
+}
+
 export function updateWorkRatio(ratio: WorkRatio, actual: number, predicted: number, window = 200): WorkRatio {
   const keep = 1 - 1 / window
   return { actual: ratio.actual * keep + actual, predicted: ratio.predicted * keep + predicted, items: ratio.items + 1 }
