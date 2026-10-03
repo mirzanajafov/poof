@@ -1,0 +1,25 @@
+FROM node:24-bookworm-slim AS manifests
+RUN npm install -g pnpm@11.21.0
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/db/package.json packages/db/
+COPY apps/api/package.json apps/api/
+
+FROM manifests AS build
+RUN pnpm install --frozen-lockfile --filter "@poof/api..."
+COPY packages/db packages/db
+COPY apps/api apps/api
+RUN pnpm --filter "@poof/api..." build
+
+FROM manifests AS runtime
+RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/api..."
+COPY --from=build /app/packages/db/dist packages/db/dist
+COPY --from=build /app/apps/api/dist apps/api/dist
+
+FROM node:24-bookworm-slim
+ENV NODE_ENV=production
+COPY --from=runtime /app /app
+WORKDIR /app/apps/api
+USER node
+EXPOSE 3111
+CMD ["node", "dist/main.js"]
