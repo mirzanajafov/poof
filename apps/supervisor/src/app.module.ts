@@ -2,6 +2,7 @@ import { Module, ValidationPipe, type DynamicModule, type INestApplication } fro
 import { ConfigModule } from '@nestjs/config'
 import { validateEnv } from './config/env.js'
 import { Datasets } from './datasets/datasets.service.js'
+import { Janitor } from './datasets/janitor.service.js'
 import { ExhibitsController } from './exhibits/exhibits.controller.js'
 import { Exhibits } from './exhibits/exhibits.service.js'
 import { InfraModule } from './infra/infra.module.js'
@@ -15,7 +16,7 @@ export class AppModule {
       module: AppModule,
       imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv, ignoreEnvFile: true }), InfraModule],
       controllers: [TasksController, ExhibitsController],
-      providers: [Datasets, Scheduler, Exhibits],
+      providers: [Datasets, Scheduler, Exhibits, Janitor],
     }
   }
 }

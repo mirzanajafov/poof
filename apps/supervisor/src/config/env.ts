@@ -69,6 +69,11 @@ export class Env {
   @Min(1)
   @Max(256)
   EXHIBIT_MAX_PROCESSES: number = 35
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  OUTPUT_TTL_HOURS: number = 24
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
