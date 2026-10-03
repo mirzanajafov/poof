@@ -17,6 +17,7 @@ export interface Calibration {
   spawnCpuMs: number
   baseRssMb: number
   steadyRssMb: number
+  memoryRampItems: number
   curves: Curve[]
 }
 
@@ -66,11 +67,14 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
   if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
   const b1 = read<B1>(base, 'b1-item-cost')
   const b3 = read<B3>(base, 'b3-spawn')
-  const b2s = readdirSync(base)
-    .filter((file) => file.startsWith('b2-concurrency-c'))
-    .map((file) => read<B2>(base, file.replace(/\.json$/, '')))
-    .sort((a, b) => a.cpus - b.cpus)
-  const measured = b2s.flatMap((b2) => b2.rows.filter((r) => r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined))
+  const b2s = mergeByCpus(
+    readdirSync(base)
+      .filter((file) => file.startsWith('b2-concurrency-c'))
+      .map((file) => read<B2>(base, file.replace(/\.json$/, ''))),
+  )
+  const measured = b2s.flatMap((b2) =>
+    b2.rows.filter((r) => r.k <= Math.ceil(3 * b2.cpus) && r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined),
+  )
   const steadyRssMb =
     measured.length >= 3
       ? linearFit(
@@ -88,12 +92,27 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
     spawnCpuMs: b3.warm.cpuMs.p50,
     baseRssMb: b3.warm.anonMb?.p50 ?? b3.warm.rssMb.p50,
     steadyRssMb,
+    memoryRampItems: 100,
     curves: b2s.map((b2) => ({
       cpus: b2.cpus,
       knee: b2.knee,
       points: b2.rows.map((r) => ({ workers: r.k, effectiveCores: Math.min(r.effectiveCores, r.k, b2.cpus) })),
     })),
   }
+}
+
+function mergeByCpus(files: B2[]): B2[] {
+  const byCpus = new Map<number, B2>()
+  for (const file of [...files].sort((a, b) => a.rows[0]!.k - b.rows[0]!.k)) {
+    const known = byCpus.get(file.cpus)
+    if (!known) {
+      byCpus.set(file.cpus, { ...file, rows: [...file.rows] })
+      continue
+    }
+    for (const row of file.rows) if (!known.rows.some((r) => r.k === row.k)) known.rows.push(row)
+    known.rows.sort((a, b) => a.k - b.k)
+  }
+  return [...byCpus.values()].sort((a, b) => a.cpus - b.cpus)
 }
 
 export function curveFor(calibration: Calibration, cpus: number): Curve {

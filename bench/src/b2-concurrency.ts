@@ -14,6 +14,7 @@ const { values } = parseArgs({
     preset: { type: 'string', default: 'webp-1600' },
     cpus: { type: 'string' },
     'k-max': { type: 'string' },
+    ks: { type: 'string' },
     duration: { type: 'string', default: '15' },
     warmup: { type: 'string', default: '3' },
     label: { type: 'string', default: 'local' },
@@ -63,7 +64,8 @@ function nextMessage<T>(child: ChildProcess, type: string): Promise<T> {
 }
 
 const rows = []
-for (let k = 1; k <= kMax; k++) {
+const ks = values.ks ? values.ks.split(',').map(Number) : Array.from({ length: kMax }, (_, i) => i + 1)
+for (const k of ks) {
   const children = Array.from({ length: k }, (_, i) =>
     fork(childPath, ['--data', values.data!, '--preset', values.preset!, '--seed', String(100 + i)]),
   )

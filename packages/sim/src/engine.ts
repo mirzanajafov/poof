@@ -153,6 +153,7 @@ interface SimProcess {
   spawnedAt: number
   lease: SimLease | null
   rss: number
+  items: number
   yielding: boolean
 }
 
@@ -355,6 +356,7 @@ export class Simulation {
       spawnedAt: this.now,
       lease,
       rss: this.options.calibration.baseRssMb,
+      items: 0,
       yielding: false,
     }
     this.processes.add(process)
@@ -571,7 +573,6 @@ export class Simulation {
     lease.inflight = true
     lease.inflightLeft = task.plan.costs[lease.cursor]!
     lease.inflightStart = this.now
-    process.rss = this.options.calibration.steadyRssMb
   }
 
   private advance(process: SimProcess, work: number): void {
@@ -608,6 +609,8 @@ export class Simulation {
     lease.inflight = false
     lease.cursor++
     lease.itemsDone++
+    process.items++
+    process.rss = workerMemoryMb(this.options.calibration, process.items)
     lease.itemMs = updateEstimate(lease.itemMs, this.now - lease.inflightStart)
     const ratio = this.typeRatio.get(task.info.type) ?? emptyEstimate
     this.typeRatio.set(task.info.type, updateEstimate(ratio, cost / task.predicted[item]!, 0.02))
@@ -840,6 +843,12 @@ export class Simulation {
       series: this.series,
     }
   }
+}
+
+export function workerMemoryMb(calibration: Calibration, items: number): number {
+  const { baseRssMb, steadyRssMb, memoryRampItems } = calibration
+  const share = Math.min(1, Math.log1p(items) / Math.log1p(memoryRampItems))
+  return baseRssMb + (steadyRssMb - baseRssMb) * share
 }
 
 export function defaultBudget(calibration: Calibration, machine: MachineSpec): number {
