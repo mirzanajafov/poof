@@ -29,10 +29,8 @@ services:
     build:
       context: .
       dockerfile: apps/supervisor/Dockerfile
-      target: build
+      target: migrate
     profiles: ["app"]
-    working_dir: /app/packages/db
-    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
     environment:
       DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
     depends_on:
