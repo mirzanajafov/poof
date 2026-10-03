@@ -34,6 +34,11 @@ export class Env {
   WORKER_CPU_CORES: number = 1.45
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  ADMISSION_PRIOR_RATIO: number = 1.2
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   CHUNK_ITEMS: number = 10

@@ -7,7 +7,7 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { admits, Breaker, emptyWorkRatio, expectedCostMs, itemTimeoutMs, serverCostModels, updateWorkRatio, workRatio, type WorkRatio } from '@poof/core'
+import { admits, Breaker, expectedCostMs, itemTimeoutMs, priorWorkRatio, serverCostModels, updateWorkRatio, workRatio, type WorkRatio } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
@@ -31,6 +31,7 @@ type Settings = Pick<
   Env,
   | 'BUDGET'
   | 'WORKER_CPU_CORES'
+  | 'ADMISSION_PRIOR_RATIO'
   | 'CHUNK_ITEMS'
   | 'MAX_ATTEMPTS'
   | 'DEAD_LETTER_SHARE'
@@ -102,6 +103,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     this.settings = {
       BUDGET: config.get('BUDGET', { infer: true }),
       WORKER_CPU_CORES: config.get('WORKER_CPU_CORES', { infer: true }),
+      ADMISSION_PRIOR_RATIO: config.get('ADMISSION_PRIOR_RATIO', { infer: true }),
       CHUNK_ITEMS: config.get('CHUNK_ITEMS', { infer: true }),
       MAX_ATTEMPTS: config.get('MAX_ATTEMPTS', { infer: true }),
       DEAD_LETTER_SHARE: config.get('DEAD_LETTER_SHARE', { infer: true }),
@@ -259,9 +261,12 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return [...this.tasks.values()].filter((t) => t.status === 'QUEUED' || t.status === 'RUNNING')
   }
 
+  private prior(): WorkRatio {
+    return priorWorkRatio(this.settings.ADMISSION_PRIOR_RATIO, 20 * 300)
+  }
+
   private ratio(preset: string): number {
-    const ratio = this.ratios.get(preset)
-    return ratio ? workRatio(ratio) : 1
+    return workRatio(this.ratios.get(preset) ?? this.prior())
   }
 
   private breaker(preset: string): Breaker {
@@ -363,7 +368,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     worker.items++
     if (message.ok) {
       task.done++
-      const ratio = this.ratios.get(task.preset) ?? emptyWorkRatio
+      const ratio = this.ratios.get(task.preset) ?? this.prior()
       this.ratios.set(task.preset, updateWorkRatio(ratio, message.stepCpuMs, task.predicted[message.item]!))
       this.record(task.preset, true)
     } else {
