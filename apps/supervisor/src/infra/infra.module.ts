@@ -1,6 +1,7 @@
 import { Global, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { createPrisma, PrismaClient } from '@poof/db'
+import { startTracing, type Tracer, type Tracing } from '@poof/tracing'
 import { Redis } from 'ioredis'
 import type { Env } from '../config/env.js'
 
@@ -39,6 +40,23 @@ export class Events implements OnApplicationShutdown {
   }
 }
 
+@Injectable()
+export class Traces implements OnApplicationShutdown {
+  private readonly tracing: Tracing
+
+  constructor(config: ConfigService<Env, true>) {
+    this.tracing = startTracing('poof-supervisor', { endpoint: config.get('OTEL_EXPORTER_OTLP_ENDPOINT', { infer: true }) })
+  }
+
+  get tracer(): Tracer {
+    return this.tracing.tracer
+  }
+
+  async onApplicationShutdown(): Promise<void> {
+    await this.tracing.shutdown().catch(() => undefined)
+  }
+}
+
 @Global()
-@Module({ providers: [Database, Events], exports: [Database, Events] })
+@Module({ providers: [Database, Events, Traces], exports: [Database, Events, Traces] })
 export class InfraModule {}

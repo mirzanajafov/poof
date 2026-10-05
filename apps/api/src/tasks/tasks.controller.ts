@@ -11,13 +11,14 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Type } from 'class-transformer'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
 import type { Env } from '../config/env.js'
 import { RateLimit, RateLimitGuard } from '../guards/guards.js'
 import { Database } from '../infra/infra.module.js'
@@ -104,8 +105,8 @@ export class TasksController {
   @Post()
   @UseGuards(RateLimitGuard)
   @RateLimit({ name: 'tasks', setting: 'TASKS_PER_MINUTE', windowSeconds: 60 })
-  submit(@Body() body: SubmitTask, @Res({ passthrough: true }) res: Response) {
-    return this.supervisor.relay('POST', '/tasks', body, res)
+  submit(@Body() body: SubmitTask, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return this.supervisor.relay('POST', '/tasks', body, res, req.headers)
   }
 
   @Get(':id/items/:item')

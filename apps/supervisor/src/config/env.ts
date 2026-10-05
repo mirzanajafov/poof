@@ -13,6 +13,10 @@ export class Env {
   DATA_DIR: string
 
   @IsOptional()
+  @IsString()
+  OTEL_EXPORTER_OTLP_ENDPOINT?: string
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   PORT: number = 3110

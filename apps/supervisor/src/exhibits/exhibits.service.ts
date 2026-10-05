@@ -3,9 +3,10 @@ import { ConflictException, Injectable, Logger, NotFoundException, type BeforeAp
 import { ConfigService } from '@nestjs/config'
 import { exhibitSchedule, expectedCostMs, policies, serverCostModels, type Arrival, type PolicyConfig } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
+import { within, type Context, type Span } from '@poof/tracing'
 import type { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
-import { Database, Events } from '../infra/infra.module.js'
+import { Database, Events, Traces } from '../infra/infra.module.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
 import { LeaseEngine, type ExhibitStats } from './lease-engine.js'
 
@@ -47,6 +48,7 @@ interface Current {
   endsAt: number
   timers: NodeJS.Timeout[]
   arriving: Promise<void>
+  span: Span
 }
 
 const emptyStats = (): ExhibitStats => ({
@@ -81,6 +83,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     private readonly events: Events,
     private readonly datasets: Datasets,
     private readonly scheduler: Scheduler,
+    private readonly traces: Traces,
   ) {
     this.settings = {
       BUDGET: config.get('BUDGET', { infer: true }),
@@ -92,7 +95,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     }
   }
 
-  async start(params: ExhibitParams): Promise<{ id: string; endsAt: number }> {
+  async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     if (this.current) throw new ConflictException('an exhibit is already running')
     if (!(params.policy in exhibitPolicies)) throw new NotFoundException(`no exhibit policy ${params.policy}`)
     const policy = exhibitPolicies[params.policy] ?? null
@@ -103,6 +106,21 @@ export class Exhibits implements BeforeApplicationShutdown {
     const startedAt = Date.now()
     const endsAt = startedAt + params.durationSeconds * 1000
     await this.db.client.exhibit.create({ data: { id, policy: params.policy, params: { ...params } } })
+    const span = this.traces.tracer.startSpan(
+      'exhibit',
+      {
+        startTime: startedAt,
+        attributes: {
+          'poof.exhibit': id,
+          'poof.policy': params.policy,
+          'poof.seed': params.seed,
+          'poof.duration_s': params.durationSeconds,
+          'poof.utilization': params.utilization,
+          'poof.dataset': params.dataset,
+        },
+      },
+      trace,
+    )
     let engine: LeaseEngine | null = null
     if (policy) {
       await this.scheduler.pause(endsAt + 15_000)
@@ -117,6 +135,8 @@ export class Exhibits implements BeforeApplicationShutdown {
           deadLetterShare: this.settings.DEAD_LETTER_SHARE,
           rssMb: this.settings.WORKER_RSS_MB,
           tickMs: 250,
+          tracer: this.traces.tracer,
+          trace: within(span),
         },
         this.db,
         this.events,
@@ -134,6 +154,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       endsAt,
       timers: [],
       arriving: Promise.resolve(),
+      span,
     }
     this.current = current
     this.poolStats = emptyStats()
@@ -173,7 +194,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     }
     const result = await this.scheduler.submit(
       { dataset: dataset.name, preset: params.preset, deadlineSeconds: deadlineMs / 1000, count: arrival.count, offset: arrival.offset },
-      { exhibitId: current.id },
+      { exhibitId: current.id, trace: within(current.span) },
     )
     current.pool.submitted++
     if (result.accepted) current.pool.tasks.push(result.id)
@@ -198,6 +219,16 @@ export class Exhibits implements BeforeApplicationShutdown {
       data: { status, endedAt: new Date(), stats: { ...stats } },
     })
     if (current.engine) this.scheduler.resume()
+    current.span.setAttributes({
+      'poof.status': status,
+      'poof.submitted': stats.submitted,
+      'poof.rejected': stats.rejected,
+      'poof.met': stats.met,
+      'poof.spawns': stats.spawns,
+      'poof.splits': stats.splits,
+      'poof.peak_processes': stats.peakProcesses,
+    })
+    current.span.end()
     this.events.publish('exhibit.ended', { exhibit: current.id, status, stats })
     return stats
   }

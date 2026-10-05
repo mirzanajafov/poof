@@ -155,10 +155,10 @@ describe('worker', () => {
   })
 
   it('kills an item that runs past its timeout', async () => {
-    const taskDir = await makeTask('timeout', 10)
+    const taskDir = await makeTask('timeout', 100)
     const handle = await started()
     const { exited } = collect(handle)
-    handle.assign(assignment(taskDir, 'a', 0, 10), 1)
+    handle.assign(assignment(taskDir, 'a', 0, 100), 1)
     const exit = await exited
     expect(exit.reason).toBe('timeout')
     expect(exit.inflight?.lease).toBe('a')
