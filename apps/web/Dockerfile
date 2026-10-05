@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim AS build
 RUN npm install -g pnpm@11.21.0
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter "@poof/web..."
 COPY apps/web apps/web
