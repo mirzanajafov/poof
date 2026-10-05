@@ -95,6 +95,7 @@ interface ExhibitWorker {
   handle: WorkerHandle
   lease: ExhibitLease | null
   yielding: boolean
+  items: number
 }
 
 export class LeaseEngine {
@@ -285,8 +286,8 @@ export class LeaseEngine {
       worker: null,
       startedAt: null,
       lastSplitAt: null,
-      itemsDone: parent?.itemsDone ?? 0,
-      itemMs: parent?.itemMs ?? emptyEstimate,
+      itemsDone: 0,
+      itemMs: emptyEstimate,
       busy: false,
     }
     task.leases.push(lease)
@@ -366,6 +367,7 @@ export class LeaseEngine {
     if (lease.state !== 'running' || !lease.worker || lease.busy || k < 1) return
     const plan = planSplit(Math.min(lease.cursor + 1, lease.hi), lease.hi, k, request.itemMs, this.spawnMs)
     if (!plan) return
+    const workerItems = lease.worker.items
     lease.busy = true
     this.reserved += plan.children.length
     const result = await lease.worker.handle.shrink(lease.id, plan.cut)
@@ -381,7 +383,7 @@ export class LeaseEngine {
         data: {
           kind: 'split',
           taskId: lease.task.info.id,
-          detail: { lease: lease.id, k: plan.children.length, cut: plan.cut, pain: request.pain, projectedMs: request.projectedMs },
+          detail: { lease: lease.id, k: plan.children.length, cut: plan.cut, pain: request.pain, projectedMs: request.projectedMs, workerItems },
         },
       }),
     )
@@ -415,7 +417,7 @@ export class LeaseEngine {
       return
     }
     lease.state = 'starting'
-    const worker: ExhibitWorker = { id: randomUUID(), handle: new WorkerHandle({ limits: { rssMb: this.options.rssMb } }), lease, yielding: false }
+    const worker: ExhibitWorker = { id: randomUUID(), handle: new WorkerHandle({ limits: { rssMb: this.options.rssMb } }), lease, yielding: false, items: 0 }
     lease.worker = worker
     this.workers.add(worker)
     this.stats.peakProcesses = Math.max(this.stats.peakProcesses, this.workers.size)
@@ -473,6 +475,7 @@ export class LeaseEngine {
     const task = lease.task
     lease.cursor = message.item + 1
     lease.itemsDone++
+    worker.items++
     task.remainingMs -= task.predicted[message.item]!
     if (message.ok) {
       task.done++
@@ -506,8 +509,11 @@ export class LeaseEngine {
     const next = worker.yielding || this.stopped ? undefined : lease.task.leases.find((l) => l.state === 'pending')
     if (next && lease.task.status === 'RUNNING') {
       this.stats.adoptions++
-      next.itemsDone = Math.max(next.itemsDone, lease.itemsDone)
-      next.itemMs = next.itemMs.count > 0 ? next.itemMs : lease.itemMs
+      next.startedAt ??= lease.startedAt
+      if (next.itemsDone === 0) {
+        next.itemsDone = lease.itemsDone
+        next.itemMs = lease.itemMs
+      }
       this.assign(worker, next)
       return
     }
