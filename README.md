@@ -105,6 +105,7 @@ Raw runs and replays are in `packages/sim/results/real/`.
 - On Windows, git doesn't record the executable bit, so the deploy script arrived on the server as a plain file.
 - The server user is uid 1001 and the images run as 1000, so the supervisor couldn't write its own data folder until the containers ran as the host user.
 - Every healthcheck is a `docker exec`. With six apps checking every five or ten seconds, dockerd was using most of a core; poof checks every 30 seconds in production.
+- The API and supervisor images were 860-880 MB. `@prisma/client` declares the Prisma CLI and TypeScript as optional peers, pnpm satisfied them from the database package's dev dependencies, and a production install carried the CLI, Prisma Studio and a copy of PGlite. A small pnpm hook that drops those peers, plus deleting the query compilers for databases I don't use, took them to 430-460 MB. The migrate image had the pnpm store baked in; 1.39 GB down to 780 MB.
 - Ending an exhibit of the box takes about 20 seconds, because the engine waits for its write queue, and a storm leaves hundreds of lease and worker rows in it. The pool stays paused for those seconds.
 
 ## Limits
@@ -112,7 +113,6 @@ Raw runs and replays are in `packages/sim/results/real/`.
 - It's one machine. On several machines a helper on another box adds real capacity, and splitting might come out differently. I didn't build that.
 - The 4-CPU results in the simulator are an extrapolation: the server has 4 vCPUs in total, so I only measured 1.5 and 2.
 - The simulator's throughput is about 15% high for the real worker, mostly because of how its contention curve was measured, and its box storms are milder than the real ones.
-- The images are about 880 MB, mostly because `@prisma/client` pulls the Prisma CLI, Studio and TypeScript in as peers.
 - The per-preset circuit breaker is tested in the simulator and in e2e tests, but with two presets live it's more of a demonstration.
 - There are no accounts. The only privileged thing is an admin token in the server's `.env`.
 - I didn't add tracing. With a single supervisor, the decision log in Postgres already answers "why did this happen", and Jaeger is a lot to run next to five other apps on 8 GB.
