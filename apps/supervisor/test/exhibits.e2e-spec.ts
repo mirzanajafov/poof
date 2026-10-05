@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { policies } from '@poof/core'
 import { makeData, start, until, type Running } from './harness.js'
 
 let dataDir: string
@@ -73,6 +74,21 @@ describe('exhibits', () => {
     expect(deep).toBeGreaterThan(0)
     const open = await running.db.task.count({ where: { exhibitId: exhibit.id, status: { in: ['QUEUED', 'RUNNING'] } } })
     expect(open).toBe(0)
+  })
+
+  it('lets a helper split only after ten images of its own', async () => {
+    running = await start(dataDir, { BUDGET: '2', EXHIBIT_MAX_PROCESSES: '8' })
+    const res = await http()
+      .post('/exhibits')
+      .send({ policy: 'box', durationSeconds: 20, dataset: 'noisy', utilization: 0.4, minItems: 150, maxItems: 200, slackMin: 0.1, slackMax: 0.15 })
+    expect(res.status).toBe(201)
+    const exhibit = await ended(res.body.id)
+    const leases = await running.db.lease.findMany({ where: { task: { exhibitId: exhibit.id } } })
+    const depth = new Map(leases.map((l) => [l.id, l.depth]))
+    const splits = await running.db.decision.findMany({ where: { kind: 'split', task: { exhibitId: exhibit.id } } })
+    const details = splits.map((s) => s.detail as { lease: string; workerItems: number })
+    expect(details.some((d) => (depth.get(d.lease) ?? 0) > 0)).toBe(true)
+    for (const d of details) expect(d.workerItems).toBeGreaterThanOrEqual(policies.box.warmupItems)
   })
 
   it('runs the same kind of load through the pool without pausing it', async () => {
