@@ -73,6 +73,10 @@ browser ──> Next.js ──> /api, /socket.io ──> NestJS API ──> Post
 
 **Exhibits run the splitting policies on real processes.** The pool finishes its current chunks and steps aside, and the same policy code the simulator uses (`packages/core`) runs the box for a minute against a seeded stream of tasks. Visitors can run any policy, the box included, because the cage is what makes that safe: one exhibit at a time, at most a minute, a two-minute cooldown, three an hour per address.
 
+**Every task is a trace.** With `OTEL_EXPORTER_OTLP_ENDPOINT` set, the API opens a span for the request and passes `traceparent` on, and the supervisor records the task, every chunk or lease, every spawn and every image. A helper's lease is a child of the lease that split, so a run of the box shows up in Jaeger as the same tree as the dashboard's "who called whom", with timings. In the trace below, the first lease's images go from 0.2 to 1.5 seconds as the box adds processes. The workers stay out of it. They know nothing but IPC, and an OpenTelemetry SDK in every worker would change the spawn cost the simulator is calibrated on, so the supervisor creates the image spans from what the worker reports. On a saturated pool the supervisor used 1.0-1.1% of the workers' CPU with export on and the same with it off. Jaeger runs as a compose profile with in-memory storage; it isn't on the public site.
+
+![A run of the box in Jaeger: the request, the exhibit, a task, its lease and the images slowing down as processes start](docs/screenshots/trace.png)
+
 ## Simulator against reality
 
 A simulator is only worth something if it predicts the real box, so I ran five policies in the real cage, three seeds each, a minute per run at 1.2 times capacity, and replayed every run in the simulator. Both sides see the same tasks: the exhibit and the replay draw their arrivals from the same seeded schedule (`exhibitSchedule` in `packages/core`), and the replay uses the measured cost of each image instead of the cost model. Averages over the three seeds, real against simulated:
@@ -115,7 +119,6 @@ Raw runs and replays are in `packages/sim/results/real/`.
 - The simulator's throughput is about 15% high for the real worker, mostly because of how its contention curve was measured, and its box storms are milder than the real ones.
 - The per-preset circuit breaker is tested in the simulator and in e2e tests, but with two presets live it's more of a demonstration.
 - There are no accounts. The only privileged thing is an admin token in the server's `.env`.
-- I didn't add tracing. With a single supervisor, the decision log in Postgres already answers "why did this happen", and Jaeger is a lot to run next to five other apps on 8 GB.
 
 ## Running it
 
@@ -125,7 +128,7 @@ Everything in Docker:
 docker compose --profile app up -d --build
 ```
 
-That starts Postgres (5447), Redis (6387), the supervisor (3110, with the cage limits), the API (3111) and the web app (http://localhost:3113). The supervisor needs photos in `data/poof/datasets`; to make them:
+That starts Postgres (5447), Redis (6387), the supervisor (3110, with the cage limits), the API (3111) and the web app (http://localhost:3113). With `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318` in the environment and `--profile tracing` added, it also starts Jaeger, at http://localhost:3116. The supervisor needs photos in `data/poof/datasets`; to make them:
 
 ```bash
 pnpm install && pnpm -r build
@@ -153,7 +156,7 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 | | |
 |---|---|
 | `POST /api/tasks` | `{ dataset, preset, deadlineSeconds, count?, offset? }`: 201, or 429 with Retry-After |
-| `GET /api/tasks`, `GET /api/tasks/:id` | tasks; one task with its leases, dead letters and decisions |
+| `GET /api/tasks`, `GET /api/tasks/:id` | tasks; one task with its leases, dead letters, decisions and trace id |
 | `GET /api/tasks/:id/items/:n` | a finished image (kept for 24 hours) |
 | `POST /api/exhibits` | `{ policy, durationSeconds, utilization?, dataset?, seed? }` |
 | `GET /api/exhibits`, `/current`, `/:id` | past runs, the one running now, one run |
@@ -167,6 +170,7 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 | `packages/core` | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit schedule |
 | `packages/sim` | the simulator, its scenarios, results and charts, and the replay of real runs |
 | `packages/worker` | the worker process and the handle that limits it |
+| `packages/tracing` | OpenTelemetry setup, off unless an endpoint is set |
 | `packages/db` | Prisma schema and migrations |
 | `packages/imaging` | the presets |
 | `apps/supervisor` | the scheduler, the lease engine for exhibits, datasets and the janitor |

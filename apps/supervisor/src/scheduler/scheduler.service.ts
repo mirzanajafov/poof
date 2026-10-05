@@ -9,10 +9,11 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { admits, Breaker, expectedCostMs, itemTimeoutMs, priorWorkRatio, serverCostModels, updateWorkRatio, workRatio, type WorkRatio } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
+import { resume, SpanStatusCode, traceIdOf, within, type Context, type Span } from '@poof/tracing'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
 import { Datasets } from '../datasets/datasets.service.js'
-import { Database, Events } from '../infra/infra.module.js'
+import { Database, Events, Traces } from '../infra/infra.module.js'
 import { exitColumn } from '../workers/exit.js'
 
 export interface SubmitRequest {
@@ -59,6 +60,7 @@ interface TaskState {
   leases: Lease[]
   status: TaskStatus
   dirty: boolean
+  span: Span
 }
 
 interface Lease {
@@ -70,6 +72,7 @@ interface Lease {
   state: LeaseState
   worker: PoolWorker | null
   dirty: boolean
+  span: Span | null
 }
 
 interface PoolWorker {
@@ -99,6 +102,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     private readonly db: Database,
     private readonly events: Events,
     private readonly datasets: Datasets,
+    private readonly traces: Traces,
   ) {
     this.settings = {
       BUDGET: config.get('BUDGET', { infer: true }),
@@ -131,7 +135,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     await this.writes
   }
 
-  async submit(request: SubmitRequest, options: { exhibitId?: string } = {}): Promise<SubmitResult> {
+  async submit(request: SubmitRequest, options: { exhibitId?: string; trace?: Context } = {}): Promise<SubmitResult> {
     if (this.pausedUntil > 0) {
       const retryAfterSeconds = Math.max(1, Math.ceil((this.pausedUntil - Date.now()) / 1000))
       return { accepted: false, id: null, reason: 'an exhibit is running', retryAfterSeconds, code: 503 }
@@ -149,6 +153,21 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const deadline = now + request.deadlineSeconds * 1000
     const backlog = this.active().map((t) => ({ id: t.id, deadline: t.deadline, workMs: t.remainingMs * this.ratio(t.preset) }))
     const candidate = { id, deadline, workMs: predictedMs * this.ratio(request.preset) }
+    const span = this.traces.tracer.startSpan(
+      'task',
+      {
+        startTime: now,
+        attributes: {
+          'poof.task': id,
+          'poof.dataset': dataset.name,
+          'poof.preset': request.preset,
+          'poof.items': items.length,
+          'poof.deadline_s': request.deadlineSeconds,
+          'poof.predicted_ms': Math.round(predictedMs),
+        },
+      },
+      options.trace,
+    )
     const base = {
       id,
       dataset: dataset.name,
@@ -160,6 +179,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       predictedMs,
       submittedAt: new Date(now),
       deadline: new Date(deadline),
+      traceId: traceIdOf(span),
     }
     if (!admits(candidate, backlog, now, this.settings.WORKER_CPU_CORES)) {
       const backlogMs = backlog.reduce((sum, w) => sum + w.workMs, 0)
@@ -169,6 +189,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         data: { kind: 'reject', taskId: id, detail: { workMs: candidate.workMs, backlogMs, retryAfterSeconds } },
       })
       this.events.publish('task.rejected', { task: id, retryAfterSeconds })
+      span.setAttributes({ 'poof.outcome': 'rejected', 'poof.work_ms': Math.round(candidate.workMs), 'poof.retry_after_s': retryAfterSeconds })
+      span.end()
       return { accepted: false, id, reason: 'the box cannot finish this before its deadline', retryAfterSeconds, code: 429 }
     }
     const dir = await this.datasets.createTask(id, dataset, items)
@@ -187,10 +209,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       leases: [],
       status: 'QUEUED',
       dirty: false,
+      span,
     }
     for (let lo = 0; lo < task.items; lo += this.settings.CHUNK_ITEMS) {
       const hi = Math.min(task.items, lo + this.settings.CHUNK_ITEMS)
-      task.leases.push({ id: randomUUID(), task, lo, hi, cursor: lo, state: 'PENDING', worker: null, dirty: false })
+      task.leases.push({ id: randomUUID(), task, lo, hi, cursor: lo, state: 'PENDING', worker: null, dirty: false, span: null })
     }
     await this.db.client.$transaction([
       this.db.client.task.create({ data: base }),
@@ -343,6 +366,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       this.persist(() => this.db.client.task.update({ where: { id: task.id }, data: { status: 'RUNNING', startedAt: new Date() } }))
     }
     const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, this.ratio(task.preset), (i) => task.attempts.get(i) ?? 0)
+    lease.span = this.traces.tracer.startSpan(
+      'chunk',
+      { attributes: { 'poof.lease': lease.id, 'poof.lo': lease.cursor, 'poof.hi': lease.hi, 'poof.worker.pid': worker.handle.pid, 'poof.timeout_ms': Math.round(timeoutMs) } },
+      within(task.span),
+    )
     worker.handle.assign(
       {
         lease: lease.id,
@@ -366,6 +394,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     if (!lease || lease.id !== message.lease) return
     const task = lease.task
     worker.items++
+    this.traceImage(lease.span, message)
     if (message.ok) {
       task.done++
       const ratio = this.ratios.get(task.preset) ?? this.prior()
@@ -380,6 +409,23 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     task.dirty = true
     this.events.publish('item', { task: task.id, item: message.item, ok: message.ok, worker: worker.id })
     this.settle(task)
+  }
+
+  private traceImage(parent: Span | null, message: ItemDone | ItemDead): void {
+    if (!parent) return
+    if (message.ok) {
+      this.traces.tracer
+        .startSpan(
+          'image',
+          { startTime: Date.now() - message.wallMs, attributes: { 'poof.item': message.item, 'poof.cpu_ms': Math.round(message.cpuMs), 'poof.step_cpu_ms': Math.round(message.stepCpuMs) } },
+          within(parent),
+        )
+        .end()
+      return
+    }
+    const span = this.traces.tracer.startSpan('image', { attributes: { 'poof.item': message.item, 'poof.attempts': message.attempts } }, within(parent))
+    span.setStatus({ code: SpanStatusCode.ERROR, message: message.error.slice(0, 200) })
+    span.end()
   }
 
   private deadLetter(task: TaskState, item: number, attempts: number, error: string): void {
@@ -397,6 +443,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     lease.cursor = Math.max(lease.cursor, message.hi)
     lease.worker = null
     worker.lease = null
+    lease.span?.end()
+    lease.span = null
     this.persist(() => this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.cursor } }))
     this.settle(lease.task)
     if (worker.retiring || worker.items >= this.settings.RECYCLE_ITEMS) {
@@ -424,6 +472,9 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private release(lease: Lease, exit: WorkerExit): void {
     const task = lease.task
     lease.worker = null
+    if (exit.reason !== 'normal') lease.span?.setStatus({ code: SpanStatusCode.ERROR, message: `worker ${exit.reason}` })
+    lease.span?.end()
+    lease.span = null
     if (exit.inflight && exit.inflight.lease === lease.id && exit.reason !== 'normal' && !this.stopping) {
       const item = exit.inflight.item
       const attempts = (task.attempts.get(item) ?? 0) + 1
@@ -482,6 +533,9 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       ]),
     )
     this.events.publish('task.failed', { task: task.id, reason })
+    task.span.setAttributes({ 'poof.outcome': kind === 'cancel' ? 'cancelled' : 'failed', 'poof.reason': reason, 'poof.done': task.done, 'poof.dead': task.dead })
+    if (kind !== 'cancel') task.span.setStatus({ code: SpanStatusCode.ERROR, message: reason })
+    task.span.end()
     this.forgetLater(task)
   }
 
@@ -496,7 +550,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         data: { status: 'DONE', finishedAt, done: task.done, deadLettered: task.dead },
       }),
     )
-    this.events.publish('task.done', { task: task.id, met: finishedAt.getTime() <= task.deadline, dead: task.dead })
+    const met = finishedAt.getTime() <= task.deadline
+    this.events.publish('task.done', { task: task.id, met, dead: task.dead })
+    task.span.setAttributes({ 'poof.outcome': met ? 'met' : 'late', 'poof.done': task.done, 'poof.dead': task.dead })
+    task.span.end(finishedAt)
     this.forgetLater(task)
   }
 
@@ -562,11 +619,16 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         leases: [],
         status: row.status === 'RUNNING' ? 'RUNNING' : 'QUEUED',
         dirty: true,
+        span: this.traces.tracer.startSpan(
+          'task',
+          { attributes: { 'poof.task': row.id, 'poof.items': row.items, 'poof.resumed': true } },
+          row.traceId ? resume(row.traceId) : undefined,
+        ),
       }
       let processed = 0
       for (const l of row.leases) {
         const state: LeaseState = l.state === 'DONE' ? 'DONE' : 'PENDING'
-        task.leases.push({ id: l.id, task, lo: l.lo, hi: l.hi, cursor: l.cursor, state, worker: null, dirty: false })
+        task.leases.push({ id: l.id, task, lo: l.lo, hi: l.hi, cursor: l.cursor, state, worker: null, dirty: false, span: null })
         processed += (state === 'DONE' ? l.hi : l.cursor) - l.lo
         if (state === 'PENDING') for (let i = l.cursor; i < l.hi; i++) task.remainingMs += predicted[i]!
       }

@@ -51,6 +51,7 @@ services:
       CAPACITY_CORES: "1.32"
       WORKER_CPU_CORES: "1.45"
       EXHIBIT_MAX_PROCESSES: "35"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - ./data/poof:/data
     ports:
@@ -77,6 +78,7 @@ services:
       DATA_DIR: /data
       ADMIN_TOKEN: local-admin-token-not-for-production
       WEB_ORIGIN: http://localhost:3112
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - ./data/poof:/data:ro
     ports:
@@ -105,6 +107,18 @@ services:
     mem_limit: 256m
     depends_on:
       - api
+
+  jaeger:
+    image: jaegertracing/jaeger:2.21.0
+    container_name: poof-jaeger
+    profiles: ["tracing"]
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    volumes:
+      - ./docker/jaeger.yaml:/etc/jaeger/config.yaml:ro
+    ports:
+      - "3116:16686"
+    cpus: 0.5
+    mem_limit: 384m
 
 volumes:
   pgdata:

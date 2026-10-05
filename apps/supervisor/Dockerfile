@@ -5,6 +5,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfil
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/imaging/package.json packages/imaging/
+COPY packages/tracing/package.json packages/tracing/
 COPY packages/worker/package.json packages/worker/
 COPY apps/supervisor/package.json apps/supervisor/
 
@@ -22,6 +23,7 @@ RUN pnpm install --frozen-lockfile --filter "@poof/supervisor..."
 COPY packages/core packages/core
 COPY packages/db packages/db
 COPY packages/imaging packages/imaging
+COPY packages/tracing packages/tracing
 COPY packages/worker packages/worker
 COPY apps/supervisor apps/supervisor
 RUN pnpm --filter "@poof/supervisor..." build
@@ -32,6 +34,7 @@ RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/supervisor..."
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/db/dist packages/db/dist
 COPY --from=build /app/packages/imaging/dist packages/imaging/dist
+COPY --from=build /app/packages/tracing/dist packages/tracing/dist
 COPY --from=build /app/packages/worker/dist packages/worker/dist
 COPY --from=build /app/apps/supervisor/dist apps/supervisor/dist
 

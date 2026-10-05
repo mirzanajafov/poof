@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, NotFoundException, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Headers, NotFoundException, Post } from '@nestjs/common'
 import { presets, type PresetName } from '@poof/imaging'
+import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import { exhibitPolicies, Exhibits, type ExhibitParams } from './exhibits.service.js'
 
@@ -58,7 +59,7 @@ export class ExhibitsController {
   constructor(private readonly exhibits: Exhibits) {}
 
   @Post()
-  start(@Body() body: StartExhibit) {
+  start(@Body() body: StartExhibit, @Headers() headers: Record<string, string>) {
     const params: ExhibitParams = {
       policy: body.policy,
       durationSeconds: body.durationSeconds,
@@ -71,7 +72,7 @@ export class ExhibitsController {
       slackMax: Math.max(body.slackMax ?? 3, body.slackMin ?? 0.5),
       seed: body.seed ?? 1,
     }
-    return this.exhibits.start(params)
+    return this.exhibits.start(params, extract(headers))
   }
 
   @Get('current')

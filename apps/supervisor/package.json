@@ -19,6 +19,7 @@
     "@poof/core": "workspace:*",
     "@poof/db": "workspace:*",
     "@poof/imaging": "workspace:*",
+    "@poof/tracing": "workspace:*",
     "@poof/worker": "workspace:*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

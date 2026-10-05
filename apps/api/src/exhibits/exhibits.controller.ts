@@ -106,7 +106,7 @@ export class ExhibitsController {
         }
       }
     }
-    const result = await this.supervisor.relay('POST', '/exhibits', body, res)
+    const result = await this.supervisor.relay('POST', '/exhibits', body, res, req.headers)
     if (res.statusCode >= 400) await this.cache.redis.del('poof:exhibit-cooldown')
     return result
   }
