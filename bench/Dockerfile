@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim
 RUN npm install -g pnpm@11.21.0
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
 COPY packages/imaging/package.json packages/imaging/
 COPY bench/package.json bench/
 RUN pnpm install --frozen-lockfile --filter "@poof/bench..."

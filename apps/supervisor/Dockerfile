@@ -1,16 +1,19 @@
 FROM node:24-bookworm-slim AS manifests
 RUN npm install -g pnpm@11.21.0
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/imaging/package.json packages/imaging/
 COPY packages/worker/package.json packages/worker/
 COPY apps/supervisor/package.json apps/supervisor/
 
-FROM manifests AS migrate
+FROM manifests AS migrate-deps
 RUN pnpm install --frozen-lockfile --filter "@poof/db"
 COPY packages/db packages/db
+
+FROM node:24-bookworm-slim AS migrate
+COPY --from=migrate-deps /app /app
 WORKDIR /app/packages/db
 CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
 
@@ -24,7 +27,8 @@ COPY apps/supervisor apps/supervisor
 RUN pnpm --filter "@poof/supervisor..." build
 
 FROM manifests AS runtime
-RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/supervisor..."
+RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/supervisor..." \
+  && find node_modules/.pnpm -path "*/@prisma/client/runtime/*" \( -name "*.map" -o \( -name "query_compiler_*" ! -name "*postgresql*" \) \) -delete
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/db/dist packages/db/dist
 COPY --from=build /app/packages/imaging/dist packages/imaging/dist

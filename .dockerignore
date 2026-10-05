@@ -5,3 +5,4 @@ data
 docs
 *.md
 **/.env
+packages/sim/results/*/raw
