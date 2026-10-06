@@ -128,7 +128,7 @@ describe('submissions', () => {
 
 describe('exhibits', () => {
   it('limits public exhibits by length and cooldown, and gives the cooldown back when the supervisor refuses', async () => {
-    running = await start(supervisor.url)
+    running = await start(supervisor.url, { EXHIBITS_PER_HOUR: '10' })
     expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 300 })).status).toBe(400)
     supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
     expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
@@ -136,8 +136,21 @@ describe('exhibits', () => {
     expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
     const cooling = await http().post('/api/exhibits').send({ policy: 'forecast+preempt', durationSeconds: 30 })
     expect(cooling.status).toBe(429)
+    expect(cooling.body.message).toMatch(/cooling down/)
     expect(Number(cooling.headers['retry-after'])).toBeGreaterThan(100)
+    expect(Number(cooling.headers['retry-after'])).toBeLessThanOrEqual(150)
     expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(201)
+  })
+
+  it('lets one address start three public exhibits an hour', async () => {
+    running = await start(supervisor.url, { EXHIBIT_COOLDOWN_SECONDS: '0' })
+    supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
+    for (let i = 0; i < 3; i++) expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
+    const limited = await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })
+    expect(limited.status).toBe(429)
+    expect(limited.body.message).toMatch(/too many requests/)
+    expect(Number(limited.headers['retry-after'])).toBeGreaterThanOrEqual(1)
+    expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(3600)
   })
 
   it('only lets the admin abort an exhibit', async () => {
