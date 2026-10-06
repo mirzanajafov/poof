@@ -14,6 +14,7 @@ const { values } = parseArgs({
     manifest: { type: 'string' },
     'steady-rss': { type: 'string' },
     'timeout-growth': { type: 'string', default: '2' },
+    speed: { type: 'string', default: '1' },
     out: { type: 'string' },
   },
 })
@@ -31,6 +32,7 @@ interface Numbers {
 const calibration = loadCalibration(values.calibration!)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
 const timeoutRule = { ...defaultTimeoutRule, growth: Number(values['timeout-growth']) }
+const speed = Number(values.speed)
 const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
@@ -43,7 +45,7 @@ function measured(preset: string): Map<string, number> {
     if (s.preset !== preset || s.source !== 'synthetic') continue
     walls.set(s.file, [...(walls.get(s.file) ?? []), s.wallMs])
   }
-  return new Map([...walls].map(([file, w]) => [file, quantile(w, 0.5)]))
+  return new Map([...walls].map(([file, w]) => [file, quantile(w, 0.5) / speed]))
 }
 
 function simulated(result: RunResult): Numbers {
@@ -105,5 +107,5 @@ for (const s of summary) {
 }
 if (values.out) {
   const memory = { baseMb: calibration.baseRssMb, steadyMb: calibration.steadyRssMb }
-  writeFileSync(values.out, `${JSON.stringify({ memory, timeoutRule, rows, summary }, null, 2)}\n`)
+  writeFileSync(values.out, `${JSON.stringify({ memory, timeoutRule, speed, rows, summary }, null, 2)}\n`)
 }

@@ -1,0 +1,152 @@
+{
+  "memory": {
+    "baseMb": 17.9,
+    "steadyMb": 141.59798064516124
+  },
+  "timeoutRule": {
+    "floorMs": 5000,
+    "multiple": 10,
+    "growth": 2
+  },
+  "speed": 0.728,
+  "rows": [
+    {
+      "policy": "box",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 24,
+        "spawns": 45,
+        "timeouts": 31,
+        "items": 55
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 32,
+        "spawns": 59,
+        "timeouts": 21,
+        "items": 111
+      }
+    },
+    {
+      "policy": "forecast",
+      "seed": 2,
+      "real": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 20,
+        "spawns": 53,
+        "timeouts": 39,
+        "items": 24
+      },
+      "sim": {
+        "submitted": 10,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 23,
+        "spawns": 64,
+        "timeouts": 39,
+        "items": 86
+      }
+    },
+    {
+      "policy": "box",
+      "seed": 3,
+      "real": {
+        "submitted": 7,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 35,
+        "spawns": 99,
+        "timeouts": 74,
+        "items": 59
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 34,
+        "spawns": 85,
+        "timeouts": 44,
+        "items": 87
+      }
+    },
+    {
+      "policy": "forecast",
+      "seed": 3,
+      "real": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 29,
+        "spawns": 70,
+        "timeouts": 54,
+        "items": 52
+      },
+      "sim": {
+        "submitted": 8,
+        "rejected": 0,
+        "met": 0,
+        "peakProcesses": 26,
+        "spawns": 67,
+        "timeouts": 38,
+        "items": 89
+      }
+    }
+  ],
+  "summary": [
+    {
+      "policy": "box",
+      "runs": 2,
+      "metShare": {
+        "real": 0,
+        "sim": 0
+      },
+      "peakProcesses": {
+        "real": 29.5,
+        "sim": 33
+      },
+      "spawns": {
+        "real": 72,
+        "sim": 72
+      },
+      "timeouts": {
+        "real": 52.5,
+        "sim": 32.5
+      },
+      "items": {
+        "real": 57,
+        "sim": 99
+      }
+    },
+    {
+      "policy": "forecast",
+      "runs": 2,
+      "metShare": {
+        "real": 0,
+        "sim": 0
+      },
+      "peakProcesses": {
+        "real": 24.5,
+        "sim": 24.5
+      },
+      "spawns": {
+        "real": 61.5,
+        "sim": 65.5
+      },
+      "timeouts": {
+        "real": 46.5,
+        "sim": 38.5
+      },
+      "items": {
+        "real": 38,
+        "sim": 87.5
+      }
+    }
+  ]
+}

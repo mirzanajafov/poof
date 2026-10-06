@@ -121,6 +121,8 @@ const path = await writeResult(values.label!, name, {
   source: dataset.source,
   durationMs,
   warmupMs,
+  mallocArenaMax: process.env.MALLOC_ARENA_MAX ?? null,
+  writesOutputs: values.write,
   knee,
   rows,
 })
