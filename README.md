@@ -154,7 +154,7 @@ pnpm --filter @poof/sim sim --calibration server --policies all     # the 5,100 
 pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../../data/synthetic/manifest.json --timeout-growth 1
 ```
 
-`bench/run-linux.sh <label>` reruns the calibration benchmarks in a capped Linux container, and `docker/test.Dockerfile` runs the test suites on Linux, where the memory limit reads `/proc` and the heartbeat test can freeze a worker. `bench/src/exhibit-runs.ts` runs a series of exhibits through the API with the admin token.
+`bench/run-linux.sh <label>` reruns the calibration benchmarks in a capped Linux container, and `docker/test.Dockerfile` runs the test suites on Linux, where the memory limit reads `/proc` and the heartbeat test can freeze a worker. `bench/src/exhibit-runs.ts` runs a series of exhibits through the API with the admin token. The unit and e2e suites also run in GitHub Actions on every push and pull request, against Postgres and Redis service containers (`.github/workflows/test.yml`).
 
 ## API
 
