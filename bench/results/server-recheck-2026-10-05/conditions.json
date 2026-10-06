@@ -1,0 +1,70 @@
+{
+  "method": "Each step waited until other load on the host (host CPU minus every poof container) stayed under 1.0 core with no swap-in for 10 minutes, and was logged every 15 s while it ran. Clean means a mean under 1.0 and no sample over 1.5 cores. The b2-storm tries were flagged only by their first sample, the docker build check and container start before any measurement window; the files here are from try 2.",
+  "steps": [
+    {
+      "step": "b2-c1.5",
+      "try": 1,
+      "start": "2026-10-05_14:52:17",
+      "end": "2026-10-05_14:57:56",
+      "verdict": "clean",
+      "othersMeanCores": 0.66,
+      "othersMaxCores": 1.06,
+      "swapInPagesPerSecond": 5
+    },
+    {
+      "step": "b2-storm",
+      "try": 1,
+      "start": "2026-10-05_15:08:22",
+      "end": "2026-10-05_15:13:50",
+      "verdict": "contaminated",
+      "othersMeanCores": 0.66,
+      "othersMaxCores": 2.19,
+      "swapInPagesPerSecond": 5
+    },
+    {
+      "step": "b2-storm",
+      "try": 2,
+      "start": "2026-10-05_15:29:24",
+      "end": "2026-10-05_15:34:55",
+      "verdict": "contaminated",
+      "othersMeanCores": 0.61,
+      "othersMaxCores": 1.93,
+      "swapInPagesPerSecond": 4,
+      "withoutFirstSample": {
+        "verdict": "clean",
+        "othersMeanCores": 0.55,
+        "othersMaxCores": 0.74
+      }
+    },
+    {
+      "step": "b2-c2",
+      "try": 1,
+      "start": "2026-10-05_16:18:42",
+      "end": "2026-10-05_16:25:47",
+      "verdict": "contaminated",
+      "othersMeanCores": 0.69,
+      "othersMaxCores": 1.72,
+      "swapInPagesPerSecond": 6
+    },
+    {
+      "step": "b2-c2",
+      "try": 2,
+      "start": "2026-10-05_16:36:08",
+      "end": "2026-10-05_16:42:56",
+      "verdict": "clean",
+      "othersMeanCores": 0.59,
+      "othersMaxCores": 0.75,
+      "swapInPagesPerSecond": 4
+    },
+    {
+      "step": "storms",
+      "try": 1,
+      "start": "2026-10-05_17:12:24",
+      "end": "2026-10-05_17:19:28",
+      "verdict": "clean",
+      "othersMeanCores": 0.76,
+      "othersMaxCores": 1.23,
+      "swapInPagesPerSecond": 4
+    }
+  ]
+}

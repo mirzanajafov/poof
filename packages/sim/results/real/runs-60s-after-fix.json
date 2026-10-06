@@ -1,0 +1,479 @@
+[
+  {
+    "id": "2cb24fc6-c015-4ded-a26b-23618eb0bc3f",
+    "policy": "box",
+    "params": {
+      "seed": 2,
+      "policy": "box",
+      "preset": "webp-1600",
+      "dataset": "synthetic",
+      "maxItems": 120,
+      "minItems": 20,
+      "slackMax": 3,
+      "slackMin": 0.5,
+      "utilization": 1.2,
+      "durationSeconds": 60
+    },
+    "stats": {
+      "met": 0,
+      "done": 0,
+      "exits": {
+        "killed": 12,
+        "normal": 1,
+        "timeout": 31,
+        "heartbeat": 1
+      },
+      "items": 55,
+      "failed": 0,
+      "spawns": 45,
+      "splits": 4,
+      "maxDepth": 1,
+      "rejected": 0,
+      "adoptions": 1,
+      "cancelled": 10,
+      "submitted": 10,
+      "preemptions": 0,
+      "deadLettered": 0,
+      "peakProcesses": 24,
+      "spawnFailures": 11
+    },
+    "tasks": [
+      {
+        "id": "1a3230e6-19f6-4676-90fa-1707b4fb78e1",
+        "status": "FAILED",
+        "items": 75,
+        "done": 34,
+        "submittedAt": "2026-10-05T13:12:28.665Z",
+        "deadline": "2026-10-05T13:12:48.848Z",
+        "finishedAt": "2026-10-05T13:13:34.749Z"
+      },
+      {
+        "id": "354d9210-271d-44e5-b06a-7b92b8ad5312",
+        "status": "FAILED",
+        "items": 96,
+        "done": 11,
+        "submittedAt": "2026-10-05T13:12:37.764Z",
+        "deadline": "2026-10-05T13:13:16.350Z",
+        "finishedAt": "2026-10-05T13:13:34.919Z"
+      },
+      {
+        "id": "29005e8d-c59d-4b71-9c19-25594d1419f0",
+        "status": "FAILED",
+        "items": 81,
+        "done": 5,
+        "submittedAt": "2026-10-05T13:12:42.954Z",
+        "deadline": "2026-10-05T13:13:39.160Z",
+        "finishedAt": "2026-10-05T13:13:34.975Z"
+      },
+      {
+        "id": "07a4b1f5-b63c-457c-aaa4-14dfa33fc61e",
+        "status": "FAILED",
+        "items": 43,
+        "done": 4,
+        "submittedAt": "2026-10-05T13:12:45.588Z",
+        "deadline": "2026-10-05T13:13:04.503Z",
+        "finishedAt": "2026-10-05T13:13:34.998Z"
+      },
+      {
+        "id": "10fc7205-8ff1-483a-b966-8adf12b76ebd",
+        "status": "FAILED",
+        "items": 67,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:12:47.375Z",
+        "deadline": "2026-10-05T13:13:49.097Z",
+        "finishedAt": "2026-10-05T13:13:35.088Z"
+      },
+      {
+        "id": "1980bf9a-6eb7-4511-939c-d4d23864ba16",
+        "status": "FAILED",
+        "items": 103,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:12:47.867Z",
+        "deadline": "2026-10-05T13:13:09.691Z",
+        "finishedAt": "2026-10-05T13:13:35.227Z"
+      },
+      {
+        "id": "1c52d555-8759-48a4-a074-aaa92a3fa6e2",
+        "status": "FAILED",
+        "items": 20,
+        "done": 1,
+        "submittedAt": "2026-10-05T13:12:50.518Z",
+        "deadline": "2026-10-05T13:12:57.847Z",
+        "finishedAt": "2026-10-05T13:13:35.247Z"
+      },
+      {
+        "id": "afe719b0-81e2-41d4-b683-69091b10da0f",
+        "status": "FAILED",
+        "items": 118,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:13:02.514Z",
+        "deadline": "2026-10-05T13:13:48.436Z",
+        "finishedAt": "2026-10-05T13:13:35.268Z"
+      },
+      {
+        "id": "e2336cf0-5089-4285-993f-ac28230e3c2c",
+        "status": "FAILED",
+        "items": 22,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:13:07.568Z",
+        "deadline": "2026-10-05T13:13:12.382Z",
+        "finishedAt": "2026-10-05T13:13:35.299Z"
+      },
+      {
+        "id": "54fda7a0-3441-49fa-b485-4508e148abdf",
+        "status": "FAILED",
+        "items": 112,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:13:08.518Z",
+        "deadline": "2026-10-05T13:13:26.694Z",
+        "finishedAt": "2026-10-05T13:13:35.318Z"
+      }
+    ]
+  },
+  {
+    "id": "ff624fc8-03c9-4030-b524-e288f902b6eb",
+    "policy": "forecast",
+    "params": {
+      "seed": 2,
+      "policy": "forecast",
+      "preset": "webp-1600",
+      "dataset": "synthetic",
+      "maxItems": 120,
+      "minItems": 20,
+      "slackMax": 3,
+      "slackMin": 0.5,
+      "utilization": 1.2,
+      "durationSeconds": 60
+    },
+    "stats": {
+      "met": 0,
+      "done": 0,
+      "exits": {
+        "killed": 6,
+        "normal": 1,
+        "timeout": 39,
+        "heartbeat": 7
+      },
+      "items": 24,
+      "failed": 0,
+      "spawns": 53,
+      "splits": 3,
+      "maxDepth": 1,
+      "rejected": 0,
+      "adoptions": 0,
+      "cancelled": 10,
+      "submitted": 10,
+      "preemptions": 0,
+      "deadLettered": 0,
+      "peakProcesses": 20,
+      "spawnFailures": 11
+    },
+    "tasks": [
+      {
+        "id": "fcfff5bc-d460-4a33-9d14-da917f2d6121",
+        "status": "FAILED",
+        "items": 75,
+        "done": 17,
+        "submittedAt": "2026-10-05T13:14:01.350Z",
+        "deadline": "2026-10-05T13:14:21.540Z",
+        "finishedAt": "2026-10-05T13:15:06.818Z"
+      },
+      {
+        "id": "e634b223-20b5-4a48-97ad-b8047144958b",
+        "status": "FAILED",
+        "items": 96,
+        "done": 5,
+        "submittedAt": "2026-10-05T13:14:10.430Z",
+        "deadline": "2026-10-05T13:14:49.016Z",
+        "finishedAt": "2026-10-05T13:15:08.310Z"
+      },
+      {
+        "id": "c645a1b3-6561-4820-806f-a49bf55d8bfd",
+        "status": "FAILED",
+        "items": 81,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:15.806Z",
+        "deadline": "2026-10-05T13:15:12.012Z",
+        "finishedAt": "2026-10-05T13:15:08.325Z"
+      },
+      {
+        "id": "aeaeade3-1e90-41c1-af97-50131fa6371b",
+        "status": "FAILED",
+        "items": 43,
+        "done": 1,
+        "submittedAt": "2026-10-05T13:14:18.588Z",
+        "deadline": "2026-10-05T13:14:37.503Z",
+        "finishedAt": "2026-10-05T13:15:08.348Z"
+      },
+      {
+        "id": "4b38e7e7-7656-4ff7-b1c2-1e723b86e6b4",
+        "status": "FAILED",
+        "items": 67,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:21.903Z",
+        "deadline": "2026-10-05T13:15:23.625Z",
+        "finishedAt": "2026-10-05T13:15:08.843Z"
+      },
+      {
+        "id": "f9c84ed1-c342-4f47-b7ef-1f8712d97f0c",
+        "status": "FAILED",
+        "items": 103,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:22.123Z",
+        "deadline": "2026-10-05T13:14:43.948Z",
+        "finishedAt": "2026-10-05T13:15:09.257Z"
+      },
+      {
+        "id": "0deffba5-5e8d-4f27-8629-bdcb8616fdfe",
+        "status": "FAILED",
+        "items": 20,
+        "done": 1,
+        "submittedAt": "2026-10-05T13:14:24.264Z",
+        "deadline": "2026-10-05T13:14:31.593Z",
+        "finishedAt": "2026-10-05T13:15:09.266Z"
+      },
+      {
+        "id": "ad41c121-e6e9-42a1-bc73-f70cc4a9af3c",
+        "status": "FAILED",
+        "items": 118,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:34.974Z",
+        "deadline": "2026-10-05T13:15:20.896Z",
+        "finishedAt": "2026-10-05T13:15:09.288Z"
+      },
+      {
+        "id": "d69ca946-d0c8-447d-a64f-fc62c176c09f",
+        "status": "FAILED",
+        "items": 22,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:39.954Z",
+        "deadline": "2026-10-05T13:14:44.768Z",
+        "finishedAt": "2026-10-05T13:15:09.340Z"
+      },
+      {
+        "id": "b77b69d9-1b98-4033-812a-5d918b9774d7",
+        "status": "FAILED",
+        "items": 112,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:14:41.703Z",
+        "deadline": "2026-10-05T13:14:59.879Z",
+        "finishedAt": "2026-10-05T13:15:09.897Z"
+      }
+    ]
+  },
+  {
+    "id": "cb14fcea-3e65-4307-a2a5-88e3e93c1328",
+    "policy": "box",
+    "params": {
+      "seed": 3,
+      "policy": "box",
+      "preset": "webp-1600",
+      "dataset": "synthetic",
+      "maxItems": 120,
+      "minItems": 20,
+      "slackMax": 3,
+      "slackMin": 0.5,
+      "utilization": 1.2,
+      "durationSeconds": 60
+    },
+    "stats": {
+      "met": 0,
+      "done": 0,
+      "exits": {
+        "killed": 20,
+        "normal": 2,
+        "timeout": 74,
+        "heartbeat": 3
+      },
+      "items": 59,
+      "failed": 0,
+      "spawns": 99,
+      "splits": 9,
+      "maxDepth": 1,
+      "rejected": 0,
+      "adoptions": 0,
+      "cancelled": 7,
+      "submitted": 7,
+      "preemptions": 0,
+      "deadLettered": 0,
+      "peakProcesses": 35,
+      "spawnFailures": 46
+    },
+    "tasks": [
+      {
+        "id": "9f1e326f-6b06-42ab-b200-932ac5e35809",
+        "status": "FAILED",
+        "items": 73,
+        "done": 17,
+        "submittedAt": "2026-10-05T13:15:32.783Z",
+        "deadline": "2026-10-05T13:16:01.500Z",
+        "finishedAt": "2026-10-05T13:17:28.066Z"
+      },
+      {
+        "id": "2e1ea2a8-cc2b-4341-b1b2-92284e2f6989",
+        "status": "FAILED",
+        "items": 78,
+        "done": 17,
+        "submittedAt": "2026-10-05T13:15:33.696Z",
+        "deadline": "2026-10-05T13:16:05.462Z",
+        "finishedAt": "2026-10-05T13:17:28.090Z"
+      },
+      {
+        "id": "c2d7749d-6fc6-4e4d-86fa-5ffdd1002841",
+        "status": "FAILED",
+        "items": 32,
+        "done": 14,
+        "submittedAt": "2026-10-05T13:15:35.773Z",
+        "deadline": "2026-10-05T13:15:43.855Z",
+        "finishedAt": "2026-10-05T13:17:28.097Z"
+      },
+      {
+        "id": "6ea0150c-2726-47a2-b83e-e21f7568e99a",
+        "status": "FAILED",
+        "items": 72,
+        "done": 11,
+        "submittedAt": "2026-10-05T13:15:36.800Z",
+        "deadline": "2026-10-05T13:16:26.460Z",
+        "finishedAt": "2026-10-05T13:17:28.109Z"
+      },
+      {
+        "id": "3a2cebc5-d866-4dea-8b7d-86d1832d2b66",
+        "status": "FAILED",
+        "items": 36,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:16:02.078Z",
+        "deadline": "2026-10-05T13:16:11.368Z",
+        "finishedAt": "2026-10-05T13:17:28.119Z"
+      },
+      {
+        "id": "f6a802ae-dce9-4a87-9d92-f095e9583e52",
+        "status": "FAILED",
+        "items": 51,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:16:15.103Z",
+        "deadline": "2026-10-05T13:16:36.143Z",
+        "finishedAt": "2026-10-05T13:17:28.129Z"
+      },
+      {
+        "id": "048ee3e1-40db-4c6f-9f27-115a2875892a",
+        "status": "FAILED",
+        "items": 96,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:16:29.101Z",
+        "deadline": "2026-10-05T13:17:56.229Z",
+        "finishedAt": "2026-10-05T13:17:28.143Z"
+      }
+    ]
+  },
+  {
+    "id": "e97e774d-d6bb-4663-b8b9-c7165dd2d3f5",
+    "policy": "forecast",
+    "params": {
+      "seed": 3,
+      "policy": "forecast",
+      "preset": "webp-1600",
+      "dataset": "synthetic",
+      "maxItems": 120,
+      "minItems": 20,
+      "slackMax": 3,
+      "slackMin": 0.5,
+      "utilization": 1.2,
+      "durationSeconds": 60
+    },
+    "stats": {
+      "met": 0,
+      "done": 0,
+      "exits": {
+        "killed": 16,
+        "timeout": 54
+      },
+      "items": 52,
+      "failed": 0,
+      "spawns": 70,
+      "splits": 6,
+      "maxDepth": 1,
+      "rejected": 0,
+      "adoptions": 0,
+      "cancelled": 8,
+      "submitted": 8,
+      "preemptions": 0,
+      "deadLettered": 0,
+      "peakProcesses": 29,
+      "spawnFailures": 11
+    },
+    "tasks": [
+      {
+        "id": "fa578baf-b22f-4d79-bbdd-9a8be3b0d9b9",
+        "status": "FAILED",
+        "items": 73,
+        "done": 15,
+        "submittedAt": "2026-10-05T13:17:45.796Z",
+        "deadline": "2026-10-05T13:18:14.513Z",
+        "finishedAt": "2026-10-05T13:19:10.095Z"
+      },
+      {
+        "id": "0d4597b8-9df6-4973-affb-23f076501c43",
+        "status": "FAILED",
+        "items": 78,
+        "done": 17,
+        "submittedAt": "2026-10-05T13:17:46.703Z",
+        "deadline": "2026-10-05T13:18:18.469Z",
+        "finishedAt": "2026-10-05T13:19:10.113Z"
+      },
+      {
+        "id": "41c08e0f-f89d-4ffd-be55-a672fc545297",
+        "status": "FAILED",
+        "items": 32,
+        "done": 9,
+        "submittedAt": "2026-10-05T13:17:48.872Z",
+        "deadline": "2026-10-05T13:17:56.954Z",
+        "finishedAt": "2026-10-05T13:19:10.529Z"
+      },
+      {
+        "id": "f83f3927-ba10-4d0e-87b3-53e43075b455",
+        "status": "FAILED",
+        "items": 72,
+        "done": 11,
+        "submittedAt": "2026-10-05T13:17:49.805Z",
+        "deadline": "2026-10-05T13:18:39.465Z",
+        "finishedAt": "2026-10-05T13:19:10.541Z"
+      },
+      {
+        "id": "d5555a10-443a-40b5-a5c7-5955552ed513",
+        "status": "FAILED",
+        "items": 36,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:18:14.775Z",
+        "deadline": "2026-10-05T13:18:24.065Z",
+        "finishedAt": "2026-10-05T13:19:10.557Z"
+      },
+      {
+        "id": "54f84b38-eb9f-4207-a553-f08360744bd9",
+        "status": "FAILED",
+        "items": 51,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:18:31.262Z",
+        "deadline": "2026-10-05T13:18:52.302Z",
+        "finishedAt": "2026-10-05T13:19:10.571Z"
+      },
+      {
+        "id": "04b3351d-7a11-4937-9966-ec388cc15767",
+        "status": "FAILED",
+        "items": 96,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:18:37.280Z",
+        "deadline": "2026-10-05T13:20:04.407Z",
+        "finishedAt": "2026-10-05T13:19:10.625Z"
+      },
+      {
+        "id": "30a0a20f-c229-421b-a637-eef643ac3933",
+        "status": "FAILED",
+        "items": 42,
+        "done": 0,
+        "submittedAt": "2026-10-05T13:18:46.855Z",
+        "deadline": "2026-10-05T13:18:55.511Z",
+        "finishedAt": "2026-10-05T13:19:10.638Z"
+      }
+    ]
+  }
+]
