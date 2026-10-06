@@ -1,6 +1,6 @@
 # poof
 
-Inspired by the Meeseeks box from Rick and Morty: you press a button, a helper appears, does one job and disappears. If the job drags on, it panics and calls more helpers, who call more helpers, until the whole thing falls over. I wanted to build the engineering version of that and find out, with numbers, when calling for help actually helps.
+Inspired by the Meeseeks box from Rick and Morty: you press a button, a helper appears, does one job and disappears. If the job drags on, it panics and calls more helpers, who call more helpers, until the whole thing falls over. It isn't only a cartoon problem: an autoscaler that adds workers when a queue falls behind, or a client that retries when a call is slow, can do the same thing, because the extra load makes everything later and that brings more extra load. I wanted to build the engineering version of that and find out, with numbers, when calling for help actually helps.
 
 poof resizes batches of photos against deadlines on one small server. You send a batch with a deadline, it predicts the work from the image sizes, and it either finishes in time or tells you up front that it can't. Next to it you can hand the box to the naive version for a minute and watch a worker that falls behind call helpers, who call helpers, inside a cage of 1.5 CPUs, 1.5 GB and 35 processes.
 
