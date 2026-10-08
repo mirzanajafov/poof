@@ -58,6 +58,6 @@ if healthy; then
   echo "Rolled back. Database migrations from the failed release stay applied;"
   echo "the dump taken above is in backups/db if the schema change has to be undone."
 else
-  echo "Rollback is not healthy either. Check: ${compose[*]} logs supervisor api web" >&2
+  echo "Rollback is not healthy either. Check: ${compose[*]} logs supervisor poof-api web" >&2
 fi
 exit 1

@@ -7,11 +7,11 @@ RUN pnpm install --frozen-lockfile --filter "@poof/web..."
 COPY apps/web apps/web
 COPY packages/sim/results/server packages/sim/results/server
 ARG NEXT_PUBLIC_LIVE_URL=
-ENV API_URL=http://api:3111 NEXT_PUBLIC_LIVE_URL=${NEXT_PUBLIC_LIVE_URL}
+ENV API_URL=http://poof-api:3111 NEXT_PUBLIC_LIVE_URL=${NEXT_PUBLIC_LIVE_URL}
 RUN pnpm --filter @poof/web build
 
 FROM node:24-bookworm-slim
-ENV NODE_ENV=production PORT=3112 HOSTNAME=0.0.0.0 API_URL=http://api:3111
+ENV NODE_ENV=production PORT=3112 HOSTNAME=0.0.0.0 API_URL=http://poof-api:3111
 WORKDIR /app
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
