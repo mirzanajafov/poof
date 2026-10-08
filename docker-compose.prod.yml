@@ -33,11 +33,11 @@ services:
       LOG_JSON: "true"
     restart: unless-stopped
 
-  api:
+  poof-api:
     ports: !reset []
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:
-      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
+      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@poof-postgres:5432/poof
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN}
       WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN}
       TRUST_PROXY: uniquelocal
