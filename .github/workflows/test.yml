@@ -46,7 +46,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
       - run: pnpm -r build
+      - run: pnpm typecheck
+      - run: pnpm lint
       - run: pnpm -r test
       - run: pnpm --filter @poof/supervisor test:e2e
       - run: pnpm --filter @poof/api test:e2e
