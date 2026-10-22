@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: poof
       POSTGRES_DB: poof
     ports:
-      - "5447:5432"
+      - '5447:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "poof"]
+      test: ['CMD', 'pg_isready', '-U', 'poof']
       interval: 5s
       retries: 10
 
@@ -19,9 +19,9 @@ services:
     image: redis:8-alpine
     container_name: poof-redis
     ports:
-      - "6387:6379"
+      - '6387:6379'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       retries: 10
 
@@ -30,7 +30,7 @@ services:
       context: .
       dockerfile: apps/supervisor/Dockerfile
       target: migrate
-    profiles: ["app"]
+    profiles: ['app']
     environment:
       DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
     depends_on:
@@ -42,20 +42,20 @@ services:
       context: .
       dockerfile: apps/supervisor/Dockerfile
     container_name: poof-supervisor
-    profiles: ["app"]
+    profiles: ['app']
     environment:
       DATABASE_URL: postgresql://poof:poof@postgres:5432/poof
       REDIS_URL: redis://redis:6379
       DATA_DIR: /data
-      BUDGET: "2"
-      CAPACITY_CORES: "1.32"
-      WORKER_CPU_CORES: "1.45"
-      EXHIBIT_MAX_PROCESSES: "35"
+      BUDGET: '2'
+      CAPACITY_CORES: '1.32'
+      WORKER_CPU_CORES: '1.45'
+      EXHIBIT_MAX_PROCESSES: '35'
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - ./data/poof:/data
     ports:
-      - "3110:3110"
+      - '3110:3110'
     cpus: 1.5
     mem_limit: 1536m
     pids_limit: 512
@@ -70,7 +70,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: poof-api
-    profiles: ["app"]
+    profiles: ['app']
     environment:
       DATABASE_URL: postgresql://poof:poof@poof-postgres:5432/poof
       REDIS_URL: redis://poof-redis:6379
@@ -82,7 +82,7 @@ services:
     volumes:
       - ./data/poof:/data:ro
     ports:
-      - "3111:3111"
+      - '3111:3111'
     cpus: 0.5
     mem_limit: 256m
     depends_on:
@@ -98,11 +98,11 @@ services:
       args:
         NEXT_PUBLIC_LIVE_URL: http://localhost:3111
     container_name: poof-web
-    profiles: ["app"]
+    profiles: ['app']
     environment:
       API_URL: http://poof-api:3111
     ports:
-      - "3113:3112"
+      - '3113:3112'
     cpus: 0.5
     mem_limit: 256m
     depends_on:
@@ -111,12 +111,12 @@ services:
   jaeger:
     image: jaegertracing/jaeger:2.21.0
     container_name: poof-jaeger
-    profiles: ["tracing"]
-    command: ["--config", "/etc/jaeger/config.yaml"]
+    profiles: ['tracing']
+    command: ['--config', '/etc/jaeger/config.yaml']
     volumes:
       - ./docker/jaeger.yaml:/etc/jaeger/config.yaml:ro
     ports:
-      - "3116:16686"
+      - '3116:16686'
     cpus: 0.5
     mem_limit: 384m
 

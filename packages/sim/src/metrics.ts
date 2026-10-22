@@ -41,7 +41,11 @@ function recovery(series: Sample[], window: Window): number | null {
   const before = within(series, { from: window.from - 5 * 60_000, to: window.from })
   const baseline = mean(before.map((s) => s.backlogMs))
   const after = series.filter((s) => s.t >= window.to)
-  const peak = Math.max(baseline, ...within(series, window).map((s) => s.backlogMs), ...after.slice(0, 1).map((s) => s.backlogMs))
+  const peak = Math.max(
+    baseline,
+    ...within(series, window).map((s) => s.backlogMs),
+    ...after.slice(0, 1).map((s) => s.backlogMs),
+  )
   const target = baseline + 0.1 * (peak - baseline)
   const back = after.find((s) => s.backlogMs <= target)
   return back ? back.t - window.to : null

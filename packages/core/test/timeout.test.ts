@@ -17,6 +17,8 @@ describe('itemTimeoutMs', () => {
   it('doubles the limit for every attempt an image already used up', () => {
     const attempts = new Map([[1, 2]])
     expect(itemTimeoutMs([600, 600, 600], 0, 3, 1, (i) => attempts.get(i) ?? 0)).toBe(24_000)
-    expect(itemTimeoutMs([600, 600, 600], 0, 3, 1, (i) => attempts.get(i) ?? 0, { floorMs: 5000, multiple: 10, growth: 1 })).toBe(6000)
+    expect(
+      itemTimeoutMs([600, 600, 600], 0, 3, 1, (i) => attempts.get(i) ?? 0, { floorMs: 5000, multiple: 10, growth: 1 }),
+    ).toBe(6000)
   })
 })

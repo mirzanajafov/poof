@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { exhibitSchedule } from '../src/schedule.ts'
 
-const params = { durationMs: 600_000, utilization: 1, capacityCores: 2, minItems: 20, maxItems: 120, slackMin: 0.5, slackMax: 3, seed: 7 }
+const params = {
+  durationMs: 600_000,
+  utilization: 1,
+  capacityCores: 2,
+  minItems: 20,
+  maxItems: 120,
+  slackMin: 0.5,
+  slackMax: 3,
+  seed: 7,
+}
 const itemMs = Array.from({ length: 100 }, (_, i) => 200 + i)
 
 describe('exhibitSchedule', () => {

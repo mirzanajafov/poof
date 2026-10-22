@@ -24,9 +24,7 @@ export function linearFit(xs: readonly number[], ys: readonly number[]) {
   }
   const slope = sxy / sxx
   const intercept = my - slope * mx
-  const logResiduals = xs
-    .map((x, i) => Math.log(ys[i]! / (intercept + slope * x)))
-    .filter((r) => Number.isFinite(r))
+  const logResiduals = xs.map((x, i) => Math.log(ys[i]! / (intercept + slope * x))).filter((r) => Number.isFinite(r))
   const m = mean(logResiduals)
   const sd = Math.sqrt(logResiduals.reduce((sum, r) => sum + (r - m) ** 2, 0) / (logResiduals.length - 1))
   return { intercept, slope, logResidualSd: sd }

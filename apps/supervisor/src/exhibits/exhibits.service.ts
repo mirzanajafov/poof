@@ -1,7 +1,20 @@
 import { randomUUID } from 'node:crypto'
-import { ConflictException, Injectable, Logger, NotFoundException, type BeforeApplicationShutdown } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type BeforeApplicationShutdown,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { exhibitSchedule, expectedCostMs, policies, serverCostModels, type Arrival, type PolicyConfig } from '@poof/core'
+import {
+  exhibitSchedule,
+  expectedCostMs,
+  policies,
+  serverCostModels,
+  type Arrival,
+  type PolicyConfig,
+} from '@poof/core'
 import type { PresetName } from '@poof/imaging'
 import { within, type Context, type Span } from '@poof/tracing'
 import type { Env } from '../config/env.js'
@@ -75,7 +88,10 @@ export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
   private poolStats: ExhibitStats = emptyStats()
-  private readonly settings: Pick<Env, 'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'>
+  private readonly settings: Pick<
+    Env,
+    'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
+  >
 
   constructor(
     config: ConfigService<Env, true>,
@@ -173,7 +189,9 @@ export class Exhibits implements BeforeApplicationShutdown {
       itemMs,
     )
     for (const arrival of arrivals) {
-      current.timers.push(setTimeout(() => this.schedule(current, () => this.arrive(current, arrival, itemMs)), arrival.at))
+      current.timers.push(
+        setTimeout(() => this.schedule(current, () => this.arrive(current, arrival, itemMs)), arrival.at),
+      )
     }
     current.timers.push(setTimeout(() => void this.finish('DONE'), params.durationSeconds * 1000))
     current.timers.push(setInterval(() => void this.publishState(), 1000))
@@ -193,7 +211,13 @@ export class Exhibits implements BeforeApplicationShutdown {
       return
     }
     const result = await this.scheduler.submit(
-      { dataset: dataset.name, preset: params.preset, deadlineSeconds: deadlineMs / 1000, count: arrival.count, offset: arrival.offset },
+      {
+        dataset: dataset.name,
+        preset: params.preset,
+        deadlineSeconds: deadlineMs / 1000,
+        count: arrival.count,
+        offset: arrival.offset,
+      },
       { exhibitId: current.id, trace: within(current.span) },
     )
     current.pool.submitted++

@@ -63,7 +63,9 @@ export const mainPolicies: PolicyConfig[] = [
 ]
 
 export const sweepPolicies: PolicyConfig[] = [
-  ...[0.5, 0.7, 0.85].map((threshold) => variant(policies.timerManaged, { name: `timer+budget θ=${threshold}`, threshold })),
+  ...[0.5, 0.7, 0.85].map((threshold) =>
+    variant(policies.timerManaged, { name: `timer+budget θ=${threshold}`, threshold }),
+  ),
   ...[1, 100].map((chunk) => variant(policies.pool, { name: `pool-${chunk}`, chunk })),
   ...[1, 2].map((z) => variant(policies.forecastManaged, { name: `forecast+budget z=${z}`, z })),
 ]

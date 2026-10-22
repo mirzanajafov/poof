@@ -50,7 +50,10 @@ export class StateController {
   @Get('health')
   async health() {
     const [redis, db] = await Promise.all([
-      this.cache.redis.ping().then(() => true).catch(() => false),
+      this.cache.redis
+        .ping()
+        .then(() => true)
+        .catch(() => false),
       this.db.client.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
     ])
     return { ok: redis && db, redis, db }

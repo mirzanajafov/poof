@@ -31,14 +31,14 @@ The simulator replays an hour of arrivals at a time: calm load, a skewed load wh
 
 Deadlines met on the cage (1.5 CPU, budget of 2 workers); rejected tasks count as misses:
 
-| policy | calm | skew | burst |
-|---|---|---|---|
-| never split | 44% | 34% | 45% |
-| split on a timer, with a budget | 44% | 31% | 45% |
-| split on a forecast, with a budget | 56% | 31% | 54% |
-| forecast, plus preemption | 67% | 35% | 64% |
-| **pool, 10 images at a time** | **66%** | **47%** | **64%** |
-| the box (timer, no budget) | 17% | 11% | 14% |
+| policy                             | calm    | skew    | burst   |
+| ---------------------------------- | ------- | ------- | ------- |
+| never split                        | 44%     | 34%     | 45%     |
+| split on a timer, with a budget    | 44%     | 31%     | 45%     |
+| split on a forecast, with a budget | 56%     | 31%     | 54%     |
+| forecast, plus preemption          | 67%     | 35%     | 64%     |
+| **pool, 10 images at a time**      | **66%** | **47%** | **64%** |
+| the box (timer, no budget)         | 17%     | 11%     | 14%     |
 
 ![Deadline hit rate by policy and scenario on the cage](packages/sim/results/server/hit-rate-cage.svg)
 
@@ -81,13 +81,13 @@ browser ──> Next.js ──> /api, /socket.io ──> NestJS API ──> Post
 
 A simulator is only worth something if it predicts the real box, so I ran five policies in the real cage, three seeds each, a minute per run at 1.2 times capacity, and replayed every run in the simulator. Both sides see the same tasks: the exhibit and the replay draw their arrivals from the same seeded schedule (`exhibitSchedule` in `packages/core`), and the replay uses the measured cost of each image instead of the cost model. Averages over the three seeds, real against simulated:
 
-| policy | on time | peak processes | spawns | workers killed for time | images done |
-|---|---|---|---|---|---|
-| pool | 36% / 31% | 2 / 2 | 0 / 0 | 0 / 0 | 162 / 196 |
-| forecast, plus preemption | 32% / 36% | 2 / 2 | 8 / 8 | 0 / 0 | 160 / 179 |
-| forecast, with a budget | 24% / 24% | 2 / 2 | 3 / 3 | 0 / 0 | 166 / 178 |
-| forecast, no budget | 17% / 17% | 22 / 22 | 72 / 58 | 54 / 33 | 100 / 123 |
-| the box | 17% / 17% | 24 / 18 | 79 / 42 | 58 / 17 | 94 / 136 |
+| policy                    | on time   | peak processes | spawns  | workers killed for time | images done |
+| ------------------------- | --------- | -------------- | ------- | ----------------------- | ----------- |
+| pool                      | 36% / 31% | 2 / 2          | 0 / 0   | 0 / 0                   | 162 / 196   |
+| forecast, plus preemption | 32% / 36% | 2 / 2          | 8 / 8   | 0 / 0                   | 160 / 179   |
+| forecast, with a budget   | 24% / 24% | 2 / 2          | 3 / 3   | 0 / 0                   | 166 / 178   |
+| forecast, no budget       | 17% / 17% | 22 / 22        | 72 / 58 | 54 / 33                 | 100 / 123   |
+| the box                   | 17% / 17% | 24 / 18        | 79 / 42 | 58 / 17                 | 94 / 136    |
 
 **With a budget, it holds.** The number of tasks turned away matches in 14 of 15 runs, tasks met are within one in 14, and spawns are within one in every budgeted run. That's about as close as two real runs get: I ran the same seeds again an hour later, and one policy went from meeting 2 of 2 tasks to 0 of 2. Where it's off is throughput: the simulator finishes 7 to 21% more images than the cage does. I guessed the supervisor, which shares the cage's 1.5 CPUs, and measured it: 2-3%. So I sampled every process and thread in the cage while the pool ran (`bench/src/cage-sample.ts`). With the queue kept full, the real pool does 1.08 cores of useful work at 98% of its CPU quota, where the simulator assumes 1.32. Most of that is the calibration itself. Rerunning the benchmark the next day with minute-long windows instead of 15 seconds gave 1.24, and the allocator setting the real workers use costs about 4% more. The supervisor takes its 2-3%, and what's left is inside the benchmark's run-to-run noise. Writing the outputs costs nothing measurable.
 
@@ -159,30 +159,30 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 
 ## API
 
-| | |
-|---|---|
-| `POST /api/tasks` | `{ dataset, preset, deadlineSeconds, count?, offset? }`: 201, or 429 with Retry-After |
-| `GET /api/tasks`, `GET /api/tasks/:id` | tasks; one task with its leases, dead letters, decisions and trace id |
-| `GET /api/tasks/:id/items/:n` | a finished image (kept for 24 hours) |
-| `POST /api/exhibits` | `{ policy, durationSeconds, utilization?, dataset?, seed? }` |
-| `GET /api/exhibits`, `/current`, `/:id` | past runs, the one running now, one run |
-| `GET /api/datasets`, `/state`, `/health` | |
-| `/socket.io` | `snapshot` every second and `events` in 150 ms batches |
+|                                          |                                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------------------------- |
+| `POST /api/tasks`                        | `{ dataset, preset, deadlineSeconds, count?, offset? }`: 201, or 429 with Retry-After |
+| `GET /api/tasks`, `GET /api/tasks/:id`   | tasks; one task with its leases, dead letters, decisions and trace id                 |
+| `GET /api/tasks/:id/items/:n`            | a finished image (kept for 24 hours)                                                  |
+| `POST /api/exhibits`                     | `{ policy, durationSeconds, utilization?, dataset?, seed? }`                          |
+| `GET /api/exhibits`, `/current`, `/:id`  | past runs, the one running now, one run                                               |
+| `GET /api/datasets`, `/state`, `/health` |                                                                                       |
+| `/socket.io`                             | `snapshot` every second and `events` in 150 ms batches                                |
 
 ## Where things are
 
-| | |
-|---|---|
-| `packages/core` | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit schedule |
-| `packages/sim` | the simulator, its scenarios, results and charts, and the replay of real runs |
-| `packages/worker` | the worker process and the handle that limits it |
-| `packages/tracing` | OpenTelemetry setup, off unless an endpoint is set |
-| `packages/db` | Prisma schema and migrations |
-| `packages/imaging` | the presets |
-| `apps/supervisor` | the scheduler, the lease engine for exhibits, datasets and the janitor |
-| `apps/api`, `apps/web` | the public API and the dashboard |
-| `bench` | the calibration benchmarks, the exhibit driver, the cage sampler and their results |
-| `deploy` | the deploy script and the backup container |
+|                        |                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `packages/core`        | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit schedule |
+| `packages/sim`         | the simulator, its scenarios, results and charts, and the replay of real runs                                            |
+| `packages/worker`      | the worker process and the handle that limits it                                                                         |
+| `packages/tracing`     | OpenTelemetry setup, off unless an endpoint is set                                                                       |
+| `packages/db`          | Prisma schema and migrations                                                                                             |
+| `packages/imaging`     | the presets                                                                                                              |
+| `apps/supervisor`      | the scheduler, the lease engine for exhibits, datasets and the janitor                                                   |
+| `apps/api`, `apps/web` | the public API and the dashboard                                                                                         |
+| `bench`                | the calibration benchmarks, the exhibit driver, the cage sampler and their results                                       |
+| `deploy`               | the deploy script and the backup container                                                                               |
 
 ## What's next
 

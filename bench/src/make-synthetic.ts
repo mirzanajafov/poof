@@ -60,7 +60,9 @@ function shapes(rand: Rand, width: number, height: number): Buffer {
         : `<ellipse cx="${x}" cy="${y}" rx="${w}" ry="${h}" fill="${color()}" fill-opacity="${opacity}"/>`,
     )
   }
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${parts.join('')}</svg>`)
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${parts.join('')}</svg>`,
+  )
 }
 
 async function render(rand: Rand, width: number, height: number, quality: number): Promise<Buffer> {

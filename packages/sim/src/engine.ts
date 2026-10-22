@@ -301,7 +301,8 @@ export class Simulation {
     this.active.add(task)
     const size = this.policy.engine === 'pool' ? this.policy.chunk : Math.ceil(items / Math.max(1, this.policy.upfront))
     for (let lo = 0; lo < items; lo += size) this.createLease(task, lo, Math.min(items, lo + size), null, 0)
-    if (this.policy.engine === 'pool') for (const process of this.processes) if (process.state === 'idle') this.claim(process)
+    if (this.policy.engine === 'pool')
+      for (const process of this.processes) if (process.state === 'idle') this.claim(process)
   }
 
   private admit(task: SimTask): boolean {
@@ -310,7 +311,11 @@ export class Simulation {
       deadline: t.info.deadline,
       workMs: t.predictedMs * this.correction(t.info.type),
     }))
-    const candidate = { id: task.info.id, deadline: task.info.deadline, workMs: task.predictedMs * this.correction(task.info.type) }
+    const candidate = {
+      id: task.info.id,
+      deadline: task.info.deadline,
+      workMs: task.predictedMs * this.correction(task.info.type),
+    }
     const capacity = effectiveCores(this.curve, this.options.budget, this.machine.cores)
     return admits(candidate, admitted, this.now, capacity)
   }
@@ -443,7 +448,10 @@ export class Simulation {
         if (lease.state === 'pending' && this.breakerState(task.info.type) !== 'open') pending.push(lease)
       }
     }
-    const starts: StartRequest[] = pending.map((lease) => ({ leaseId: String(lease.id), deadline: lease.task.info.deadline }))
+    const starts: StartRequest[] = pending.map((lease) => ({
+      leaseId: String(lease.id),
+      deadline: lease.task.info.deadline,
+    }))
     let grants: Grants
     if (this.policy.budget) {
       const free = this.options.budget - this.liveProcesses()
@@ -538,7 +546,14 @@ export class Simulation {
   private itemTimeout(lease: SimLease): number {
     const scale = this.policy.engine === 'pool' ? this.correction(lease.task.info.type) : 1
     const task = lease.task
-    return itemTimeoutMs(task.predicted, lease.cursor, lease.hi, scale, (i) => task.attempts[i]!, this.options.timeoutRule)
+    return itemTimeoutMs(
+      task.predicted,
+      lease.cursor,
+      lease.hi,
+      scale,
+      (i) => task.attempts[i]!,
+      this.options.timeoutRule,
+    )
   }
 
   private enforceTimeouts(): void {

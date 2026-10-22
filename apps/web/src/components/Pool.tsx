@@ -4,7 +4,15 @@ import Link from 'next/link'
 import { short, until } from '@/lib/format'
 import type { LiveSnapshot } from '@/lib/types'
 
-export function Tiles({ live, throughput, connected }: { live: LiveSnapshot | null; throughput: number; connected: boolean }) {
+export function Tiles({
+  live,
+  throughput,
+  connected,
+}: {
+  live: LiveSnapshot | null
+  throughput: number
+  connected: boolean
+}) {
   const busy = live?.workers.filter((w) => w.lease).length ?? 0
   const tiles = [
     { label: 'Workers busy', value: live ? `${busy} / ${live.budget}` : '–' },
@@ -33,7 +41,9 @@ export function Workers({ live }: { live: LiveSnapshot | null }) {
   return (
     <section>
       <h2 className="text-sm font-semibold">Workers</h2>
-      <p className="text-xs text-muted">The budget is {live.budget}. Each worker takes ten images at a time, most urgent task first.</p>
+      <p className="text-xs text-muted">
+        The budget is {live.budget}. Each worker takes ten images at a time, most urgent task first.
+      </p>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {slots.map((worker, i) => {
           const lease = worker?.lease
@@ -58,7 +68,10 @@ export function Workers({ live }: { live: LiveSnapshot | null }) {
                 )}
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
-                <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${progress * 100}%` }} />
+                <div
+                  className="h-full rounded-full bg-accent transition-[width]"
+                  style={{ width: `${progress * 100}%` }}
+                />
               </div>
             </div>
           )
@@ -87,10 +100,15 @@ export function Queue({ live }: { live: LiveSnapshot | null }) {
                   <Link href={`/tasks/${task.id}`} className="font-medium underline-offset-2 hover:underline">
                     Task {short(task.id)}
                   </Link>
-                  <span className={`tabular text-xs ${late ? 'text-bad' : 'text-muted'}`}>{until(task.deadline, now)}</span>
+                  <span className={`tabular text-xs ${late ? 'text-bad' : 'text-muted'}`}>
+                    {until(task.deadline, now)}
+                  </span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${(task.done / task.items) * 100}%` }} />
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{ width: `${(task.done / task.items) * 100}%` }}
+                  />
                 </div>
                 <div className="tabular mt-1 text-xs text-muted">
                   {task.done} of {task.items} · {task.preset}

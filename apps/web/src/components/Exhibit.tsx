@@ -59,9 +59,9 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
     <section className="rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h2 className="text-base font-semibold">Let a splitting policy run the box</h2>
       <p className="mt-1 max-w-3xl text-sm text-muted">
-        For a minute the pool steps aside and a policy that gives each task its own workers takes over, with tasks arriving at
-        1.2 times what the box can do. Workers that fall behind call helpers. Everything runs inside the box&apos;s limits: 1.5
-        CPUs, 1.5 GB, 35 processes.
+        For a minute the pool steps aside and a policy that gives each task its own workers takes over, with tasks
+        arriving at 1.2 times what the box can do. Workers that fall behind call helpers. Everything runs inside the
+        box&apos;s limits: 1.5 CPUs, 1.5 GB, 35 processes.
       </p>
       {exhibit ? (
         <ExhibitLive exhibit={exhibit} processes={processes} />
@@ -139,7 +139,9 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
       <Sparkline points={processes} budget={exhibit.budget} />
       <div>
         <h3 className="text-sm font-semibold">Who called whom</h3>
-        <p className="text-xs text-muted">One tree per task. A child is a helper the parent called. Hover a node for its range.</p>
+        <p className="text-xs text-muted">
+          One tree per task. A child is a helper the parent called. Hover a node for its range.
+        </p>
         <div className="mt-2 flex gap-4 overflow-x-auto pb-2">
           {exhibit.tasks.length === 0 && <p className="text-sm text-muted">No tasks yet.</p>}
           {exhibit.tasks.map((task) => (
@@ -174,7 +176,17 @@ function LeaseTree({ leases }: { leases: ExhibitLease[] }) {
         {layout.edges.map((edge) => {
           const a = at.get(edge.from)!
           const b = at.get(edge.to)!
-          return <line key={`${edge.from}-${edge.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="stroke-line" strokeWidth={1.5} />
+          return (
+            <line
+              key={`${edge.from}-${edge.to}`}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              className="stroke-line"
+              strokeWidth={1.5}
+            />
+          )
         })}
         {layout.nodes.map(({ lease, x, y }) => (
           <circle key={lease.id} cx={x} cy={y} r={6} strokeWidth={1.5} className={stateClass[lease.state]}>
@@ -219,16 +231,41 @@ function Sparkline({ points, budget }: { points: number[]; budget: number | null
   return (
     <figure>
       <figcaption className="text-sm font-semibold">Live worker processes</figcaption>
-      <svg viewBox={`0 0 ${width} ${height}`} className="mt-1 h-24 w-full" preserveAspectRatio="none" role="img" aria-label="Processes over the run">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="mt-1 h-24 w-full"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Processes over the run"
+      >
         <line x1={0} x2={width} y1={height - 0.5} y2={height - 0.5} className="stroke-line" />
-        <line x1={0} x2={width} y1={y(Math.round(max))} y2={y(Math.round(max))} className="stroke-line" vectorEffect="non-scaling-stroke" />
+        <line
+          x1={0}
+          x2={width}
+          y1={y(Math.round(max))}
+          y2={y(Math.round(max))}
+          className="stroke-line"
+          vectorEffect="non-scaling-stroke"
+        />
         {budget !== null && (
-          <line x1={0} x2={width} y1={y(budget)} y2={y(budget)} className="stroke-muted" strokeDasharray="5 4" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          <line
+            x1={0}
+            x2={width}
+            y1={y(budget)}
+            y2={y(budget)}
+            className="stroke-muted"
+            strokeDasharray="5 4"
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+          />
         )}
-        {points.length > 1 && <path d={d} className="fill-none stroke-storm" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+        {points.length > 1 && (
+          <path d={d} className="fill-none stroke-storm" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        )}
       </svg>
       <p className="text-xs text-muted">
-        Top line: {Math.round(max)} processes. One point a second over the last two minutes{budget !== null ? `. Dashed: the budget of ${budget}.` : '. This policy has no budget.'}
+        Top line: {Math.round(max)} processes. One point a second over the last two minutes
+        {budget !== null ? `. Dashed: the budget of ${budget}.` : '. This policy has no budget.'}
       </p>
     </figure>
   )

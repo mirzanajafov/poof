@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { emptyEstimate, emptyWorkRatio, priorWorkRatio, updateEstimate, updateWorkRatio, workRatio } from '../src/estimate.ts'
+import {
+  emptyEstimate,
+  emptyWorkRatio,
+  priorWorkRatio,
+  updateEstimate,
+  updateWorkRatio,
+  workRatio,
+} from '../src/estimate.ts'
 import { Rng } from '../src/rng.ts'
 
 describe('workRatio', () => {

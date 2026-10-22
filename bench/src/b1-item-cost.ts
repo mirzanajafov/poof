@@ -105,7 +105,12 @@ for (const name of values.presets!.split(',')) {
       images: images.length,
       wallMs: summary(images.map((i) => i.wallMs)),
       msPerMp: summary(images.map((i) => i.wallMs / i.mp)),
-      costFit: { interceptMs: round(cost.intercept), msPerMp: round(cost.slope), r2: round(cost.r2), logResidualSd: round(cost.logResidualSd) },
+      costFit: {
+        interceptMs: round(cost.intercept),
+        msPerMp: round(cost.slope),
+        r2: round(cost.r2),
+        logResidualSd: round(cost.logResidualSd),
+      },
       rssFit: { interceptMb: round(memory.intercept), mbPerMp: round(memory.slope), r2: round(memory.r2) },
     }
     console.log(name, dataset.source, JSON.stringify(fits[name]![dataset.source]))
@@ -116,6 +121,12 @@ const path = await writeResult(values.label!, 'b1-item-cost', {
   env: environment(values.label!),
   baseRssMb: round(baseRssMb),
   fits,
-  samples: samples.map((s) => ({ ...s, readMs: round(s.readMs), wallMs: round(s.wallMs), cpuMs: round(s.cpuMs), peakRssMb: round(s.peakRssMb) })),
+  samples: samples.map((s) => ({
+    ...s,
+    readMs: round(s.readMs),
+    wallMs: round(s.wallMs),
+    cpuMs: round(s.cpuMs),
+    peakRssMb: round(s.peakRssMb),
+  })),
 })
 console.log(`wrote ${path}`)
