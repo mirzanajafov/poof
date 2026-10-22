@@ -178,4 +178,11 @@ describe('live view', () => {
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()
   })
+
+  it('lets the default web origin read the polling handshake', async () => {
+    running = await start(supervisor.url)
+    const handshake = await http().get('/socket.io/?EIO=4&transport=polling').set('Origin', 'http://localhost:3112')
+    expect(handshake.status).toBe(200)
+    expect(handshake.headers['access-control-allow-origin']).toBe('http://localhost:3112')
+  })
 })
