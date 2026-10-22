@@ -11,17 +11,19 @@ export default defineConfig(
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
   {
-    languageOptions: { parserOptions: { projectService: true } },
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
     rules: {
       '@typescript-eslint/array-type': ['error', { default: 'array-simple' }],
+      '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
       '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       '@typescript-eslint/no-inferrable-types': ['error', { ignoreProperties: true }],
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
     },
   },
   {
     rules: {
       '@typescript-eslint/no-base-to-string': 'off',
-      '@typescript-eslint/no-confusing-void-expression': ['off', { ignoreArrowShorthand: true }],
+      '@typescript-eslint/no-confusing-void-expression': 'off',
       '@typescript-eslint/no-deprecated': 'off',
       '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
@@ -32,7 +34,7 @@ export default defineConfig(
       '@typescript-eslint/prefer-for-of': 'off',
       '@typescript-eslint/prefer-optional-chain': 'off',
       '@typescript-eslint/require-await': 'off',
-      '@typescript-eslint/restrict-template-expressions': ['off', { allowNumber: true }],
+      '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
       'no-useless-assignment': 'off',
     },
