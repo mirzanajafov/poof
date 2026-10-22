@@ -22,7 +22,8 @@ if (!values.data) exitWithUsage('missing --data, and DATA_DIR is not set')
 const sources = values.from.map(
   (spec) => parseDatasetSource(spec) ?? exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name matching ${datasetNamePattern.source}`),
 )
-if (new Set(sources.map(({ name }) => name)).size < sources.length) exitWithUsage('two --from arguments share a name')
+const repeated = sources.find(({ name }, index) => sources.findIndex((source) => source.name === name) !== index)
+if (repeated) exitWithUsage(`two --from arguments share the name ${repeated.name}`)
 
 for (const { name, dir } of sources) {
   const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
