@@ -186,6 +186,6 @@ describe('live view', () => {
     expect(allowed.status).toBe(200)
     expect(allowed.headers['access-control-allow-origin']).toBe('https://poof.example')
     const foreign = await handshake('https://elsewhere.example')
-    expect(foreign.headers['access-control-allow-origin']).not.toBe('https://elsewhere.example')
+    expect(foreign.headers['access-control-allow-origin']).toBe('https://poof.example')
   })
 })
