@@ -1,6 +1,7 @@
 import { copyFile, link, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { datasetNamePattern } from './datasets/dataset-name.js'
 import { parseDatasetSource } from './datasets/dataset-source.js'
 
 function exitWithUsage(problem: string): never {
@@ -15,10 +16,11 @@ const { values } = parseArgs({
   },
 })
 
-if (!values.from?.length || !values.data) exitWithUsage('missing --from or --data')
+if (!values.from?.length) exitWithUsage('missing --from')
+if (!values.data) exitWithUsage('missing --data, and DATA_DIR is not set')
 
 const sources = values.from.map(
-  (spec) => parseDatasetSource(spec) ?? exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name of lowercase letters, digits and dashes`),
+  (spec) => parseDatasetSource(spec) ?? exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name matching ${datasetNamePattern.source}`),
 )
 
 for (const { name, dir } of sources) {

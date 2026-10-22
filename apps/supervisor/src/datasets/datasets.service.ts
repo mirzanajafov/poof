@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { Env } from '../config/env.js'
-import { isDatasetName } from './dataset-source.js'
+import { datasetNamePattern } from './dataset-name.js'
 
 export interface DatasetItem {
   file: string
@@ -26,7 +26,7 @@ export class Datasets {
   }
 
   async get(name: string): Promise<Dataset> {
-    if (!isDatasetName(name)) throw new NotFoundException(`no dataset ${name}`)
+    if (!datasetNamePattern.test(name)) throw new NotFoundException(`no dataset ${name}`)
     const cached = this.cache.get(name)
     if (cached) return cached
     let raw: string
