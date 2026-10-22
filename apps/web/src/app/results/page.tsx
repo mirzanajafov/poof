@@ -91,8 +91,8 @@ export default async function Results() {
           </table>
         </div>
         <p className="mt-1 text-xs text-muted">
-          Share of submitted tasks finished by their deadline, mean of 20 seeds; rejected tasks count as misses. Hover a
-          cell for its 95% interval.
+          Share of submitted tasks finished by their deadline, mean of 20 seeds, with rejected tasks counted as misses.
+          Hover a cell for its 95% interval.
         </p>
       </section>
       {charts.map((chart, i) => (
