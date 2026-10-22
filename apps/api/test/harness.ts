@@ -75,6 +75,7 @@ export async function start(supervisorUrl: string, env: Record<string, string> =
     DATA_DIR: dataDir,
     ADMIN_TOKEN: adminToken,
     TRUST_PROXY: 'loopback',
+    WEB_ORIGIN: 'http://localhost:3112',
     TASKS_PER_MINUTE: '10',
     EXHIBITS_PER_HOUR: '3',
     EXHIBIT_COOLDOWN_SECONDS: '120',
