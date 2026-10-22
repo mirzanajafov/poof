@@ -10,14 +10,44 @@ const items = replayItems(manifest, measured, 'webp-1600')
 const run = (policy: string): ExhibitRun => ({
   id: 'x',
   policy,
-  params: { durationSeconds: 60, utilization: 1.2, minItems: 20, maxItems: 60, slackMin: 0.5, slackMax: 3, seed: 3, dataset: 'synthetic', preset: 'webp-1600' },
-  stats: { submitted: 0, rejected: 0, done: 0, met: 0, cancelled: 0, items: 0, spawns: 0, splits: 0, peakProcesses: 0, exits: {} },
+  params: {
+    durationSeconds: 60,
+    utilization: 1.2,
+    minItems: 20,
+    maxItems: 60,
+    slackMin: 0.5,
+    slackMax: 3,
+    seed: 3,
+    dataset: 'synthetic',
+    preset: 'webp-1600',
+  },
+  stats: {
+    submitted: 0,
+    rejected: 0,
+    done: 0,
+    met: 0,
+    cancelled: 0,
+    items: 0,
+    spawns: 0,
+    splits: 0,
+    peakProcesses: 0,
+    exits: {},
+  },
 })
 
 describe('replay', () => {
   it('submits exactly the tasks the exhibit schedule would', () => {
     const schedule = exhibitSchedule(
-      { durationMs: 60_000, utilization: 1.2, capacityCores, minItems: 20, maxItems: 60, slackMin: 0.5, slackMax: 3, seed: 3 },
+      {
+        durationMs: 60_000,
+        utilization: 1.2,
+        capacityCores,
+        minItems: 20,
+        maxItems: 60,
+        slackMin: 0.5,
+        slackMax: 3,
+        seed: 3,
+      },
       items.map((i) => i.predictedMs),
     )
     const result = replay(run('forecast+preempt'), items, calibration)
@@ -27,7 +57,9 @@ describe('replay', () => {
 
   it('uses the measured cost of each image and is deterministic', () => {
     expect(items[3]!.costMs).toBe(230)
-    expect(JSON.stringify(replay(run('box'), items, calibration))).toBe(JSON.stringify(replay(run('box'), items, calibration)))
+    expect(JSON.stringify(replay(run('box'), items, calibration))).toBe(
+      JSON.stringify(replay(run('box'), items, calibration)),
+    )
   })
 
   it('starts the pool warm, with no spawns', () => {

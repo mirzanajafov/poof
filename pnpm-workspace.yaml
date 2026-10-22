@@ -1,9 +1,9 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "bench"
+  - 'apps/*'
+  - 'packages/*'
+  - 'bench'
 
 allowBuilds:
-  "@prisma/engines": true
+  '@prisma/engines': true
   prisma: true
   sharp: true

@@ -107,7 +107,8 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
       child.stderr!.on('data', (chunk: Buffer) => {
         this.stderr = (this.stderr + chunk.toString()).slice(-4096)
       })
-      const onEarlyExit = (code: number | null) => reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
+      const onEarlyExit = (code: number | null) =>
+        reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
       child.once('exit', onEarlyExit)
       child.on('message', (message: FromWorker) => {
         if (message.type === 'ready') {

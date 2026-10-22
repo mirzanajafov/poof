@@ -27,7 +27,9 @@ export function useLive(): Live {
 
   useEffect(() => {
     since.current = Date.now()
-    const socket = io(process.env.NEXT_PUBLIC_LIVE_URL ?? window.location.origin, { transports: ['websocket', 'polling'] })
+    const socket = io(process.env.NEXT_PUBLIC_LIVE_URL ?? window.location.origin, {
+      transports: ['websocket', 'polling'],
+    })
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
     socket.on('snapshot', (next: Snapshot) => {

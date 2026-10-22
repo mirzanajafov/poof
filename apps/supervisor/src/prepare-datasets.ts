@@ -20,7 +20,9 @@ if (!values.from?.length) exitWithUsage('missing --from')
 if (!values.data) exitWithUsage('missing --data, and DATA_DIR is not set')
 
 const sources = values.from.map(
-  (spec) => parseDatasetSource(spec) ?? exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name matching ${datasetNamePattern.source}`),
+  (spec) =>
+    parseDatasetSource(spec) ??
+    exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name matching ${datasetNamePattern.source}`),
 )
 const repeated = sources.find(({ name }, index) => sources.findIndex((source) => source.name === name) !== index)
 if (repeated) exitWithUsage(`two --from arguments share the name ${repeated.name}`)

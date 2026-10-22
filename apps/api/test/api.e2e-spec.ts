@@ -44,7 +44,12 @@ async function seedTask() {
       done: 19,
       deadLettered: 1,
       deadline: new Date(Date.now() + 60_000),
-      leases: { create: [{ lo: 0, hi: 10, cursor: 10, state: 'DONE' }, { lo: 10, hi: 20, cursor: 20, state: 'DONE' }] },
+      leases: {
+        create: [
+          { lo: 0, hi: 10, cursor: 10, state: 'DONE' },
+          { lo: 10, hi: 20, cursor: 20, state: 'DONE' },
+        ],
+      },
       deadLetters: { create: [{ item: 4, attempts: 3, error: 'bad input' }] },
       decisions: { create: [{ kind: 'worker-exit', detail: { reason: 'crash', item: 4 } }] },
     },
@@ -74,7 +79,12 @@ describe('read model', () => {
     await mkdir(join(running.dataDir, 'datasets', 'tiny'), { recursive: true })
     await writeFile(
       join(running.dataDir, 'datasets', 'tiny', 'manifest.json'),
-      JSON.stringify({ items: [{ file: 'a.jpg', width: 4000, height: 3000 }, { file: 'b.jpg', width: 1000, height: 1000 }] }),
+      JSON.stringify({
+        items: [
+          { file: 'a.jpg', width: 4000, height: 3000 },
+          { file: 'b.jpg', width: 1000, height: 1000 },
+        ],
+      }),
     )
     const res = await http().get('/api/datasets')
     expect(res.body).toEqual([{ name: 'tiny', items: 2, meanMp: 6.5 }])
@@ -105,7 +115,13 @@ describe('submissions', () => {
     const busy = await http().post('/api/tasks').send(body)
     expect(busy.status).toBe(429)
     expect(busy.headers['retry-after']).toBe('7')
-    expect((await http().post('/api/tasks').send({ ...body, extra: true })).status).toBe(400)
+    expect(
+      (
+        await http()
+          .post('/api/tasks')
+          .send({ ...body, extra: true })
+      ).status,
+    ).toBe(400)
   })
 
   it('answers 502 when the supervisor is down', async () => {
@@ -139,13 +155,16 @@ describe('exhibits', () => {
     expect(cooling.body.message).toMatch(/cooling down/)
     expect(Number(cooling.headers['retry-after'])).toBeGreaterThan(100)
     expect(Number(cooling.headers['retry-after'])).toBeLessThanOrEqual(150)
-    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(201)
+    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(
+      201,
+    )
   })
 
   it('lets one address start three public exhibits an hour', async () => {
     running = await start(supervisor.url, { EXHIBIT_COOLDOWN_SECONDS: '0' })
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
-    for (let i = 0; i < 3; i++) expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
+    for (let i = 0; i < 3; i++)
+      expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
     const limited = await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })
     expect(limited.status).toBe(429)
     expect(limited.body.message).toMatch(/too many requests/)

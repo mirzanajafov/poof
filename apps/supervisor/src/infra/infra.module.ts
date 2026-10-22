@@ -45,7 +45,9 @@ export class Traces implements OnApplicationShutdown {
   private readonly tracing: Tracing
 
   constructor(config: ConfigService<Env, true>) {
-    this.tracing = startTracing('poof-supervisor', { endpoint: config.get('OTEL_EXPORTER_OTLP_ENDPOINT', { infer: true }) })
+    this.tracing = startTracing('poof-supervisor', {
+      endpoint: config.get('OTEL_EXPORTER_OTLP_ENDPOINT', { infer: true }),
+    })
   }
 
   get tracer(): Tracer {

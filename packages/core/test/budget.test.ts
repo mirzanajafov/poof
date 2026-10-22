@@ -3,12 +3,30 @@ import { allocate } from '../src/budget.ts'
 import type { SplitRequest } from '../src/types.ts'
 
 function split(leaseId: string, deadline: number, k: number, timeLeftMs = 10_000): SplitRequest {
-  return { leaseId, taskId: leaseId, deadline, k, remaining: 100, pain: 1.2, projectedMs: 0, timeLeftMs, itemMs: 50, opportunistic: false }
+  return {
+    leaseId,
+    taskId: leaseId,
+    deadline,
+    k,
+    remaining: 100,
+    pain: 1.2,
+    projectedMs: 0,
+    timeLeftMs,
+    itemMs: 50,
+    opportunistic: false,
+  }
 }
 
 describe('allocate', () => {
   it('hands out tokens earliest deadline first', () => {
-    const grants = allocate(3, [{ leaseId: 'root', deadline: 9_000 }], [split('a', 5_000, 2), split('b', 20_000, 2)], 0, 200, 4)
+    const grants = allocate(
+      3,
+      [{ leaseId: 'root', deadline: 9_000 }],
+      [split('a', 5_000, 2), split('b', 20_000, 2)],
+      0,
+      200,
+      4,
+    )
     expect(grants.splits.get('a')).toBe(2)
     expect(grants.starts).toEqual(['root'])
     expect(grants.splits.has('b')).toBe(false)
@@ -28,7 +46,17 @@ describe('allocate', () => {
   })
 
   it('treats a start whose deadline has passed as lost', () => {
-    const grants = allocate(1, [{ leaseId: 'late', deadline: 100 }, { leaseId: 'fresh', deadline: 50_000 }], [], 1_000, 200, 4)
+    const grants = allocate(
+      1,
+      [
+        { leaseId: 'late', deadline: 100 },
+        { leaseId: 'fresh', deadline: 50_000 },
+      ],
+      [],
+      1_000,
+      200,
+      4,
+    )
     expect(grants.starts).toEqual(['fresh'])
   })
 
@@ -47,12 +75,20 @@ describe('preemption', () => {
   ]
 
   it('yields the running lease with the latest deadline for urgent work that found no token', () => {
-    const grants = allocate(0, [{ leaseId: 'root', deadline: 20_000 }], [], 0, 200, 4, { running, yielding: 0, minRemaining: 2 })
+    const grants = allocate(0, [{ leaseId: 'root', deadline: 20_000 }], [], 0, 200, 4, {
+      running,
+      yielding: 0,
+      minRemaining: 2,
+    })
     expect(grants.preempt).toEqual(['late-deadline'])
   })
 
   it('never preempts work that is due sooner than the waiting request', () => {
-    const grants = allocate(0, [{ leaseId: 'root', deadline: 95_000 }], [], 0, 200, 4, { running, yielding: 0, minRemaining: 2 })
+    const grants = allocate(0, [{ leaseId: 'root', deadline: 95_000 }], [], 0, 200, 4, {
+      running,
+      yielding: 0,
+      minRemaining: 2,
+    })
     expect(grants.preempt).toEqual([])
   })
 

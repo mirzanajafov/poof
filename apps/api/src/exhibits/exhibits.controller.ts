@@ -81,7 +81,15 @@ export class ExhibitsController {
       include: {
         tasks: {
           orderBy: { submittedAt: 'asc' },
-          select: { id: true, status: true, items: true, done: true, submittedAt: true, deadline: true, finishedAt: true },
+          select: {
+            id: true,
+            status: true,
+            items: true,
+            done: true,
+            submittedAt: true,
+            deadline: true,
+            finishedAt: true,
+          },
         },
       },
     })
@@ -98,7 +106,13 @@ export class ExhibitsController {
         throw new BadRequestException(`exhibits are limited to ${this.publicSeconds} s`)
       }
       if (this.cooldownSeconds > 0) {
-        const started = await this.cache.redis.set('poof:exhibit-cooldown', '1', 'EX', this.cooldownSeconds + body.durationSeconds, 'NX')
+        const started = await this.cache.redis.set(
+          'poof:exhibit-cooldown',
+          '1',
+          'EX',
+          this.cooldownSeconds + body.durationSeconds,
+          'NX',
+        )
         if (!started) {
           const ttl = await this.cache.redis.ttl('poof:exhibit-cooldown')
           res.setHeader('Retry-After', String(Math.max(1, ttl)))

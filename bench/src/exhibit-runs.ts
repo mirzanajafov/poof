@@ -19,7 +19,10 @@ const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
-async function call(path: string, init?: RequestInit): Promise<{ status: number; body: Record<string, unknown> | null }> {
+async function call(
+  path: string,
+  init?: RequestInit,
+): Promise<{ status: number; body: Record<string, unknown> | null }> {
   const res = await fetch(`${values.api}${path}`, init)
   return { status: res.status, body: (await res.json().catch(() => null)) as Record<string, unknown> | null }
 }

@@ -23,7 +23,14 @@ import {
 } from '@poof/core'
 import type { PresetName } from '@poof/imaging'
 import { SpanStatusCode, traceIdOf, within, type Context, type Span, type Tracer } from '@poof/tracing'
-import { WorkerHandle, type ExitReason, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
+import {
+  WorkerHandle,
+  type ExitReason,
+  type ItemDead,
+  type ItemDone,
+  type LeaseDone,
+  type WorkerExit,
+} from '@poof/worker'
 import type { Dataset, DatasetItem, Datasets } from '../datasets/datasets.service.js'
 import type { Database, Events } from '../infra/infra.module.js'
 import { exitColumn } from '../workers/exit.js'
@@ -148,7 +155,13 @@ export class LeaseEngine {
     return this.workers.size + this.reserved
   }
 
-  async submit(dataset: Dataset, items: DatasetItem[], preset: PresetName, deadlineMs: number, offset: number): Promise<boolean> {
+  async submit(
+    dataset: Dataset,
+    items: DatasetItem[],
+    preset: PresetName,
+    deadlineMs: number,
+    offset: number,
+  ): Promise<boolean> {
     if (this.stopped) return false
     const model = serverCostModels[preset]!
     const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
@@ -161,7 +174,13 @@ export class LeaseEngine {
       'task',
       {
         startTime: now,
-        attributes: { 'poof.task': id, 'poof.dataset': dataset.name, 'poof.preset': preset, 'poof.items': items.length, 'poof.offset': offset },
+        attributes: {
+          'poof.task': id,
+          'poof.dataset': dataset.name,
+          'poof.preset': preset,
+          'poof.items': items.length,
+          'poof.offset': offset,
+        },
       },
       this.options.trace,
     )
@@ -212,8 +231,14 @@ export class LeaseEngine {
     this.tasks.set(id, task)
     this.persist(() => this.db.client.task.create({ data: base }))
     const size = Math.ceil(task.info.items / Math.max(1, this.options.policy.upfront))
-    for (let lo = 0; lo < task.info.items; lo += size) this.createLease(task, lo, Math.min(task.info.items, lo + size), null, 0)
-    this.events.publish('task.accepted', { task: id, items: items.length, deadline: deadlineMs, exhibit: this.options.exhibitId })
+    for (let lo = 0; lo < task.info.items; lo += size)
+      this.createLease(task, lo, Math.min(task.info.items, lo + size), null, 0)
+    this.events.publish('task.accepted', {
+      task: id,
+      items: items.length,
+      deadline: deadlineMs,
+      exhibit: this.options.exhibitId,
+    })
     return true
   }
 
@@ -234,8 +259,13 @@ export class LeaseEngine {
             where: { id: task.info.id },
             data: { status: 'FAILED', finishedAt: new Date(), done: task.done, deadLettered: task.dead },
           }),
-          this.db.client.lease.updateMany({ where: { taskId: task.info.id, state: { not: 'DONE' } }, data: { state: 'DONE' } }),
-          this.db.client.decision.create({ data: { kind: 'cancel', taskId: task.info.id, detail: { reason: 'exhibit ended' } } }),
+          this.db.client.lease.updateMany({
+            where: { taskId: task.info.id, state: { not: 'DONE' } },
+            data: { state: 'DONE' },
+          }),
+          this.db.client.decision.create({
+            data: { kind: 'cancel', taskId: task.info.id, detail: { reason: 'exhibit ended' } },
+          }),
         ]),
       )
     }
@@ -294,7 +324,13 @@ export class LeaseEngine {
     return this.spawnEstimate.count > 0 ? this.spawnEstimate.mean : 180
   }
 
-  private createLease(task: ExhibitTask, lo: number, hi: number, parent: ExhibitLease | null, depth: number): ExhibitLease {
+  private createLease(
+    task: ExhibitTask,
+    lo: number,
+    hi: number,
+    parent: ExhibitLease | null,
+    depth: number,
+  ): ExhibitLease {
     const id = randomUUID()
     const lease: ExhibitLease = {
       id,
@@ -360,20 +396,34 @@ export class LeaseEngine {
     const starts: StartRequest[] = []
     for (const task of this.active()) {
       if (this.breakerState(task.preset) === 'open') continue
-      for (const lease of task.leases) if (lease.state === 'pending') starts.push({ leaseId: lease.id, deadline: task.info.deadline })
+      for (const lease of task.leases)
+        if (lease.state === 'pending') starts.push({ leaseId: lease.id, deadline: task.info.deadline })
     }
     let grants: Grants
     if (policy.budget) {
-      grants = allocate(this.options.budget - this.processes, starts, requests, now, this.spawnMs, policy.fanout, this.preemption())
+      grants = allocate(
+        this.options.budget - this.processes,
+        starts,
+        requests,
+        now,
+        this.spawnMs,
+        policy.fanout,
+        this.preemption(),
+      )
     } else {
-      grants = { starts: starts.map((s) => s.leaseId), splits: new Map(requests.map((r) => [r.leaseId, r.k])), preempt: [] }
+      grants = {
+        starts: starts.map((s) => s.leaseId),
+        splits: new Map(requests.map((r) => [r.leaseId, r.k])),
+        preempt: [],
+      }
     }
     const byLease = new Map(requests.map((r) => [r.leaseId, r]))
     for (const id of grants.preempt) void this.yieldLease(this.leases.get(id)!)
     for (const [id, k] of grants.splits) void this.split(this.leases.get(id)!, k, byLease.get(id)!)
     for (const id of grants.starts) {
       const lease = this.leases.get(id)!
-      if (lease.state === 'pending' && (!policy.breaker || this.breaker(lease.task.preset).allows(now))) this.launch(lease)
+      if (lease.state === 'pending' && (!policy.breaker || this.breaker(lease.task.preset).allows(now)))
+        this.launch(lease)
     }
   }
 
@@ -404,18 +454,31 @@ export class LeaseEngine {
     lease.hi = plan.cut
     lease.lastSplitAt = Date.now()
     this.stats.splits++
-    lease.span.addEvent('split', { 'poof.k': plan.children.length, 'poof.cut': plan.cut, 'poof.pain': request.pain, 'poof.worker_items': workerItems })
+    lease.span.addEvent('split', {
+      'poof.k': plan.children.length,
+      'poof.cut': plan.cut,
+      'poof.pain': request.pain,
+      'poof.worker_items': workerItems,
+    })
     this.persist(() => this.db.client.lease.update({ where: { id: lease.id }, data: { hi: lease.hi } }))
     this.persist(() =>
       this.db.client.decision.create({
         data: {
           kind: 'split',
           taskId: lease.task.info.id,
-          detail: { lease: lease.id, k: plan.children.length, cut: plan.cut, pain: request.pain, projectedMs: request.projectedMs, workerItems },
+          detail: {
+            lease: lease.id,
+            k: plan.children.length,
+            cut: plan.cut,
+            pain: request.pain,
+            projectedMs: request.projectedMs,
+            workerItems,
+          },
         },
       }),
     )
-    for (const range of plan.children) this.launch(this.createLease(lease.task, range.lo, range.hi, lease, lease.depth + 1))
+    for (const range of plan.children)
+      this.launch(this.createLease(lease.task, range.lo, range.hi, lease, lease.depth + 1))
   }
 
   private async yieldLease(lease: ExhibitLease): Promise<void> {
@@ -446,12 +509,22 @@ export class LeaseEngine {
       return
     }
     lease.state = 'starting'
-    const worker: ExhibitWorker = { id: randomUUID(), handle: new WorkerHandle({ limits: { rssMb: this.options.rssMb } }), lease, yielding: false, items: 0 }
+    const worker: ExhibitWorker = {
+      id: randomUUID(),
+      handle: new WorkerHandle({ limits: { rssMb: this.options.rssMb } }),
+      lease,
+      yielding: false,
+      items: 0,
+    }
     lease.worker = worker
     this.workers.add(worker)
     this.stats.peakProcesses = Math.max(this.stats.peakProcesses, this.workers.size)
     const started = Date.now()
-    const spawn = this.options.tracer.startSpan('spawn', { attributes: { 'poof.processes': this.workers.size } }, within(lease.span))
+    const spawn = this.options.tracer.startSpan(
+      'spawn',
+      { attributes: { 'poof.processes': this.workers.size } },
+      within(lease.span),
+    )
     worker.handle.start().then(
       () => {
         spawn.setAttribute('poof.worker.pid', worker.handle.pid)
@@ -485,7 +558,9 @@ export class LeaseEngine {
     lease.startedAt ??= Date.now()
     if (task.status === 'QUEUED') {
       task.status = 'RUNNING'
-      this.persist(() => this.db.client.task.update({ where: { id: task.info.id }, data: { status: 'RUNNING', startedAt: new Date() } }))
+      this.persist(() =>
+        this.db.client.task.update({ where: { id: task.info.id }, data: { status: 'RUNNING', startedAt: new Date() } }),
+      )
     }
     const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, 1, (i) => task.attempts.get(i) ?? 0)
     worker.handle.assign(
@@ -500,7 +575,9 @@ export class LeaseEngine {
       },
       timeoutMs,
     )
-    this.persist(() => this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'RUNNING', workerId: worker.id } }))
+    this.persist(() =>
+      this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'RUNNING', workerId: worker.id } }),
+    )
   }
 
   private onItem(worker: ExhibitWorker, message: ItemDone | ItemDead): void {
@@ -541,7 +618,9 @@ export class LeaseEngine {
     worker.lease = null
     lease.span.setAttribute('poof.hi', lease.hi)
     lease.span.end()
-    this.persist(() => this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.hi } }))
+    this.persist(() =>
+      this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.hi } }),
+    )
     this.settle(lease.task)
     const next = worker.yielding || this.stopped ? undefined : lease.task.leases.find((l) => l.state === 'pending')
     if (next && lease.task.status === 'RUNNING') {
@@ -571,7 +650,8 @@ export class LeaseEngine {
     if (!lease || this.stopped) return
     const task = lease.task
     lease.worker = null
-    if (exit.reason !== 'normal') lease.span.addEvent('worker exit', { 'poof.reason': exit.reason, 'poof.item': exit.inflight?.item ?? -1 })
+    if (exit.reason !== 'normal')
+      lease.span.addEvent('worker exit', { 'poof.reason': exit.reason, 'poof.item': exit.inflight?.item ?? -1 })
     if (exit.inflight && exit.inflight.lease === lease.id && exit.reason !== 'normal') {
       const item = exit.inflight.item
       const attempts = (task.attempts.get(item) ?? 0) + 1
@@ -640,13 +720,23 @@ export class LeaseEngine {
   private traceImage(parent: Span, message: ItemDone | ItemDead): void {
     if (message.ok) {
       this.options.tracer
-        .startSpan('image', { startTime: Date.now() - message.wallMs, attributes: { 'poof.item': message.item, 'poof.cpu_ms': Math.round(message.cpuMs) } }, within(parent))
+        .startSpan(
+          'image',
+          {
+            startTime: Date.now() - message.wallMs,
+            attributes: { 'poof.item': message.item, 'poof.cpu_ms': Math.round(message.cpuMs) },
+          },
+          within(parent),
+        )
         .end()
       return
     }
-    const span = this.options.tracer.startSpan('image', { attributes: { 'poof.item': message.item, 'poof.attempts': message.attempts } }, within(parent))
+    const span = this.options.tracer.startSpan(
+      'image',
+      { attributes: { 'poof.item': message.item, 'poof.attempts': message.attempts } },
+      within(parent),
+    )
     span.setStatus({ code: SpanStatusCode.ERROR, message: message.error.slice(0, 200) })
     span.end()
   }
 }
-

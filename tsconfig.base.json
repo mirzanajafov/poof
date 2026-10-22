@@ -11,6 +11,10 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "removeComments": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"]
   }
 }

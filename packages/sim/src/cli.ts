@@ -77,10 +77,18 @@ await new Promise<void>((resolve, reject) => {
     }
     worker.on('message', (message: { metrics: RunMetrics; series: Sample[] | null; runMs: number }) => {
       metrics.push(message.metrics)
-      if (message.series) series.push({ machine: current!.machine, scenario: current!.scenario, policy: current!.policy, samples: message.series })
+      if (message.series)
+        series.push({
+          machine: current!.machine,
+          scenario: current!.scenario,
+          policy: current!.policy,
+          samples: message.series,
+        })
       runMs += message.runMs
       if (++finished % 100 === 0 || finished === jobs.length) {
-        process.stdout.write(`\r${finished}/${jobs.length} runs, ${((performance.now() - started) / 1000).toFixed(0)} s`)
+        process.stdout.write(
+          `\r${finished}/${jobs.length} runs, ${((performance.now() - started) / 1000).toFixed(0)} s`,
+        )
       }
       next()
     })
@@ -111,7 +119,9 @@ for (const machine of values.machines!.split(',')) {
 }
 
 console.log(`\n${table(cells)}`)
-console.log(`\nsimulated ${jobs.length} runs in ${((performance.now() - started) / 1000).toFixed(1)} s, ${(runMs / jobs.length).toFixed(0)} ms per run`)
+console.log(
+  `\nsimulated ${jobs.length} runs in ${((performance.now() - started) / 1000).toFixed(1)} s, ${(runMs / jobs.length).toFixed(0)} ms per run`,
+)
 
 const out = values.out ?? fileURLToPath(new URL(`../results/${values.calibration}/`, import.meta.url))
 await mkdir(join(out, 'raw'), { recursive: true })

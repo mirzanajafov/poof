@@ -14,7 +14,15 @@ interface ExhibitDetail {
   endedAt: string | null
   params: { durationSeconds: number; utilization: number; dataset: string; seed: number }
   stats: ExhibitStats | null
-  tasks: Array<{ id: string; status: string; items: number; done: number; submittedAt: string; deadline: string; finishedAt: string | null }>
+  tasks: Array<{
+    id: string
+    status: string
+    items: number
+    done: number
+    submittedAt: string
+    deadline: string
+    finishedAt: string | null
+  }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -42,11 +50,12 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
       {exhibit.status === 'RUNNING' && <Refresh every={3000} />}
       <header>
         <p className="text-sm text-muted">
-          {exhibit.params.durationSeconds} s · arrivals at {exhibit.params.utilization}× capacity · {exhibit.params.dataset} · seed{' '}
-          {exhibit.params.seed}
+          {exhibit.params.durationSeconds} s · arrivals at {exhibit.params.utilization}× capacity ·{' '}
+          {exhibit.params.dataset} · seed {exhibit.params.seed}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-          Exhibit: {exhibit.policy} <span className="text-base font-normal text-muted">({exhibit.status.toLowerCase()})</span>
+          Exhibit: {exhibit.policy}{' '}
+          <span className="text-base font-normal text-muted">({exhibit.status.toLowerCase()})</span>
         </h1>
       </header>
       {s ? (
@@ -85,14 +94,17 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
         <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
           {exhibit.tasks.map((task) => {
             const allowed = new Date(task.deadline).getTime() - new Date(task.submittedAt).getTime()
-            const took = task.finishedAt ? new Date(task.finishedAt).getTime() - new Date(task.submittedAt).getTime() : null
+            const took = task.finishedAt
+              ? new Date(task.finishedAt).getTime() - new Date(task.submittedAt).getTime()
+              : null
             return (
               <li key={task.id} className="tabular flex flex-wrap justify-between gap-2 px-3 py-2">
                 <Link href={`/tasks/${task.id}`} className="underline">
                   {short(task.id)}
                 </Link>
                 <span className="text-muted">
-                  {task.status === 'FAILED' ? 'stopped' : task.status.toLowerCase()} · {task.done}/{task.items} · allowed {seconds(allowed)}
+                  {task.status === 'FAILED' ? 'stopped' : task.status.toLowerCase()} · {task.done}/{task.items} ·
+                  allowed {seconds(allowed)}
                   {took !== null ? ` · ${task.status === 'FAILED' ? 'stopped after' : 'took'} ${seconds(took)}` : ''}
                 </span>
               </li>

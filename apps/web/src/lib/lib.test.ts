@@ -13,15 +13,23 @@ group('format', () => {
   })
 
   it('turns supervisor events into sentences and drops the noise', () => {
-    expect(describe({ kind: 'task.done', at: 0, task: 'abcdef123', met: true, dead: 0 })).toBe('Task abcdef done, on time')
+    expect(describe({ kind: 'task.done', at: 0, task: 'abcdef123', met: true, dead: 0 })).toBe(
+      'Task abcdef done, on time',
+    )
     expect(describe({ kind: 'item.dead', at: 0, task: 'abcdef123', item: 4, attempts: 3 })).toBe(
       'Image 4 of task abcdef dead-lettered after 3 tries',
     )
-    expect(describe({ kind: 'worker.exit', at: 0, reason: 'timeout' })).toBe('A worker was killed: an item took too long')
+    expect(describe({ kind: 'worker.exit', at: 0, reason: 'timeout' })).toBe(
+      'A worker was killed: an item took too long',
+    )
     expect(describe({ kind: 'worker.exit', at: 0, reason: 'normal' })).toBeNull()
     expect(describe({ kind: 'item', at: 0 })).toBeNull()
-    expect(describe({ kind: 'lease.created', at: 0, task: 'abcdef1', depth: 1, lo: 7, hi: 8 })).toBe('Task abcdef split: a helper got image 7')
-    expect(describe({ kind: 'lease.claimed', at: 0, task: 'abcdef1', lo: 10, hi: 20 })).toBe('A worker took images 10-19 of task abcdef')
+    expect(describe({ kind: 'lease.created', at: 0, task: 'abcdef1', depth: 1, lo: 7, hi: 8 })).toBe(
+      'Task abcdef split: a helper got image 7',
+    )
+    expect(describe({ kind: 'lease.claimed', at: 0, task: 'abcdef1', lo: 10, hi: 20 })).toBe(
+      'A worker took images 10-19 of task abcdef',
+    )
   })
 })
 

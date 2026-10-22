@@ -24,7 +24,14 @@ export const policies = {
   box: { ...defaults, ...unmanaged, name: 'box', engine: 'lease', trigger: 'timer', maxDepth: Infinity },
   timerManaged: { ...defaults, ...managed, name: 'timer+budget', engine: 'lease', trigger: 'timer', maxDepth: 3 },
   forecast: { ...defaults, ...unmanaged, name: 'forecast', engine: 'lease', trigger: 'forecast', maxDepth: 3 },
-  forecastManaged: { ...defaults, ...managed, name: 'forecast+budget', engine: 'lease', trigger: 'forecast', maxDepth: 3 },
+  forecastManaged: {
+    ...defaults,
+    ...managed,
+    name: 'forecast+budget',
+    engine: 'lease',
+    trigger: 'forecast',
+    maxDepth: 3,
+  },
   perfect: { ...defaults, ...managed, name: 'perfect', engine: 'lease', trigger: 'oracle', maxDepth: 3 },
   forecastGreedy: {
     ...defaults,

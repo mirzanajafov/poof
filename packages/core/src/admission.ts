@@ -4,8 +4,16 @@ export interface Work {
   workMs: number
 }
 
-export function admits(candidate: Work, admitted: readonly Work[], now: number, capacity: number, slack = 0.9): boolean {
-  const ordered = [...admitted, candidate].sort((a, b) => a.deadline - b.deadline || Number(a === candidate) - Number(b === candidate))
+export function admits(
+  candidate: Work,
+  admitted: readonly Work[],
+  now: number,
+  capacity: number,
+  slack = 0.9,
+): boolean {
+  const ordered = [...admitted, candidate].sort(
+    (a, b) => a.deadline - b.deadline || Number(a === candidate) - Number(b === candidate),
+  )
   let withCandidate = 0
   let without = 0
   for (const work of ordered) {

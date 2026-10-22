@@ -37,7 +37,11 @@ const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
 const runs = JSON.parse(readFileSync(values.runs!, 'utf8')) as ExhibitRun[]
-const manifest = (JSON.parse(readFileSync(values.manifest!, 'utf8')) as { items: Array<{ file: string; width: number; height: number }> }).items
+const manifest = (
+  JSON.parse(readFileSync(values.manifest!, 'utf8')) as {
+    items: Array<{ file: string; width: number; height: number }>
+  }
+).items
 
 function measured(preset: string): Map<string, number> {
   const walls = new Map<string, number[]>()
@@ -74,7 +78,12 @@ function real(run: ExhibitRun): Numbers {
 
 const rows = runs.map((run) => {
   const items = replayItems(manifest, measured(run.params.preset), run.params.preset)
-  return { policy: run.policy, seed: run.params.seed, real: real(run), sim: simulated(replay(run, items, calibration, timeoutRule)) }
+  return {
+    policy: run.policy,
+    seed: run.params.seed,
+    real: real(run),
+    sim: simulated(replay(run, items, calibration, timeoutRule)),
+  }
 })
 
 const keys: Array<keyof Numbers> = ['submitted', 'rejected', 'met', 'peakProcesses', 'spawns', 'timeouts', 'items']
@@ -91,7 +100,10 @@ const summary = [...byPolicy].map(([policy, list]) => {
     policy,
     runs: list.length,
     metShare: { real: mean(list.map((r) => share(r.real))), sim: mean(list.map((r) => share(r.sim))) },
-    peakProcesses: { real: mean(list.map((r) => r.real.peakProcesses)), sim: mean(list.map((r) => r.sim.peakProcesses)) },
+    peakProcesses: {
+      real: mean(list.map((r) => r.real.peakProcesses)),
+      sim: mean(list.map((r) => r.sim.peakProcesses)),
+    },
     spawns: { real: mean(list.map((r) => r.real.spawns)), sim: mean(list.map((r) => r.sim.spawns)) },
     timeouts: { real: mean(list.map((r) => r.real.timeouts)), sim: mean(list.map((r) => r.sim.timeouts)) },
     items: { real: mean(list.map((r) => r.real.items)), sim: mean(list.map((r) => r.sim.items)) },
@@ -102,7 +114,9 @@ for (const s of summary) {
   const f = (v: { real: number; sim: number }, pct = false) =>
     pct ? `${(v.real * 100).toFixed(0)}%/${(v.sim * 100).toFixed(0)}%` : `${v.real.toFixed(0)}/${v.sim.toFixed(0)}`
   console.log(
-    [s.policy.padEnd(16), s.runs, f(s.metShare, true), f(s.peakProcesses), f(s.spawns), f(s.timeouts), f(s.items)].join('\t'),
+    [s.policy.padEnd(16), s.runs, f(s.metShare, true), f(s.peakProcesses), f(s.spawns), f(s.timeouts), f(s.items)].join(
+      '\t',
+    ),
   )
 }
 if (values.out) {

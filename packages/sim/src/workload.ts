@@ -124,7 +124,9 @@ export class Workload implements Arrivals {
     this.stats = workloadStats(scenario, types)
     const capacityMsPerMs = cores
     this.baseRate = (scenario.utilization * capacityMsPerMs) / this.stats.meanTaskWorkMs
-    this.burstRate = scenario.burst ? (scenario.burst.utilization * capacityMsPerMs) / this.stats.meanTaskWorkMs : this.baseRate
+    this.burstRate = scenario.burst
+      ? (scenario.burst.utilization * capacityMsPerMs) / this.stats.meanTaskWorkMs
+      : this.baseRate
     this.arrivalRng = Rng.of(seed, scenario.name, 'arrivals')
   }
 

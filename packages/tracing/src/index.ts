@@ -36,7 +36,13 @@ const propagator = new W3CTraceContextPropagator()
 export function startTracing(service: string, options: TracingOptions = {}): Tracing {
   const endpoint = options.endpoint?.replace(/\/$/, '')
   const exporter = options.exporter ?? (endpoint ? new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }) : null)
-  if (!exporter) return { enabled: false, tracer: trace.getTracer(service), flush: async () => undefined, shutdown: async () => undefined }
+  if (!exporter)
+    return {
+      enabled: false,
+      tracer: trace.getTracer(service),
+      flush: async () => undefined,
+      shutdown: async () => undefined,
+    }
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ [ATTR_SERVICE_NAME]: service }),
     spanProcessors: [new BatchSpanProcessor(exporter, { maxQueueSize: 8192, maxExportBatchSize: 512 })],

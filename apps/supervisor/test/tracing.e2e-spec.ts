@@ -31,12 +31,17 @@ beforeAll(async () => {
     let body = ''
     req.on('data', (chunk: Buffer) => (body += chunk.toString()))
     req.on('end', () => {
-      const payload = JSON.parse(body) as { resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: Array<Record<string, unknown>> }> }> }
+      const payload = JSON.parse(body) as {
+        resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: Array<Record<string, unknown>> }> }>
+      }
       for (const resource of payload.resourceSpans ?? []) {
         for (const scope of resource.scopeSpans ?? []) {
           for (const span of scope.spans ?? []) {
             const attributes = Object.fromEntries(
-              ((span.attributes as Array<{ key: string; value: Record<string, unknown> }>) ?? []).map((a) => [a.key, value(a.value)]),
+              ((span.attributes as Array<{ key: string; value: Record<string, unknown> }>) ?? []).map((a) => [
+                a.key,
+                value(a.value),
+              ]),
             )
             spans.push({
               traceId: span.traceId as string,
@@ -96,14 +101,23 @@ describe('tracing', () => {
     expect(chunks).toHaveLength(2)
     const chunkIds = new Set(chunks.map((c) => c.spanId))
     const images = spans.filter((s) => s.name === 'image' && chunkIds.has(s.parentSpanId))
-    expect(images.map((i) => i.attributes['poof.item']).sort((a, b) => Number(a) - Number(b))).toEqual([...Array(12).keys()])
+    expect(images.map((i) => i.attributes['poof.item']).sort((a, b) => Number(a) - Number(b))).toEqual([
+      ...Array(12).keys(),
+    ])
   })
 
   it('draws the same tree of helpers as the lease table during an exhibit of the box', async () => {
     running = await start(dataDir, { OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, BUDGET: '2', EXHIBIT_MAX_PROCESSES: '8' })
-    const res = await request(running.app.getHttpServer())
-      .post('/exhibits')
-      .send({ policy: 'box', durationSeconds: 15, dataset: 'noisy', utilization: 0.4, minItems: 150, maxItems: 200, slackMin: 0.1, slackMax: 0.15 })
+    const res = await request(running.app.getHttpServer()).post('/exhibits').send({
+      policy: 'box',
+      durationSeconds: 15,
+      dataset: 'noisy',
+      utilization: 0.4,
+      minItems: 150,
+      maxItems: 200,
+      slackMin: 0.1,
+      slackMax: 0.15,
+    })
     expect(res.status).toBe(201)
     await until(async () => {
       const exhibit = await running!.db.exhibit.findUnique({ where: { id: res.body.id } })

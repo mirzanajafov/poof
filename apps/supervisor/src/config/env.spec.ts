@@ -5,8 +5,18 @@ const base = { DATABASE_URL: 'postgresql://localhost/db', REDIS_URL: 'redis://lo
 
 describe('validateEnv', () => {
   it('applies defaults and converts numbers', () => {
-    expect(validateEnv(base)).toMatchObject({ PORT: 3110, BUDGET: 2, CAPACITY_CORES: 1.32, WORKER_CPU_CORES: 1.45, ADMISSION_PRIOR_RATIO: 1.2, CHUNK_ITEMS: 10 })
-    expect(validateEnv({ ...base, BUDGET: '4', CAPACITY_CORES: '3.7' })).toMatchObject({ BUDGET: 4, CAPACITY_CORES: 3.7 })
+    expect(validateEnv(base)).toMatchObject({
+      PORT: 3110,
+      BUDGET: 2,
+      CAPACITY_CORES: 1.32,
+      WORKER_CPU_CORES: 1.45,
+      ADMISSION_PRIOR_RATIO: 1.2,
+      CHUNK_ITEMS: 10,
+    })
+    expect(validateEnv({ ...base, BUDGET: '4', CAPACITY_CORES: '3.7' })).toMatchObject({
+      BUDGET: 4,
+      CAPACITY_CORES: 3.7,
+    })
   })
 
   it('rejects missing or out-of-range values', () => {

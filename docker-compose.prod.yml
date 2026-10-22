@@ -27,23 +27,29 @@ services:
 
   supervisor:
     ports: !reset []
-    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    user: '${APP_UID:-1000}:${APP_GID:-1000}'
     environment:
       DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
-      LOG_JSON: "true"
+      LOG_JSON: 'true'
     restart: unless-stopped
 
   poof-api:
     ports: !reset []
-    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    user: '${APP_UID:-1000}:${APP_GID:-1000}'
     environment:
       DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@poof-postgres:5432/poof
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN}
       WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN}
       TRUST_PROXY: uniquelocal
-      LOG_JSON: "true"
+      LOG_JSON: 'true'
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3111/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3111/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
       interval: 30s
       start_period: 30s
       start_interval: 3s
@@ -56,7 +62,7 @@ services:
   web:
     build:
       args:
-        NEXT_PUBLIC_LIVE_URL: ""
+        NEXT_PUBLIC_LIVE_URL: ''
     ports: !reset []
     networks:
       - default
@@ -66,8 +72,8 @@ services:
   backup:
     build: ./deploy/backup
     container_name: poof-backup
-    profiles: ["app"]
-    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    profiles: ['app']
+    user: '${BACKUP_UID:-1000}:${BACKUP_GID:-1000}'
     environment:
       PGHOST: postgres
       PGUSER: poof

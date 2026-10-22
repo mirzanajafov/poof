@@ -73,7 +73,9 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
       .map((file) => read<B2>(base, file.replace(/\.json$/, ''))),
   )
   const measured = b2s.flatMap((b2) =>
-    b2.rows.filter((r) => r.k <= Math.ceil(3 * b2.cpus) && r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined),
+    b2.rows.filter(
+      (r) => r.k <= Math.ceil(3 * b2.cpus) && r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined,
+    ),
   )
   const steadyRssMb =
     measured.length >= 3

@@ -55,7 +55,12 @@ function escape(text: string): string {
 
 const highlight = 'forecast+budget'
 
-export function hitRateChart(cells: readonly Cell[], machine: string, policies: readonly string[], title: string): string {
+export function hitRateChart(
+  cells: readonly Cell[],
+  machine: string,
+  policies: readonly string[],
+  title: string,
+): string {
   const names = Object.keys(scenarios).filter((s) => cells.some((c) => c.machine === machine && c.scenario === s))
   const labelWidth = 130
   const panel = 118
@@ -79,14 +84,18 @@ export function hitRateChart(cells: readonly Cell[], machine: string, policies: 
     body.push(`<text class="ink" x="${x0 + panel / 2}" y="${top - 8}" text-anchor="middle">${scenario}</text>`)
     for (const tick of [0, 0.5, 1]) {
       body.push(`<line class="grid" x1="${x(tick)}" x2="${x(tick)}" y1="${top}" y2="${top + policies.length * row}"/>`)
-      body.push(`<text class="muted small" x="${x(tick)}" y="${top + policies.length * row + 16}" text-anchor="middle">${tick * 100}%</text>`)
+      body.push(
+        `<text class="muted small" x="${x(tick)}" y="${top + policies.length * row + 16}" text-anchor="middle">${tick * 100}%</text>`,
+      )
     }
     policies.forEach((policy, i) => {
       const cell = cells.find((c) => c.machine === machine && c.scenario === scenario && c.policy === policy)
       if (!cell) return
       const y = top + i * row + row / 2
       const cls = policy === highlight ? 's1' : 'other'
-      body.push(`<line class="${cls}" x1="${x(cell.hitRate.lo)}" x2="${x(cell.hitRate.hi)}" y1="${y}" y2="${y}" stroke-width="2" stroke-linecap="round"/>`)
+      body.push(
+        `<line class="${cls}" x1="${x(cell.hitRate.lo)}" x2="${x(cell.hitRate.hi)}" y1="${y}" y2="${y}" stroke-width="2" stroke-linecap="round"/>`,
+      )
       body.push(`<circle class="${cls}" cx="${x(cell.hitRate.mean)}" cy="${y}" r="4.5" stroke="none"/>`)
     })
   })
@@ -102,7 +111,15 @@ interface Line {
 export function timelineChart(
   lines: readonly Line[],
   value: (s: Sample) => number,
-  options: { title: string; subtitle: string; from: number; to: number; event: { from: number; to: number; label: string }; reference?: { value: number; label: string }; format: (v: number) => string },
+  options: {
+    title: string
+    subtitle: string
+    from: number
+    to: number
+    event: { from: number; to: number; label: string }
+    reference?: { value: number; label: string }
+    format: (v: number) => string
+  },
 ): string {
   const width = 760
   const height = 330
@@ -112,7 +129,10 @@ export function timelineChart(
   const bottom = 40
   const plotW = width - left - right
   const plotH = height - top - bottom
-  const visible = lines.map((l) => ({ ...l, samples: l.samples.filter((s) => s.t >= options.from && s.t <= options.to) }))
+  const visible = lines.map((l) => ({
+    ...l,
+    samples: l.samples.filter((s) => s.t >= options.from && s.t <= options.to),
+  }))
   const max = Math.max(options.reference?.value ?? 0, ...visible.flatMap((l) => l.samples.map(value)))
   const yMax = niceMax(max)
   const x = (t: number) => left + ((t - options.from) / (options.to - options.from)) * plotW
@@ -130,7 +150,9 @@ export function timelineChart(
   }
   const minute = 60_000
   for (let t = Math.ceil(options.from / (5 * minute)) * 5 * minute; t <= options.to; t += 5 * minute) {
-    body.push(`<text class="muted small" x="${x(t)}" y="${top + plotH + 18}" text-anchor="middle">${t / minute} min</text>`)
+    body.push(
+      `<text class="muted small" x="${x(t)}" y="${top + plotH + 18}" text-anchor="middle">${t / minute} min</text>`,
+    )
   }
   body.push(`<line class="axis" x1="${left}" x2="${left + plotW}" y1="${top + plotH}" y2="${top + plotH}"/>`)
   const labels: Array<{ y: number; text: string; cls: string | null }> = []
@@ -141,7 +163,9 @@ export function timelineChart(
   }
   for (const line of visible) {
     if (line.samples.length === 0) continue
-    const d = line.samples.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(s.t).toFixed(1)},${y(value(s)).toFixed(1)}`).join(' ')
+    const d = line.samples
+      .map((s, i) => `${i === 0 ? 'M' : 'L'}${x(s.t).toFixed(1)},${y(value(s)).toFixed(1)}`)
+      .join(' ')
     body.push(`<path class="line ${line.cls}" style="fill:none" d="${d}"/>`)
     labels.push({ y: y(value(line.samples[line.samples.length - 1]!)), text: line.policy, cls: line.cls })
   }
@@ -200,8 +224,22 @@ if (isMain) {
     samples: Sample[]
   }>
   const machine = values.machine!
-  const policies = ['never', 'static-4', 'pool-10', 'box', 'timer+budget', 'forecast', 'forecast+budget', 'perfect', 'forecast+idle', 'forecast+preempt']
-  await writeFile(join(dir, `hit-rate-${machine}.svg`), hitRateChart(summary.cells, machine, policies, `Deadline hit rate by policy (${machine})`))
+  const policies = [
+    'never',
+    'static-4',
+    'pool-10',
+    'box',
+    'timer+budget',
+    'forecast',
+    'forecast+budget',
+    'perfect',
+    'forecast+idle',
+    'forecast+preempt',
+  ]
+  await writeFile(
+    join(dir, `hit-rate-${machine}.svg`),
+    hitRateChart(summary.cells, machine, policies, `Deadline hit rate by policy (${machine})`),
+  )
   const burst = scenarios.burst!.burst!
   const picks: Array<[string, string]> = [
     ['forecast+budget', 's1'],
@@ -210,10 +248,19 @@ if (isMain) {
     ['forecast+preempt', 's4'],
   ]
   const lines = picks
-    .map(([policy, cls]) => ({ policy, cls, samples: series.find((s) => s.machine === machine && s.scenario === 'burst' && s.policy === policy)?.samples ?? [] }))
+    .map(([policy, cls]) => ({
+      policy,
+      cls,
+      samples:
+        series.find((s) => s.machine === machine && s.scenario === 'burst' && s.policy === policy)?.samples ?? [],
+    }))
     .filter((l) => l.samples.length > 0)
   const budget = summary.cells.find((c) => c.machine === machine && c.policy === highlight)?.budget ?? 0
-  const window = { from: burst.from - 5 * 60_000, to: burst.to + 15 * 60_000, event: { ...burst, label: 'burst: arrivals at 1.5× capacity' } }
+  const window = {
+    from: burst.from - 5 * 60_000,
+    to: burst.to + 15 * 60_000,
+    event: { ...burst, label: 'burst: arrivals at 1.5× capacity' },
+  }
   await writeFile(
     join(dir, `burst-processes-${machine}.svg`),
     timelineChart(lines, (s) => s.processes, {
@@ -229,7 +276,8 @@ if (isMain) {
     timelineChart(smoothed(lines, 15), (s) => s.goodput, {
       ...window,
       title: `Goodput during a burst (${machine}, seed 1)`,
-      subtitle: 'Useful image work finished, as a share of the cores, 15 s rolling mean. Spawns, killed work and retries do not count.',
+      subtitle:
+        'Useful image work finished, as a share of the cores, 15 s rolling mean. Spawns, killed work and retries do not count.',
       format: (v) => `${Math.round(v * 100)}%`,
     }),
   )

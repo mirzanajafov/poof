@@ -32,7 +32,12 @@ export function PressTheButton({ datasets }: { datasets: Dataset[] }) {
       })
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
       if (res.status === 201) {
-        setOutcome({ kind: 'accepted', id: String(body.id), items: Number(body.items), predictedSeconds: Number(body.predictedSeconds) })
+        setOutcome({
+          kind: 'accepted',
+          id: String(body.id),
+          items: Number(body.items),
+          predictedSeconds: Number(body.predictedSeconds),
+        })
       } else {
         const retry = res.headers.get('retry-after')
         setOutcome({
@@ -52,8 +57,8 @@ export function PressTheButton({ datasets }: { datasets: Dataset[] }) {
     <form onSubmit={submit} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h2 className="text-base font-semibold">Press the button</h2>
       <p className="mt-1 text-sm text-muted">
-        Send a batch of photos to resize. The box predicts the work from the image sizes and either takes it or tells you
-        when to come back.
+        Send a batch of photos to resize. The box predicts the work from the image sizes and either takes it or tells
+        you when to come back.
       </p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="text-sm">

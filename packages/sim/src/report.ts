@@ -80,7 +80,10 @@ export function summarize(metrics: readonly RunMetrics[]): Cell[] {
       spawnsPerTask: mean(runs.map((r) => r.spawnsPerTask)),
       splitsPerTask: mean(runs.map((r) => r.splitsPerTask)),
       claimsPerTask: mean(runs.map((r) => r.claimsPerTask)),
-      peakProcesses: { mean: mean(runs.map((r) => r.peakProcesses)), max: Math.max(...runs.map((r) => r.peakProcesses)) },
+      peakProcesses: {
+        mean: mean(runs.map((r) => r.peakProcesses)),
+        max: Math.max(...runs.map((r) => r.peakProcesses)),
+      },
       maxDepth: Math.max(...runs.map((r) => r.maxDepth)),
       oomKills: mean(runs.map((r) => r.oomKills)),
       crashes: mean(runs.map((r) => r.crashes)),
@@ -131,9 +134,24 @@ function num(value: number | null | undefined, digits = 1): string {
 
 export function table(cells: readonly Cell[]): string {
   const lines: string[] = []
-  const header = ['policy', 'hit', '95% CI', 'rej', 'skew hit', 'late p95', 'cpu/item', 'ovh', 'spawn/t', 'peak', 'oom', 'goodput', 'recov s']
+  const header = [
+    'policy',
+    'hit',
+    '95% CI',
+    'rej',
+    'skew hit',
+    'late p95',
+    'cpu/item',
+    'ovh',
+    'spawn/t',
+    'peak',
+    'oom',
+    'goodput',
+    'recov s',
+  ]
   const groups = new Map<string, Cell[]>()
-  for (const cell of cells) groups.set(`${cell.machine} ${cell.scenario}`, [...(groups.get(`${cell.machine} ${cell.scenario}`) ?? []), cell])
+  for (const cell of cells)
+    groups.set(`${cell.machine} ${cell.scenario}`, [...(groups.get(`${cell.machine} ${cell.scenario}`) ?? []), cell])
   for (const [name, group] of groups) {
     lines.push(`\n${name} (budget ${group[0]!.budget}, ${group[0]!.tasks} tasks over ${group[0]!.seeds} seeds)`)
     lines.push(header.join('\t'))

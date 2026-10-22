@@ -15,7 +15,16 @@ interface Cell {
 }
 
 const results = join(process.cwd(), '..', '..', 'packages', 'sim', 'results', 'server')
-const policies = ['never', 'static-4', 'pool-10', 'timer+budget', 'forecast+budget', 'forecast+preempt', 'box', 'forecast']
+const policies = [
+  'never',
+  'static-4',
+  'pool-10',
+  'timer+budget',
+  'forecast+budget',
+  'forecast+preempt',
+  'box',
+  'forecast',
+]
 const scenarios = ['calm', 'skew', 'neighbour', 'burst', 'poison']
 
 async function svg(name: string): Promise<string> {
@@ -36,13 +45,14 @@ export default async function Results() {
       <header className="max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">What the simulator said</h1>
         <p className="mt-2 text-muted">
-          Before writing the service, I simulated this box 5,100 times, an hour of arrivals each (5 scenarios, 3 machine sizes,
-          17 policies, 20 seeds), calibrated on benchmarks from the server it runs on. The plan was to show that splitting late work with a good
-          forecast and a budget beats splitting on a timer. It does. But a plain pool that hands out ten images at a time,
-          earliest deadline first, beats every splitting policy except the one I taught to preempt, and that one still loses
-          when a heavy block of images needs every core at once. The reason is preemption: the pool reconsiders who gets a core
-          every few seconds, while a worker that owns a task keeps its core until the task is done. That is why the box you press
-          runs a pool, and why the splitting policies are exhibits.
+          Before writing the service, I simulated this box 5,100 times, an hour of arrivals each (5 scenarios, 3 machine
+          sizes, 17 policies, 20 seeds), calibrated on benchmarks from the server it runs on. The plan was to show that
+          splitting late work with a good forecast and a budget beats splitting on a timer. It does. But a plain pool
+          that hands out ten images at a time, earliest deadline first, beats every splitting policy except the one I
+          taught to preempt, and that one still loses when a heavy block of images needs every core at once. The reason
+          is preemption: the pool reconsiders who gets a core every few seconds, while a worker that owns a task keeps
+          its core until the task is done. That is why the box you press runs a pool, and why the splitting policies are
+          exhibits.
         </p>
       </header>
       <section>
@@ -66,7 +76,11 @@ export default async function Results() {
                   {scenarios.map((scenario) => {
                     const c = cell('cage', scenario, policy)
                     return (
-                      <td key={scenario} className="px-3 py-2 text-right" title={c ? `95% interval ${pct(c.hitRate.lo)}-${pct(c.hitRate.hi)}` : ''}>
+                      <td
+                        key={scenario}
+                        className="px-3 py-2 text-right"
+                        title={c ? `95% interval ${pct(c.hitRate.lo)}-${pct(c.hitRate.hi)}` : ''}
+                      >
                         {c ? pct(c.hitRate.mean) : '–'}
                       </td>
                     )
@@ -77,8 +91,8 @@ export default async function Results() {
           </table>
         </div>
         <p className="mt-1 text-xs text-muted">
-          Share of submitted tasks finished by their deadline, mean of 20 seeds; rejected tasks count as misses. Hover a cell for its
-          95% interval.
+          Share of submitted tasks finished by their deadline, mean of 20 seeds; rejected tasks count as misses. Hover a
+          cell for its 95% interval.
         </p>
       </section>
       {charts.map((chart, i) => (

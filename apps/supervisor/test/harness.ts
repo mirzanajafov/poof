@@ -31,7 +31,9 @@ async function dataset(root: string, name: string, count: number, corrupt: numbe
     const file = `${i}.jpg`
     const body = corrupt.includes(i)
       ? Buffer.from('not an image')
-      : await sharp({ create: { width: 640, height: 480, channels: 3, background: { r: (i * 13) % 255, g: 120, b: 80 } } })
+      : await sharp({
+          create: { width: 640, height: 480, channels: 3, background: { r: (i * 13) % 255, g: 120, b: 80 } },
+        })
           .jpeg()
           .toBuffer()
     await writeFile(join(dir, file), body)
@@ -46,7 +48,15 @@ async function noisy(root: string, name: string, count: number): Promise<void> {
   const items = []
   for (let i = 0; i < count; i++) {
     const file = `${i}.jpg`
-    const image = sharp({ create: { width: 2000, height: 1500, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 120 + i, sigma: 40 } } })
+    const image = sharp({
+      create: {
+        width: 2000,
+        height: 1500,
+        channels: 3,
+        background: '#808080',
+        noise: { type: 'gaussian', mean: 120 + i, sigma: 40 },
+      },
+    })
     await writeFile(join(dir, file), await image.jpeg({ quality: 90 }).toBuffer())
     items.push({ file, width: 2000, height: 1500 })
   }

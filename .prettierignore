@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+bench/results
+packages/sim/results
+*.md
+!README.md
