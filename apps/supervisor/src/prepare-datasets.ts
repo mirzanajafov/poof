@@ -1,6 +1,13 @@
 import { copyFile, link, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { datasetNamePattern } from './datasets/dataset-name.js'
+import { parseDatasetSource } from './datasets/dataset-source.js'
+
+function exitWithUsage(problem: string): never {
+  console.error(`${problem}\nusage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>`)
+  process.exit(1)
+}
 
 const { values } = parseArgs({
   options: {
@@ -9,13 +16,16 @@ const { values } = parseArgs({
   },
 })
 
-if (!values.from?.length || !values.data) {
-  console.error('usage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>')
-  process.exit(1)
-}
+if (!values.from?.length) exitWithUsage('missing --from')
+if (!values.data) exitWithUsage('missing --data, and DATA_DIR is not set')
 
-for (const spec of values.from) {
-  const [name, dir] = spec.split('=') as [string, string]
+const sources = values.from.map(
+  (spec) => parseDatasetSource(spec) ?? exitWithUsage(`invalid --from ${spec}: expected <name>=<dir> with a name matching ${datasetNamePattern.source}`),
+)
+const repeated = sources.find(({ name }, index) => sources.findIndex((source) => source.name === name) !== index)
+if (repeated) exitWithUsage(`two --from arguments share the name ${repeated.name}`)
+
+for (const { name, dir } of sources) {
   const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
     items: Array<{ file: string; width: number; height: number }>
   }
