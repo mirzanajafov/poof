@@ -1,6 +1,7 @@
 import { copyFile, link, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { parseDatasetSource } from './datasets/dataset-source.js'
 
 const { values } = parseArgs({
   options: {
@@ -9,13 +10,14 @@ const { values } = parseArgs({
   },
 })
 
-if (!values.from?.length || !values.data) {
+const sources = values.from?.map(parseDatasetSource) ?? []
+
+if (!sources.length || !sources.every((source) => source !== undefined) || !values.data) {
   console.error('usage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>')
   process.exit(1)
 }
 
-for (const spec of values.from) {
-  const [name, dir] = spec.split('=') as [string, string]
+for (const { name, dir } of sources) {
   const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
     items: Array<{ file: string; width: number; height: number }>
   }
