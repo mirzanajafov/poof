@@ -8,9 +8,7 @@ const BATCH_MS = 150
 const SNAPSHOT_MS = 1000
 const MAX_BUFFER = 1000
 
-@WebSocketGateway({
-  cors: { origin: (origin: string | undefined, done: (error: Error | null, ok?: boolean) => void) => done(null, !origin || origin === process.env.WEB_ORIGIN) },
-})
+@WebSocketGateway()
 export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplicationShutdown {
   @WebSocketServer()
   server: Server

@@ -5,6 +5,7 @@ import { type Env, validateEnv } from './config/env.js'
 import { ExhibitsController } from './exhibits/exhibits.controller.js'
 import { Admin, AdminGuard, RateLimitGuard } from './guards/guards.js'
 import { InfraModule } from './infra/infra.module.js'
+import { LiveAdapter } from './live/live.adapter.js'
 import { LiveGateway } from './live/live.gateway.js'
 import { StateController } from './state/state.controller.js'
 import { Supervisor } from './supervisor/supervisor.client.js'
@@ -27,7 +28,9 @@ export function configureApp<T extends INestApplication>(app: T): T {
   const trustProxy = config.get('TRUST_PROXY', { infer: true })
   ;(app as unknown as NestExpressApplication).set('trust proxy', trustProxy === 'false' ? false : trustProxy.split(','))
   app.setGlobalPrefix('api')
-  app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }) })
+  const webOrigin = config.get('WEB_ORIGIN', { infer: true })
+  app.enableCors({ origin: webOrigin })
+  app.useWebSocketAdapter(new LiveAdapter(app, webOrigin))
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
   app.enableShutdownHooks()
   return app

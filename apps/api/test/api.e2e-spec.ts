@@ -178,4 +178,14 @@ describe('live view', () => {
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()
   })
+
+  it('lets only the configured web origin read the polling handshake', async () => {
+    running = await start(supervisor.url, { WEB_ORIGIN: 'https://poof.example' })
+    const handshake = (origin: string) => http().get('/socket.io/?EIO=4&transport=polling').set('Origin', origin)
+    const allowed = await handshake('https://poof.example')
+    expect(allowed.status).toBe(200)
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://poof.example')
+    const foreign = await handshake('https://elsewhere.example')
+    expect(foreign.headers['access-control-allow-origin']).toBe('https://poof.example')
+  })
 })
