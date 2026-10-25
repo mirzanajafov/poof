@@ -115,6 +115,38 @@ describe('supervisor', () => {
     expect(b.finishedAt!.getTime()).toBeLessThan(a.finishedAt!.getTime())
   })
 
+  it('fails the tasks it cannot resume after a restart and says why', async () => {
+    const db = createPrisma(inject('databaseUrl'))
+    const unfinished = (dataset: string, preset: string) =>
+      db.task.create({
+        data: {
+          dataset,
+          preset,
+          items: 10,
+          policy: 'pool',
+          predictedMs: 1000,
+          deadline: new Date(Date.now() + 600_000),
+          leases: { create: [{ lo: 0, hi: 10, cursor: 0 }] },
+        },
+      })
+    const unknownPreset = await unfinished('small', 'png-9000')
+    const missingDataset = await unfinished('gone', 'webp-1600')
+    await db.$disconnect()
+    running = await start(dataDir)
+    for (const [task, reason] of [
+      [unknownPreset, 'no preset png-9000 after a restart'],
+      [missingDataset, 'dataset gone after a restart'],
+    ] as const) {
+      const failed = await running.db.task.findUniqueOrThrow({
+        where: { id: task.id },
+        include: { leases: true, decisions: true },
+      })
+      expect(failed.status).toBe('FAILED')
+      expect(failed.leases.every((l) => l.state === 'DONE')).toBe(true)
+      expect(failed.decisions.map((d) => d.detail)).toEqual([{ reason }])
+    }
+  })
+
   it('resumes unfinished work after a restart without losing an item', async () => {
     running = await start(dataDir)
     const res = await submit({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 3600, count: 120 })

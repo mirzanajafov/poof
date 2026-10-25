@@ -74,7 +74,7 @@ interface Lease {
   lo: number
   hi: number
   cursor: number
-  state: LeaseState
+  state: Exclude<LeaseState, 'starting'>
   worker: PoolWorker | null
   dirty: boolean
   span: Span | null
@@ -715,7 +715,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }
       let processed = 0
       for (const l of row.leases) {
-        const state: LeaseState = l.state === 'DONE' ? 'done' : 'pending'
+        const state = l.state === 'DONE' ? 'done' : 'pending'
         task.leases.push({
           id: l.id,
           task,
