@@ -186,6 +186,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     const current = this.current
     if (!current) return null
     this.current = null
+    this.events.clearExhibitSnapshot()
     for (const timer of current.timers) clearTimeout(timer)
     await current.arriving
     const stats = current.engine ? await current.engine.stop() : await this.finishPool(current)
@@ -239,7 +240,8 @@ export class Exhibits implements BeforeApplicationShutdown {
     const current = this.current
     if (!current) return
     if (!current.engine) this.poolStats = await this.poolCounts(current).catch(() => this.poolStats)
-    this.events.saveExhibitSnapshot(this.state())
+    const state = this.state()
+    if (state) this.events.saveExhibitSnapshot(state)
   }
 
   state(): ExhibitSnapshot | null {

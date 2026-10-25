@@ -1,8 +1,10 @@
 import { rm } from 'node:fs/promises'
+import { exhibitSnapshotKey } from '@poof/contracts'
+import { policies } from '@poof/core'
+import { Redis } from 'ioredis'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { policies } from '@poof/core'
-import { makeData, start, until, type Running } from './harness.js'
+import { makeData, redisUrl, start, until, type Running } from './harness.js'
 
 let dataDir: string
 let running: Running | null = null
@@ -152,17 +154,21 @@ describe('exhibits', () => {
     expect(await running.db.exhibit.count()).toBe(before)
   })
 
-  it('aborts a running exhibit', async () => {
+  it('aborts a running exhibit and takes it off the live view at once', async () => {
     running = await start(dataDir)
+    const redis = new Redis(redisUrl)
     const res = await http()
       .post('/exhibits')
       .send({ policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' })
     expect(res.status).toBe(201)
     expect((await http().post('/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
     expect((await http().get('/exhibits/current')).status).toBe(200)
+    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 1)
     expect((await http().delete('/exhibits/current')).status).toBe(200)
     const exhibit = await running.db.exhibit.findUniqueOrThrow({ where: { id: res.body.id } })
     expect(exhibit.status).toBe('ABORTED')
     expect((await http().get('/exhibits/current')).status).toBe(404)
+    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 0, 2000)
+    await redis.quit()
   })
 })

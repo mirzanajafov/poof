@@ -8,6 +8,8 @@ import sharp from 'sharp'
 import { inject } from 'vitest'
 import { AppModule, configureApp } from '../src/app.module.js'
 
+export const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387'
+
 export interface Running {
   app: INestApplication
   db: PrismaClient
@@ -66,7 +68,7 @@ async function noisy(root: string, name: string, count: number): Promise<void> {
 export async function start(dataDir: string, env: Record<string, string> = {}): Promise<Running> {
   Object.assign(process.env, {
     DATABASE_URL: inject('databaseUrl'),
-    REDIS_URL: process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387',
+    REDIS_URL: redisUrl,
     DATA_DIR: dataDir,
     BUDGET: '2',
     CHECKPOINT_MS: '200',

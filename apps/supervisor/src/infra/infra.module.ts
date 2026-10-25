@@ -43,11 +43,15 @@ export class Events implements OnApplicationShutdown {
     this.save(poolSnapshotKey, snapshot)
   }
 
-  saveExhibitSnapshot(snapshot: ExhibitSnapshot | null): void {
+  saveExhibitSnapshot(snapshot: ExhibitSnapshot): void {
     this.save(exhibitSnapshotKey, snapshot)
   }
 
-  private save(key: string, value: PoolSnapshot | ExhibitSnapshot | null): void {
+  clearExhibitSnapshot(): void {
+    void this.redis.del(exhibitSnapshotKey).catch(() => undefined)
+  }
+
+  private save(key: string, value: PoolSnapshot | ExhibitSnapshot): void {
     void this.redis.set(key, JSON.stringify(value), 'EX', 30).catch(() => undefined)
   }
 
