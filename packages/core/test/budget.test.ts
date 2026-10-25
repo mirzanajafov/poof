@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { allocate } from '../src/budget.ts'
+import { allocate, grant } from '../src/budget.ts'
+import { policies } from '../src/policies.ts'
 import type { SplitRequest } from '../src/types.ts'
 
 function split(leaseId: string, deadline: number, k: number, timeLeftMs = 10_000): SplitRequest {
@@ -105,5 +106,24 @@ describe('preemption', () => {
     const spare = { ...split('s', 10_000, 2), opportunistic: true }
     const grants = allocate(0, [], [spare], 0, 200, 4, { running, yielding: 0, minRemaining: 2 })
     expect(grants.preempt).toEqual([])
+  })
+})
+
+describe('grant', () => {
+  const starts = [
+    { leaseId: 'r1', deadline: 5_000 },
+    { leaseId: 'r2', deadline: 6_000 },
+  ]
+
+  it('grants every start and split when the policy has no budget', () => {
+    const grants = grant(policies.box, 0, starts, [split('a', 5_000, 3)], 0, 200)
+    expect(grants.starts).toEqual(['r1', 'r2'])
+    expect(grants.splits).toEqual(new Map([['a', 3]]))
+    expect(grants.preempt).toEqual([])
+  })
+
+  it('stays within the free tokens when the policy has a budget', () => {
+    const grants = grant(policies.forecastManaged, 2, starts, [split('a', 5_000, 3)], 0, 200)
+    expect(grants.starts.length + [...grants.splits.values()].reduce((sum, k) => sum + k, 0)).toBe(2)
   })
 })

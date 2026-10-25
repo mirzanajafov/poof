@@ -31,7 +31,7 @@ export class Events implements OnApplicationShutdown {
   private readonly redis: Redis
 
   constructor(config: ConfigService<Env, true>) {
-    this.redis = new Redis(config.get('REDIS_URL', { infer: true }), { lazyConnect: false, maxRetriesPerRequest: 2 })
+    this.redis = new Redis(config.get('REDIS_URL', { infer: true }), { maxRetriesPerRequest: 2 })
     this.redis.on('error', () => undefined)
   }
 

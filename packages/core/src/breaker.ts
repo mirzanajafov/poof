@@ -1,28 +1,19 @@
 import type { BreakerState } from './types.ts'
 
-export interface BreakerConfig {
-  window: number
-  minSamples: number
-  failureRatio: number
-  openMs: number
-}
-
-export const defaultBreakerConfig: BreakerConfig = { window: 20, minSamples: 10, failureRatio: 0.5, openMs: 30_000 }
+const outcomeWindow = 20
+const minSamples = 10
+const failureRatio = 0.5
+const openMs = 30_000
 
 export class Breaker {
-  readonly config: BreakerConfig
   private outcomes: boolean[] = []
   private current: BreakerState = 'closed'
   private openedAt = 0
   private probing = false
   opened = 0
 
-  constructor(config: BreakerConfig = defaultBreakerConfig) {
-    this.config = config
-  }
-
   state(now: number): BreakerState {
-    if (this.current === 'open' && now - this.openedAt >= this.config.openMs) {
+    if (this.current === 'open' && now - this.openedAt >= openMs) {
       this.current = 'half-open'
       this.probing = false
     }
@@ -38,9 +29,9 @@ export class Breaker {
       return
     }
     this.outcomes.push(!ok)
-    if (this.outcomes.length > this.config.window) this.outcomes.shift()
+    if (this.outcomes.length > outcomeWindow) this.outcomes.shift()
     const failures = this.outcomes.filter(Boolean).length
-    if (this.outcomes.length >= this.config.minSamples && failures / this.outcomes.length > this.config.failureRatio) {
+    if (this.outcomes.length >= minSamples && failures / this.outcomes.length > failureRatio) {
       this.open(now)
     }
   }
@@ -67,5 +58,43 @@ export class Breaker {
     this.current = 'closed'
     this.outcomes = []
     this.probing = false
+  }
+}
+
+export class Breakers<Type extends string> {
+  private readonly byType = new Map<Type, Breaker>()
+  private readonly enabled: boolean
+
+  constructor(enabled = true) {
+    this.enabled = enabled
+  }
+
+  state(type: Type, now: number): BreakerState {
+    return this.enabled ? this.breaker(type).state(now) : 'closed'
+  }
+
+  allows(type: Type, now: number): boolean {
+    return !this.enabled || this.breaker(type).allows(now)
+  }
+
+  record(type: Type, ok: boolean, now: number): void {
+    if (this.enabled) this.breaker(type).record(ok, now)
+  }
+
+  opened(type: Type): number {
+    return this.byType.get(type)?.opened ?? 0
+  }
+
+  states(now: number): Map<Type, BreakerState> {
+    return new Map([...this.byType].map(([type, breaker]) => [type, breaker.state(now)]))
+  }
+
+  private breaker(type: Type): Breaker {
+    let breaker = this.byType.get(type)
+    if (!breaker) {
+      breaker = new Breaker()
+      this.byType.set(type, breaker)
+    }
+    return breaker
   }
 }

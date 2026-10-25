@@ -18,6 +18,14 @@ let server: Server
 let endpoint: string
 let spans: Collected[] = []
 
+interface OtlpSpan {
+  traceId: string
+  spanId: string
+  parentSpanId?: string
+  name: string
+  attributes?: Array<{ key: string; value: Record<string, unknown> }>
+}
+
 function value(v: Record<string, unknown>): string | number | boolean {
   if ('stringValue' in v) return v.stringValue as string
   if ('intValue' in v) return Number(v.intValue)
@@ -32,22 +40,17 @@ beforeAll(async () => {
     req.on('data', (chunk: Buffer) => (body += chunk.toString()))
     req.on('end', () => {
       const payload = JSON.parse(body) as {
-        resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: Array<Record<string, unknown>> }> }>
+        resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: OtlpSpan[] }> }>
       }
       for (const resource of payload.resourceSpans ?? []) {
         for (const scope of resource.scopeSpans ?? []) {
           for (const span of scope.spans ?? []) {
-            const attributes = Object.fromEntries(
-              ((span.attributes as Array<{ key: string; value: Record<string, unknown> }>) ?? []).map((a) => [
-                a.key,
-                value(a.value),
-              ]),
-            )
+            const attributes = Object.fromEntries((span.attributes ?? []).map((a) => [a.key, value(a.value)]))
             spans.push({
-              traceId: span.traceId as string,
-              spanId: span.spanId as string,
-              parentSpanId: (span.parentSpanId as string | undefined) ?? '',
-              name: span.name as string,
+              traceId: span.traceId,
+              spanId: span.spanId,
+              parentSpanId: span.parentSpanId ?? '',
+              name: span.name,
               attributes,
             })
           }

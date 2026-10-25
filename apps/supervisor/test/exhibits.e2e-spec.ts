@@ -63,6 +63,8 @@ describe('exhibits', () => {
     expect(blocked.status).toBe(503)
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0)
     await waitUntilOnTheLiveView()
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect((await http().get('/health')).body.workers).toBe(0)
     const exhibit = await ended(res.body.id)
     expect(exhibit.status).toBe('DONE')
     await waitUntilOffTheLiveView()

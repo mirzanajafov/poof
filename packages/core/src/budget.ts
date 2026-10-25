@@ -1,5 +1,5 @@
 import { finishMs } from './split.ts'
-import type { SplitRequest } from './types.ts'
+import type { PolicyConfig, SplitRequest } from './types.ts'
 
 export interface StartRequest {
   leaseId: string
@@ -24,12 +24,9 @@ export interface Preemption {
   minRemaining: number
 }
 
-interface Candidate {
-  deadline: number
-  rank: number
-  start?: StartRequest
-  split?: SplitRequest
-}
+type Candidate = { deadline: number; rank: number } & (
+  { kind: 'start'; start: StartRequest } | { kind: 'split'; split: SplitRequest }
+)
 
 const URGENT = 0
 const SPARE = 1
@@ -51,10 +48,17 @@ export function allocate(
   const splitRank = (split: SplitRequest) =>
     split.opportunistic ? SPARE : lostCause(split, spawnMs, fanout) ? LOST : URGENT
   const candidates: Candidate[] = [
-    ...starts.map((start) => ({ deadline: start.deadline, rank: start.deadline <= now ? LOST : URGENT, start })),
-    ...splits.map((split) => ({ deadline: split.deadline, rank: splitRank(split), split })),
+    ...starts.map((start): Candidate => ({
+      kind: 'start',
+      deadline: start.deadline,
+      rank: start.deadline <= now ? LOST : URGENT,
+      start,
+    })),
+    ...splits.map((split): Candidate => ({ kind: 'split', deadline: split.deadline, rank: splitRank(split), split })),
   ]
-  candidates.sort((a, b) => a.rank - b.rank || a.deadline - b.deadline || Number(!a.start) - Number(!b.start))
+  candidates.sort(
+    (a, b) => a.rank - b.rank || a.deadline - b.deadline || Number(a.kind === 'split') - Number(b.kind === 'split'),
+  )
   const grants: Grants = { starts: [], splits: new Map(), preempt: [] }
   const waiting: Candidate[] = []
   for (const candidate of candidates) {
@@ -62,10 +66,10 @@ export function allocate(
       waiting.push(candidate)
       continue
     }
-    if (candidate.start) {
+    if (candidate.kind === 'start') {
       grants.starts.push(candidate.start.leaseId)
       free--
-    } else if (candidate.split) {
+    } else {
       const k = Math.min(candidate.split.k, free)
       grants.splits.set(candidate.split.leaseId, k)
       free -= k
@@ -73,6 +77,21 @@ export function allocate(
   }
   if (preemption) grants.preempt = preempt(waiting, preemption)
   return grants
+}
+
+export function grant(
+  policy: PolicyConfig,
+  free: number,
+  starts: readonly StartRequest[],
+  splits: readonly SplitRequest[],
+  now: number,
+  spawnMs: number,
+  preemption?: Preemption,
+): Grants {
+  if (!policy.budget) {
+    return { starts: starts.map((s) => s.leaseId), splits: new Map(splits.map((s) => [s.leaseId, s.k])), preempt: [] }
+  }
+  return allocate(free, starts, splits, now, spawnMs, policy.fanout, preemption)
 }
 
 function preempt(waiting: readonly Candidate[], preemption: Preemption): string[] {

@@ -55,7 +55,7 @@ export function Workers({ live }: { live: PoolSnapshot | null }) {
                 <span className="tabular text-xs text-muted">{worker ? `${worker.items} done` : ''}</span>
               </div>
               <div className="mt-1 text-xs text-muted">
-                {lease && worker?.task ? (
+                {lease && worker.task ? (
                   <>
                     Task{' '}
                     <Link className="underline" href={`/tasks/${worker.task}`}>

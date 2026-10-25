@@ -38,7 +38,6 @@ export interface View {
   leases: readonly LeaseInfo[]
   breakers: ReadonlyMap<string, BreakerState>
   spawnMs: number
-  killSwitch: boolean
 }
 
 export type Trigger = 'none' | 'timer' | 'forecast' | 'oracle'

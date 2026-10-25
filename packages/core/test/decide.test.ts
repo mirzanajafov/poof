@@ -30,7 +30,6 @@ function view(leases: LeaseInfo[], now: number, overrides: Partial<View> = {}): 
     leases,
     breakers: new Map(),
     spawnMs: 200,
-    killSwitch: false,
     ...overrides,
   }
 }
@@ -70,7 +69,7 @@ describe('decide', () => {
     expect(request!.remaining).toBe(900)
   })
 
-  it('respects warm-up, cooldown, depth, breakers and the kill switch', () => {
+  it('respects warm-up, cooldown, depth and breakers', () => {
     const now = 10_000
     const config = policies.forecastManaged
     expect(decide(view([lease({ itemsDone: 3 })], now), config)).toHaveLength(0)
@@ -78,7 +77,6 @@ describe('decide', () => {
     expect(decide(view([lease({ lastSplitAt: 8_000 })], now), config)).toHaveLength(0)
     expect(decide(view([lease({ depth: 3 })], now), config)).toHaveLength(0)
     expect(decide(view([lease()], now, { breakers: new Map([['webp-1600', 'open']]) }), config)).toHaveLength(0)
-    expect(decide(view([lease()], now, { killSwitch: true }), config)).toHaveLength(0)
     expect(decide(view([lease({ state: 'starting' })], now), config)).toHaveLength(0)
   })
 

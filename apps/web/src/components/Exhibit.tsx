@@ -107,7 +107,7 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
   const s = exhibit.stats
   const kills = Object.entries(s.exits)
     .filter(([reason]) => reason !== 'normal')
-    .reduce((sum, [, n]) => sum + (n ?? 0), 0)
+    .reduce((sum, [, n]) => sum + n, 0)
   const stats = [
     ['Processes now', String(exhibit.processes)],
     ['Peak', String(s.peakProcesses)],

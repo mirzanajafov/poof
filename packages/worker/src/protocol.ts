@@ -54,13 +54,7 @@ export interface ItemDead {
   error: string
 }
 
-export interface Shrunk {
-  type: 'shrunk'
-  lease: string
-  cut: number
-  ok: boolean
-  next: number
-}
+export type Shrunk = { type: 'shrunk'; lease: string } & ({ ok: true; cut: number } | { ok: false })
 
 export interface LeaseDone {
   type: 'leaseDone'

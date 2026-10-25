@@ -28,7 +28,7 @@ function eligible(config: PolicyConfig, view: View, task: TaskInfo, lease: Lease
 }
 
 export function decide(view: View, config: PolicyConfig): SplitRequest[] {
-  if (config.trigger === 'none' || view.killSwitch) return []
+  if (config.trigger === 'none') return []
   const requests: SplitRequest[] = []
   for (const lease of view.leases) {
     const task = view.tasks.get(lease.taskId)

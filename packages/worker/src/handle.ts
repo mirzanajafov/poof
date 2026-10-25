@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { ExitReason } from '@poof/contracts'
-import type { Assignment, FromWorker, ItemDead, ItemDone, LeaseDone, Shrunk } from './protocol.ts'
+import type { Assignment, FromWorker, ItemDead, ItemDone, LeaseDone, Ready, Shrunk } from './protocol.ts'
 
 export interface Limits {
   rssMb: number
@@ -44,8 +44,8 @@ interface Tracked {
 
 const ownDir = new URL('.', import.meta.url)
 const fromSource = import.meta.url.endsWith('.ts')
-const defaultEntry = fileURLToPath(new URL(fromSource ? 'worker.ts' : 'worker.js', ownDir))
-const defaultExecArgv = fromSource ? ['--conditions=source', '--disable-warning=ExperimentalWarning'] : []
+const entry = fileURLToPath(new URL(fromSource ? 'worker.ts' : 'worker.js', ownDir))
+const execArgv = fromSource ? ['--conditions=source', '--disable-warning=ExperimentalWarning'] : []
 
 function linuxRssMb(pid: number): number | null {
   if (process.platform !== 'linux') return null
@@ -59,8 +59,6 @@ function linuxRssMb(pid: number): number | null {
 
 export class WorkerHandle extends EventEmitter<HandleEvents> {
   readonly limits: Limits
-  private readonly entry: string
-  private readonly execArgv: string[]
   private child: ChildProcess | null = null
   private readonly leases: Tracked[] = []
   private since = 0
@@ -73,11 +71,9 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   private readonly pendingShrinks = new Map<string, (result: Shrunk) => void>()
   pid = 0
 
-  constructor(options: { limits?: Partial<Limits>; entry?: string; execArgv?: string[] } = {}) {
+  constructor(options: { limits?: Partial<Limits> } = {}) {
     super()
     this.limits = { ...defaultLimits, ...options.limits }
-    this.entry = options.entry ?? defaultEntry
-    this.execArgv = options.execArgv ?? defaultExecArgv
   }
 
   get inflight(): Inflight | null {
@@ -96,8 +92,8 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = fork(this.entry, [], {
-        execArgv: this.execArgv,
+      const child = fork(entry, [], {
+        execArgv,
         env: { MALLOC_ARENA_MAX: '2', ...process.env, POOF_HEARTBEAT_MS: String(this.limits.heartbeatMs) },
         stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       })
@@ -149,40 +145,47 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
     setTimeout(() => this.child?.kill('SIGKILL'), this.limits.killGraceMs).unref()
   }
 
-  private onMessage(message: FromWorker): void {
-    if (message.type === 'beat') {
-      this.lastBeat = Date.now()
-      this.reportedRssMb = message.rssMb
-    } else if (message.type === 'item') {
-      const lease = this.leases[0]
-      if (lease && lease.lease === message.lease) lease.cursor = message.item + 1
-      this.since = Date.now()
-      this.lastBeat = Date.now()
-      this.emit('item', message)
-    } else if (message.type === 'leaseDone') {
-      this.leases.shift()
-      this.since = Date.now()
-      this.emit('leaseDone', message)
-    } else if (message.type === 'shrunk') {
-      const tracked = this.leases.find((l) => l.lease === message.lease)
-      if (tracked && message.ok) tracked.hi = message.cut
-      this.pendingShrinks.get(message.lease)?.(message)
-      this.pendingShrinks.delete(message.lease)
+  private onMessage(message: Exclude<FromWorker, Ready>): void {
+    switch (message.type) {
+      case 'beat':
+        this.lastBeat = Date.now()
+        this.reportedRssMb = message.rssMb
+        break
+      case 'item': {
+        const lease = this.leases[0]
+        if (lease?.lease === message.lease) lease.cursor = message.item + 1
+        this.since = Date.now()
+        this.lastBeat = Date.now()
+        this.emit('item', message)
+        break
+      }
+      case 'leaseDone':
+        this.leases.shift()
+        this.since = Date.now()
+        this.emit('leaseDone', message)
+        break
+      case 'shrunk': {
+        const tracked = this.leases.find((l) => l.lease === message.lease)
+        if (tracked && message.ok) tracked.hi = message.cut
+        this.pendingShrinks.get(message.lease)?.(message)
+        this.pendingShrinks.delete(message.lease)
+        break
+      }
     }
   }
 
   private watch(): void {
     const now = Date.now()
-    if (this.rssMb > this.limits.rssMb) return this.kill('memory')
     const lease = this.leases[0]
-    if (lease && lease.cursor < lease.hi && now - this.since > lease.itemTimeoutMs) return this.kill('timeout')
-    if (now - this.lastBeat > this.limits.missedBeats * this.limits.heartbeatMs) return this.kill('heartbeat')
+    if (this.rssMb > this.limits.rssMb) this.kill('memory')
+    else if (lease && lease.cursor < lease.hi && now - this.since > lease.itemTimeoutMs) this.kill('timeout')
+    else if (now - this.lastBeat > this.limits.missedBeats * this.limits.heartbeatMs) this.kill('heartbeat')
   }
 
   private onExit(code: number | null, signal: NodeJS.Signals | null): void {
     if (this.watchdog) clearInterval(this.watchdog)
     const reason: ExitReason = this.killReason ?? (code === 0 && this.stopping ? 'normal' : 'crash')
-    for (const [lease, resolve] of this.pendingShrinks) resolve({ type: 'shrunk', lease, cut: -1, ok: false, next: -1 })
+    for (const [lease, resolve] of this.pendingShrinks) resolve({ type: 'shrunk', lease, ok: false })
     this.pendingShrinks.clear()
     this.emit('exit', { reason, code, signal, inflight: this.inflight, stderr: this.stderr })
     this.child = null

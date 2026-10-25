@@ -118,7 +118,7 @@ export function compare(
   const differences: number[] = []
   for (const [seed, value] of left) {
     const other = right.get(seed)
-    if (value !== null && value !== undefined && other !== null && other !== undefined) differences.push(value - other)
+    if (value !== null && other !== null && other !== undefined) differences.push(value - other)
   }
   if (differences.length === 0) return null
   return { machine, scenario, metric, a, b, difference: bootstrap(differences) }

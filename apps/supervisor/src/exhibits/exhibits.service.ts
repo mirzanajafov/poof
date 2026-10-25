@@ -8,7 +8,7 @@ import {
   type ExhibitSnapshot,
   type ExhibitStats,
 } from '@poof/contracts'
-import { exhibitPolicies, exhibitSchedule, expectedCostMs, serverCostModels, type Arrival } from '@poof/core'
+import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
 import { within, type Context, type Span } from '@poof/tracing'
 import type { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
@@ -71,7 +71,6 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   private async begin(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     const dataset = await this.datasets.get(params.dataset)
-    const model = serverCostModels[params.preset]
     const id = randomUUID()
     const startedAt = Date.now()
     const endsAt = startedAt + params.durationSeconds * 1000
@@ -129,7 +128,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       span,
     }
     this.current = current
-    const itemMs = dataset.items.map((item) => expectedCostMs(model, (item.width * item.height) / 1e6))
+    const itemMs = dataset.items.map((item) => predictedCostMs(params.preset, item))
     const arrivals = exhibitSchedule(
       {
         durationMs: params.durationSeconds * 1000,

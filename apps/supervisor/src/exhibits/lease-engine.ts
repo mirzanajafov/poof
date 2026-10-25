@@ -3,18 +3,15 @@ import { Logger } from '@nestjs/common'
 import { emptyExhibitStats, type ExhibitSnapshot, type ExhibitStats, type ManifestItem } from '@poof/contracts'
 import {
   admits,
-  allocate,
-  Breaker,
+  Breakers,
   decide,
   emptyEstimate,
-  expectedCostMs,
+  grant,
   itemTimeoutMs,
   planSplit,
-  serverCostModels,
+  predictedCostMs,
   updateEstimate,
-  type BreakerState,
   type Estimate,
-  type Grants,
   type LeaseInfo,
   type LeaseState,
   type PolicyConfig,
@@ -90,7 +87,7 @@ export class LeaseEngine {
   private readonly tasks = new Map<string, ExhibitTask>()
   private readonly leases = new Map<string, ExhibitLease>()
   private readonly workers = new Set<ExhibitWorker>()
-  private readonly breakers = new Map<PresetName, Breaker>()
+  private readonly breakers: Breakers<PresetName>
   private spawnEstimate: Estimate = emptyEstimate
   private reserved = 0
   private writes: Promise<unknown> = Promise.resolve()
@@ -103,7 +100,9 @@ export class LeaseEngine {
     private readonly db: Database,
     private readonly events: Events,
     private readonly datasets: Datasets,
-  ) {}
+  ) {
+    this.breakers = new Breakers(options.policy.breaker)
+  }
 
   start(): void {
     this.timer = setInterval(() => this.tick(), this.options.tickMs)
@@ -120,14 +119,11 @@ export class LeaseEngine {
     deadlineMs: number,
     offset: number,
   ): Promise<boolean> {
-    if (this.stopped) return false
-    const model = serverCostModels[preset]
-    const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
+    const predicted = Float64Array.from(items, (item) => predictedCostMs(preset, item))
     const predictedMs = predicted.reduce((sum, v) => sum + v, 0)
     const now = Date.now()
     const id = randomUUID()
     const info: TaskInfo = { id, type: preset, items: items.length, submittedAt: now, deadline: deadlineMs }
-    this.stats.submitted++
     const span = this.options.tracer.startSpan(
       'task',
       {
@@ -158,6 +154,7 @@ export class LeaseEngine {
     if (this.options.policy.admission) {
       const backlog = this.active().map((t) => ({ id: t.info.id, deadline: t.info.deadline, workMs: t.remainingMs }))
       if (!admits({ id, deadline: deadlineMs, workMs: predictedMs }, backlog, now, this.options.capacityCores)) {
+        this.stats.submitted++
         this.stats.rejected++
         this.persist(() => this.db.client.task.create({ data: { ...base, status: 'REJECTED' } }))
         this.events.publish({ kind: 'task.rejected', task: id, exhibit: this.options.exhibitId })
@@ -168,11 +165,11 @@ export class LeaseEngine {
     }
     const dir = await this.datasets.createTask(id, dataset, items)
     if (this.stopped) {
-      this.stats.submitted--
       span.end()
       await this.datasets.removeTask(id)
       return false
     }
+    this.stats.submitted++
     const task: ExhibitTask = {
       info,
       preset,
@@ -259,19 +256,6 @@ export class LeaseEngine {
     this.writes = this.writes.then(write).catch((error: unknown) => this.logger.error(error))
   }
 
-  private breaker(type: PresetName): Breaker {
-    let breaker = this.breakers.get(type)
-    if (!breaker) {
-      breaker = new Breaker()
-      this.breakers.set(type, breaker)
-    }
-    return breaker
-  }
-
-  private breakerState(type: PresetName): BreakerState {
-    return this.options.policy.breaker ? this.breaker(type).state(Date.now()) : 'closed'
-  }
-
   private get spawnMs(): number {
     return this.spawnEstimate.count > 0 ? this.spawnEstimate.mean : 180
   }
@@ -351,39 +335,24 @@ export class LeaseEngine {
         })
       }
     }
-    const breakers = new Map([...this.breakers.keys()].map((type) => [type, this.breakerState(type)] as const))
-    const requests = decide({ now, tasks, leases: infos, breakers, spawnMs: this.spawnMs, killSwitch: false }, policy)
+    const requests = decide(
+      { now, tasks, leases: infos, breakers: this.breakers.states(now), spawnMs: this.spawnMs },
+      policy,
+    )
     const starts: StartRequest[] = []
     for (const task of this.active()) {
-      if (this.breakerState(task.preset) === 'open') continue
+      if (this.breakers.state(task.preset, now) === 'open') continue
       for (const lease of task.leases)
         if (lease.state === 'pending') starts.push({ leaseId: lease.id, deadline: task.info.deadline })
     }
-    let grants: Grants
-    if (policy.budget) {
-      grants = allocate(
-        this.options.budget - this.processes,
-        starts,
-        requests,
-        now,
-        this.spawnMs,
-        policy.fanout,
-        this.preemption(),
-      )
-    } else {
-      grants = {
-        starts: starts.map((s) => s.leaseId),
-        splits: new Map(requests.map((r) => [r.leaseId, r.k])),
-        preempt: [],
-      }
-    }
+    const free = this.options.budget - this.processes
+    const grants = grant(policy, free, starts, requests, now, this.spawnMs, this.preemption())
     const byLease = new Map(requests.map((r) => [r.leaseId, r]))
     for (const id of grants.preempt) void this.yieldLease(this.leases.get(id)!)
     for (const [id, k] of grants.splits) void this.split(this.leases.get(id)!, k, byLease.get(id)!)
     for (const id of grants.starts) {
       const lease = this.leases.get(id)!
-      if (lease.state === 'pending' && (!policy.breaker || this.breaker(lease.task.preset).allows(now)))
-        this.launch(lease)
+      if (lease.state === 'pending' && this.breakers.allows(lease.task.preset, now)) this.launch(lease)
     }
   }
 
@@ -394,7 +363,7 @@ export class LeaseEngine {
     for (const worker of this.workers) {
       if (worker.yielding) yielding++
       const lease = worker.lease
-      if (worker.yielding || !lease || lease.state !== 'running' || lease.busy) continue
+      if (worker.yielding || lease?.state !== 'running' || lease.busy) continue
       running.push({ leaseId: lease.id, deadline: lease.task.info.deadline, remaining: lease.hi - lease.cursor - 1 })
     }
     return { running, yielding, minRemaining: 2 }
@@ -489,7 +458,10 @@ export class LeaseEngine {
       () => {
         spawn.setAttribute('poof.worker.pid', worker.handle.pid)
         spawn.end()
-        if (this.stopped) return worker.handle.kill('killed')
+        if (this.stopped) {
+          worker.handle.kill('killed')
+          return
+        }
         this.spawnEstimate = updateEstimate(this.spawnEstimate, Date.now() - started)
         this.stats.spawns++
         this.persist(() => this.db.client.worker.create({ data: { id: worker.id, pid: worker.handle.pid } }))
@@ -542,7 +514,7 @@ export class LeaseEngine {
 
   private onItem(worker: ExhibitWorker, message: ItemDone | ItemDead): void {
     const lease = worker.lease
-    if (!lease || lease.id !== message.lease) return
+    if (lease?.id !== message.lease) return
     const task = lease.task
     lease.cursor = message.item + 1
     lease.itemsDone++
@@ -553,7 +525,7 @@ export class LeaseEngine {
       task.done++
       this.stats.items++
       lease.itemMs = updateEstimate(lease.itemMs, message.wallMs)
-      if (this.options.policy.breaker) this.breaker(task.preset).record(true, Date.now())
+      this.breakers.record(task.preset, true, Date.now())
     } else {
       this.deadLetter(task, message.item, message.attempts, message.error)
     }
@@ -564,7 +536,7 @@ export class LeaseEngine {
   private deadLetter(task: ExhibitTask, item: number, attempts: number, error: string): void {
     task.dead++
     this.stats.deadLettered++
-    if (this.options.policy.breaker) this.breaker(task.preset).record(false, Date.now())
+    this.breakers.record(task.preset, false, Date.now())
     this.persist(() =>
       this.db.client.deadLetter.create({ data: { taskId: task.info.id, item, attempts, error: error.slice(0, 500) } }),
     )
@@ -572,7 +544,7 @@ export class LeaseEngine {
 
   private onLeaseDone(worker: ExhibitWorker, message: LeaseDone): void {
     const lease = worker.lease
-    if (!lease || lease.id !== message.lease) return
+    if (lease?.id !== message.lease) return
     lease.state = 'done'
     lease.worker = null
     worker.lease = null
@@ -612,7 +584,7 @@ export class LeaseEngine {
     lease.worker = null
     if (exit.reason !== 'normal')
       lease.span.addEvent('worker exit', { 'poof.reason': exit.reason, 'poof.item': exit.inflight?.item ?? -1 })
-    if (exit.inflight && exit.inflight.lease === lease.id && exit.reason !== 'normal') {
+    if (exit.inflight?.lease === lease.id && exit.reason !== 'normal') {
       const item = exit.inflight.item
       const attempts = (task.attempts.get(item) ?? 0) + 1
       task.attempts.set(item, attempts)
@@ -621,7 +593,7 @@ export class LeaseEngine {
         task.remainingMs -= task.predicted[item]!
         lease.cursor = item + 1
       } else {
-        if (this.options.policy.breaker) this.breaker(task.preset).record(false, Date.now())
+        this.breakers.record(task.preset, false, Date.now())
         lease.cursor = item
       }
     }

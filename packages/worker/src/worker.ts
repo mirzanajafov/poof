@@ -96,19 +96,22 @@ async function drain(): Promise<void> {
 }
 
 function shrink(lease: string, cut: number): void {
-  if (current && current.assignment.lease === lease) {
-    const ok = cut > current.cursor && cut < current.hi
-    if (ok) current.hi = cut
-    void send({ type: 'shrunk', lease, cut, ok, next: Math.min(current.cursor + 1, current.hi) })
+  if (current?.assignment.lease === lease) {
+    if (cut > current.cursor && cut < current.hi) {
+      current.hi = cut
+      void send({ type: 'shrunk', lease, ok: true, cut })
+    } else {
+      void send({ type: 'shrunk', lease, ok: false })
+    }
     return
   }
   const queued = queue.find((a) => a.lease === lease)
   if (queued && cut >= queued.lo && cut < queued.hi) {
     queued.hi = cut
-    void send({ type: 'shrunk', lease, cut, ok: true, next: queued.lo })
+    void send({ type: 'shrunk', lease, ok: true, cut })
     return
   }
-  void send({ type: 'shrunk', lease, cut, ok: false, next: -1 })
+  void send({ type: 'shrunk', lease, ok: false })
 }
 
 const beat = setInterval(() => void send({ type: 'beat', rssMb: rssMb() }), heartbeatMs)
@@ -120,14 +123,17 @@ function exit(): void {
 
 process.on('disconnect', () => process.exit(0))
 process.on('message', (message: ToWorker) => {
-  if (message.type === 'assign') {
-    queue.push(message)
-    void drain()
-  } else if (message.type === 'shrink') {
-    shrink(message.lease, message.cut)
-  } else if (message.type === 'stop') {
-    stopping = true
-    if (!running) exit()
+  switch (message.type) {
+    case 'assign':
+      queue.push(message)
+      void drain()
+      break
+    case 'shrink':
+      shrink(message.lease, message.cut)
+      break
+    case 'stop':
+      stopping = true
+      if (!running) exit()
   }
 })
 

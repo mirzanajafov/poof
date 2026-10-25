@@ -92,7 +92,7 @@ export class Env {
 
 export function validateEnv(raw: Record<string, unknown>): Env {
   const env = plainToInstance(Env, raw, { enableImplicitConversion: true })
-  const errors = validateSync(env, { skipMissingProperties: false })
+  const errors = validateSync(env)
   if (errors.length > 0) {
     throw new Error(errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`).join('; '))
   }
