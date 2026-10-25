@@ -9,7 +9,6 @@ import {
   itemTimeoutMs,
   planSplit,
   updateEstimate,
-  type BreakerState,
   type Estimate,
   type Preemption,
   type RunningLease,
@@ -172,7 +171,7 @@ export class Simulation {
   private readonly tasks: SimTask[] = []
   private readonly active = new Set<SimTask>()
   private readonly processes = new Set<SimProcess>()
-  private readonly breakers = new Breakers<string>()
+  private readonly breakers: Breakers<string>
   private readonly typeRatio = new Map<string, Estimate>()
   private spawnEstimate: Estimate = emptyEstimate
   private readonly cpu = { usefulMs: 0, spawnMs: 0, lostMs: 0 }
@@ -195,6 +194,7 @@ export class Simulation {
 
   constructor(options: SimOptions) {
     this.policy = options.policy
+    this.breakers = new Breakers(options.policy.breaker)
     this.machine = options.machine
     this.curve = curveFor(options.calibration, options.machine.cores)
     this.workload =
@@ -367,14 +367,6 @@ export class Simulation {
     }
   }
 
-  private breakerState(type: string): BreakerState {
-    return this.policy.breaker ? this.breakers.get(type).state(this.now) : 'closed'
-  }
-
-  private breakerAllows(type: string): boolean {
-    return !this.policy.breaker || this.breakers.get(type).allows(this.now)
-  }
-
   private view(): View {
     const tasks = new Map<string, TaskInfo>()
     const leases: LeaseInfo[] = []
@@ -423,7 +415,7 @@ export class Simulation {
     const pending: SimLease[] = []
     for (const task of this.active) {
       for (const lease of task.leases) {
-        if (lease.state === 'pending' && this.breakerState(task.info.type) !== 'open') pending.push(lease)
+        if (lease.state === 'pending' && this.breakers.state(task.info.type, this.now) !== 'open') pending.push(lease)
       }
     }
     const starts: StartRequest[] = pending.map((lease) => ({
@@ -439,7 +431,7 @@ export class Simulation {
     for (const [leaseId, k] of grants.splits) this.applySplit(byId.get(leaseId)!, k, requestById.get(leaseId)!)
     for (const leaseId of grants.starts) {
       const lease = byId.get(leaseId)!
-      if (lease.state !== 'pending' || !this.breakerAllows(lease.task.info.type)) continue
+      if (lease.state !== 'pending' || !this.breakers.allows(lease.task.info.type, this.now)) continue
       this.spawn(lease)
     }
   }
@@ -598,7 +590,7 @@ export class Simulation {
     lease.itemMs = updateEstimate(lease.itemMs, this.now - lease.inflightStart)
     const ratio = this.typeRatio.get(task.info.type) ?? emptyEstimate
     this.typeRatio.set(task.info.type, updateEstimate(ratio, cost / task.predicted[item]!, 0.02))
-    if (this.policy.breaker) this.breakers.get(task.info.type).record(true, this.now)
+    this.breakers.record(task.info.type, true, this.now)
     this.settle(task)
     this.startItem(process, lease)
   }
@@ -625,12 +617,9 @@ export class Simulation {
     this.cpu.lostMs += task.plan.costs[item]! - lease.inflightLeft
     lease.inflight = false
     task.attempts[item] = Math.min(255, task.attempts[item]! + 1)
-    if (this.policy.breaker) {
-      const breaker = this.breakers.get(task.info.type)
-      const before = breaker.opened
-      breaker.record(false, this.now)
-      this.counts.breakerOpened += breaker.opened - before
-    }
+    const opened = this.breakers.opened(task.info.type)
+    this.breakers.record(task.info.type, false, this.now)
+    this.counts.breakerOpened += this.breakers.opened(task.info.type) - opened
     if (this.policy.deadLetter && task.attempts[item]! >= this.options.maxAttempts) {
       task.state[item] = DEAD
       task.dead++
@@ -664,7 +653,7 @@ export class Simulation {
     }
     const task = lease.task
     const next = task.failed || process.yielding ? undefined : task.leases.find((l) => l.state === 'pending')
-    if (next && this.breakerAllows(task.info.type)) {
+    if (next && this.breakers.allows(task.info.type, this.now)) {
       this.counts.adoptions++
       next.state = 'running'
       next.process = process
@@ -685,7 +674,7 @@ export class Simulation {
     let best: SimLease | null = null
     let bestKey: [number, number] = [Infinity, Infinity]
     for (const task of this.active) {
-      if (this.breakerState(task.info.type) === 'open') continue
+      if (this.breakers.state(task.info.type, this.now) === 'open') continue
       const key: [number, number] = [task.info.deadline <= this.now ? 1 : 0, task.info.deadline]
       if (key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] >= bestKey[1])) continue
       const lease = task.leases.find((l) => l.state === 'pending')
@@ -693,7 +682,7 @@ export class Simulation {
       best = lease
       bestKey = key
     }
-    if (!best || !this.breakerAllows(best.task.info.type)) {
+    if (!best || !this.breakers.allows(best.task.info.type, this.now)) {
       process.state = 'idle'
       return
     }

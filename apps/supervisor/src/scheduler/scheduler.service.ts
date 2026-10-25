@@ -319,10 +319,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private record(preset: PresetName, ok: boolean): void {
-    const breaker = this.breakers.get(preset)
-    const before = breaker.state(Date.now())
-    breaker.record(ok, Date.now())
-    const after = breaker.state(Date.now())
+    const now = Date.now()
+    const before = this.breakers.state(preset, now)
+    this.breakers.record(preset, ok, now)
+    const after = this.breakers.state(preset, now)
     if (after !== before) {
       this.persist(() => this.db.client.breakerEvent.create({ data: { type: preset, state: after } }))
       this.events.publish({ kind: 'breaker', preset, state: after })
@@ -347,6 +347,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private addWorker(handle: WorkerHandle): void {
+    if (this.stopping || this.paused) {
+      handle.kill('killed')
+      return
+    }
     const worker: PoolWorker = { id: randomUUID(), handle, lease: null, items: 0, retiring: false }
     this.workers.add(worker)
     this.persist(() => this.db.client.worker.create({ data: { id: worker.id, pid: handle.pid } }))
@@ -354,10 +358,6 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
     handle.on('exit', (exit) => this.onExit(worker, exit))
     this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: handle.pid })
-    if (this.stopping) {
-      handle.kill('killed')
-      return
-    }
     this.claim(worker)
   }
 
@@ -369,11 +369,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const now = Date.now()
     let best: TaskState | null = null
     for (const task of this.active()) {
-      if (this.breakers.get(task.preset).state(now) === 'open') continue
+      if (this.breakers.state(task.preset, now) === 'open') continue
       if (!task.leases.some((l) => l.state === 'pending')) continue
       if (!best || rank(task, now) < rank(best, now)) best = task
     }
-    if (!best || !this.breakers.get(best.preset).allows(now)) return null
+    if (!best || !this.breakers.allows(best.preset, now)) return null
     return best.leases.find((l) => l.state === 'pending') ?? null
   }
 

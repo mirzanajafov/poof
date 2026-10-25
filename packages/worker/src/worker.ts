@@ -123,14 +123,17 @@ function exit(): void {
 
 process.on('disconnect', () => process.exit(0))
 process.on('message', (message: ToWorker) => {
-  if (message.type === 'assign') {
-    queue.push(message)
-    void drain()
-  } else if (message.type === 'shrink') {
-    shrink(message.lease, message.cut)
-  } else {
-    stopping = true
-    if (!running) exit()
+  switch (message.type) {
+    case 'assign':
+      queue.push(message)
+      void drain()
+      break
+    case 'shrink':
+      shrink(message.lease, message.cut)
+      break
+    case 'stop':
+      stopping = true
+      if (!running) exit()
   }
 })
 

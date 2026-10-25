@@ -11,7 +11,6 @@ import {
   planSplit,
   predictedCostMs,
   updateEstimate,
-  type BreakerState,
   type Estimate,
   type LeaseInfo,
   type LeaseState,
@@ -88,7 +87,7 @@ export class LeaseEngine {
   private readonly tasks = new Map<string, ExhibitTask>()
   private readonly leases = new Map<string, ExhibitLease>()
   private readonly workers = new Set<ExhibitWorker>()
-  private readonly breakers = new Breakers<PresetName>()
+  private readonly breakers: Breakers<PresetName>
   private spawnEstimate: Estimate = emptyEstimate
   private reserved = 0
   private writes: Promise<unknown> = Promise.resolve()
@@ -101,7 +100,9 @@ export class LeaseEngine {
     private readonly db: Database,
     private readonly events: Events,
     private readonly datasets: Datasets,
-  ) {}
+  ) {
+    this.breakers = new Breakers(options.policy.breaker)
+  }
 
   start(): void {
     this.timer = setInterval(() => this.tick(), this.options.tickMs)
@@ -255,10 +256,6 @@ export class LeaseEngine {
     this.writes = this.writes.then(write).catch((error: unknown) => this.logger.error(error))
   }
 
-  private breakerState(type: PresetName): BreakerState {
-    return this.options.policy.breaker ? this.breakers.get(type).state(Date.now()) : 'closed'
-  }
-
   private get spawnMs(): number {
     return this.spawnEstimate.count > 0 ? this.spawnEstimate.mean : 180
   }
@@ -344,7 +341,7 @@ export class LeaseEngine {
     )
     const starts: StartRequest[] = []
     for (const task of this.active()) {
-      if (this.breakerState(task.preset) === 'open') continue
+      if (this.breakers.state(task.preset, now) === 'open') continue
       for (const lease of task.leases)
         if (lease.state === 'pending') starts.push({ leaseId: lease.id, deadline: task.info.deadline })
     }
@@ -355,8 +352,7 @@ export class LeaseEngine {
     for (const [id, k] of grants.splits) void this.split(this.leases.get(id)!, k, byLease.get(id)!)
     for (const id of grants.starts) {
       const lease = this.leases.get(id)!
-      if (lease.state === 'pending' && (!policy.breaker || this.breakers.get(lease.task.preset).allows(now)))
-        this.launch(lease)
+      if (lease.state === 'pending' && this.breakers.allows(lease.task.preset, now)) this.launch(lease)
     }
   }
 
@@ -529,7 +525,7 @@ export class LeaseEngine {
       task.done++
       this.stats.items++
       lease.itemMs = updateEstimate(lease.itemMs, message.wallMs)
-      if (this.options.policy.breaker) this.breakers.get(task.preset).record(true, Date.now())
+      this.breakers.record(task.preset, true, Date.now())
     } else {
       this.deadLetter(task, message.item, message.attempts, message.error)
     }
@@ -540,7 +536,7 @@ export class LeaseEngine {
   private deadLetter(task: ExhibitTask, item: number, attempts: number, error: string): void {
     task.dead++
     this.stats.deadLettered++
-    if (this.options.policy.breaker) this.breakers.get(task.preset).record(false, Date.now())
+    this.breakers.record(task.preset, false, Date.now())
     this.persist(() =>
       this.db.client.deadLetter.create({ data: { taskId: task.info.id, item, attempts, error: error.slice(0, 500) } }),
     )
@@ -597,7 +593,7 @@ export class LeaseEngine {
         task.remainingMs -= task.predicted[item]!
         lease.cursor = item + 1
       } else {
-        if (this.options.policy.breaker) this.breakers.get(task.preset).record(false, Date.now())
+        this.breakers.record(task.preset, false, Date.now())
         lease.cursor = item
       }
     }

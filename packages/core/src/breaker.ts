@@ -63,17 +63,38 @@ export class Breaker {
 
 export class Breakers<Type extends string> {
   private readonly byType = new Map<Type, Breaker>()
+  private readonly enabled: boolean
 
-  get(type: Type): Breaker {
+  constructor(enabled = true) {
+    this.enabled = enabled
+  }
+
+  state(type: Type, now: number): BreakerState {
+    return this.enabled ? this.breaker(type).state(now) : 'closed'
+  }
+
+  allows(type: Type, now: number): boolean {
+    return !this.enabled || this.breaker(type).allows(now)
+  }
+
+  record(type: Type, ok: boolean, now: number): void {
+    if (this.enabled) this.breaker(type).record(ok, now)
+  }
+
+  opened(type: Type): number {
+    return this.byType.get(type)?.opened ?? 0
+  }
+
+  states(now: number): Map<Type, BreakerState> {
+    return new Map([...this.byType].map(([type, breaker]) => [type, breaker.state(now)]))
+  }
+
+  private breaker(type: Type): Breaker {
     let breaker = this.byType.get(type)
     if (!breaker) {
       breaker = new Breaker()
       this.byType.set(type, breaker)
     }
     return breaker
-  }
-
-  states(now: number): Map<Type, BreakerState> {
-    return new Map([...this.byType].map(([type, breaker]) => [type, breaker.state(now)]))
   }
 }

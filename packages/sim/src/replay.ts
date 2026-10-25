@@ -2,8 +2,7 @@ import type { ExhibitParams, ManifestItem } from '@poof/contracts'
 import {
   exhibitPolicies,
   exhibitSchedule,
-  expectedCostMs,
-  serverCostModels,
+  predictedCostMs,
   type Arrival,
   type PresetName,
   type TimeoutRule,
@@ -34,12 +33,10 @@ export function replayItems(
   measured: ReadonlyMap<string, number>,
   preset: PresetName,
 ): ReplayItem[] {
-  const model = serverCostModels[preset]
   return manifest.map((item) => {
-    const mp = (item.width * item.height) / 1e6
     const costMs = measured.get(item.file)
     if (costMs === undefined) throw new Error(`no measured cost for ${item.file}`)
-    return { file: item.file, mp, costMs, predictedMs: expectedCostMs(model, mp) }
+    return { file: item.file, mp: (item.width * item.height) / 1e6, costMs, predictedMs: predictedCostMs(preset, item) }
   })
 }
 

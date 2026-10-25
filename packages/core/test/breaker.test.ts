@@ -46,15 +46,25 @@ describe('Breaker', () => {
 describe('Breakers', () => {
   it('keeps one breaker per type and reports the state of each', () => {
     const breakers = new Breakers<string>()
-    for (let i = 0; i < 10; i++) breakers.get('thumb-320').record(false, 0)
-    breakers.get('webp-1600').record(true, 0)
-    expect(breakers.get('thumb-320')).toBe(breakers.get('thumb-320'))
+    for (let i = 0; i < 10; i++) breakers.record('thumb-320', false, 0)
+    breakers.record('webp-1600', true, 0)
+    expect(breakers.allows('thumb-320', 1)).toBe(false)
+    expect(breakers.allows('webp-1600', 1)).toBe(true)
+    expect(breakers.opened('thumb-320')).toBe(1)
     expect(breakers.states(1)).toEqual(
       new Map([
         ['thumb-320', 'open'],
         ['webp-1600', 'closed'],
       ]),
     )
+  })
+
+  it('stays closed and keeps nothing for a policy without breakers', () => {
+    const breakers = new Breakers<string>(false)
+    for (let i = 0; i < 10; i++) breakers.record('thumb-320', false, 0)
+    expect(breakers.state('thumb-320', 1)).toBe('closed')
+    expect(breakers.allows('thumb-320', 1)).toBe(true)
+    expect(breakers.states(1)).toEqual(new Map())
   })
 })
 
