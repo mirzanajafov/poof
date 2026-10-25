@@ -8,7 +8,7 @@ import sharp from 'sharp'
 import { inject } from 'vitest'
 import { AppModule, configureApp } from '../src/app.module.js'
 
-export const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387'
+export const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387/4'
 
 export interface Running {
   app: INestApplication

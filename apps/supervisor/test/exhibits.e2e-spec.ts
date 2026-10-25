@@ -8,9 +8,11 @@ import { makeData, redisUrl, start, until, type Running } from './harness.js'
 
 let dataDir: string
 let running: Running | null = null
+let redis: Redis
 
 beforeAll(async () => {
   dataDir = await makeData()
+  redis = new Redis(redisUrl)
 })
 
 afterEach(async () => {
@@ -20,9 +22,14 @@ afterEach(async () => {
 
 afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true })
+  await redis.quit()
 })
 
 const http = () => request(running!.app.getHttpServer())
+
+async function offTheLiveView() {
+  await until(async () => (await redis.exists(exhibitSnapshotKey)) === 0, 2000)
+}
 
 async function ended(id: string) {
   return until(async () => {
@@ -51,8 +58,10 @@ describe('exhibits', () => {
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 600, count: 10 })
     expect(blocked.status).toBe(503)
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0)
+    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 1, 2000)
     const exhibit = await ended(res.body.id)
     expect(exhibit.status).toBe('DONE')
+    await offTheLiveView()
     const stats = exhibit.stats as { peakProcesses: number; submitted: number; done: number; spawns: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.done).toBeGreaterThan(0)
@@ -135,6 +144,7 @@ describe('exhibits', () => {
     expect(res.status).toBe(201)
     expect((await http().get('/health')).body.paused).toBe(false)
     const exhibit = await ended(res.body.id)
+    await offTheLiveView()
     const stats = exhibit.stats as { submitted: number; done: number; peakProcesses: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.peakProcesses).toBe(2)
@@ -156,7 +166,6 @@ describe('exhibits', () => {
 
   it('aborts a running exhibit and takes it off the live view at once', async () => {
     running = await start(dataDir)
-    const redis = new Redis(redisUrl)
     const res = await http()
       .post('/exhibits')
       .send({ policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' })
@@ -168,7 +177,6 @@ describe('exhibits', () => {
     const exhibit = await running.db.exhibit.findUniqueOrThrow({ where: { id: res.body.id } })
     expect(exhibit.status).toBe('ABORTED')
     expect((await http().get('/exhibits/current')).status).toBe(404)
-    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 0, 2000)
-    await redis.quit()
+    await offTheLiveView()
   })
 })
