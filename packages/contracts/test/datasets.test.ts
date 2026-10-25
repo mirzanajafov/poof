@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseManifest } from '../src/datasets.ts'
+import { parseManifest, parseTaskManifest } from '../src/datasets.ts'
 
 const manifest = (items: unknown, extra: Record<string, unknown> = {}) => JSON.stringify({ ...extra, items })
 const image = { file: 'a.jpg', width: 640, height: 480 }
@@ -29,6 +29,13 @@ describe('parseManifest', () => {
         'm.json: item 0 needs a plain file name',
       )
     }
+  })
+
+  it('reads a task manifest that lists only file names, with the same file name rule', () => {
+    expect(parseTaskManifest(manifest([{ file: '0-a.jpg' }]), 'm.json')).toEqual({ items: [{ file: '0-a.jpg' }] })
+    expect(() => parseTaskManifest(manifest([{ file: '../a.jpg' }]), 'm.json')).toThrow(
+      'm.json: item 0 needs a plain file name',
+    )
   })
 
   it('refuses dimensions that are not positive integers', () => {

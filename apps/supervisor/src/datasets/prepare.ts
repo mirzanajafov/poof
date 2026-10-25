@@ -1,8 +1,8 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseManifest } from '@poof/contracts'
 import type { DatasetSource } from './dataset-source.js'
-import { linkOrCopy } from './link-or-copy.js'
+import { replaceWithLinkOrCopy } from './link-or-copy.js'
 
 async function check({ name, dir }: DatasetSource) {
   const path = join(dir, 'manifest.json')
@@ -20,8 +20,10 @@ export async function prepareDatasets(
   for (const { name, dir, manifest } of checked) {
     const target = join(dataDir, 'datasets', name)
     await mkdir(target, { recursive: true })
-    for (const item of manifest.items) await linkOrCopy(join(dir, item.file), join(target, item.file))
-    await writeFile(join(target, 'manifest.json'), JSON.stringify(manifest))
+    for (const item of manifest.items) await replaceWithLinkOrCopy(join(dir, item.file), join(target, item.file))
+    const temp = join(target, `manifest.json.${process.pid}.tmp`)
+    await writeFile(temp, JSON.stringify(manifest))
+    await rename(temp, join(target, 'manifest.json'))
     prepared.push({ name, items: manifest.items.length })
   }
   return prepared

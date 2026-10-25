@@ -3,9 +3,13 @@ import { datasetNamePattern } from '@poof/contracts'
 import { parseDatasetSource } from './datasets/dataset-source.js'
 import { prepareDatasets } from './datasets/prepare.js'
 
-function exitWithUsage(problem: string): never {
-  console.error(`${problem}\nusage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>`)
+function fail(problem: string): never {
+  console.error(problem)
   process.exit(1)
+}
+
+function exitWithUsage(problem: string): never {
+  return fail(`${problem}\nusage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>`)
 }
 
 function readOptions() {
@@ -33,5 +37,5 @@ const sources = options.from.map(
 const repeated = sources.find(({ name }, index) => sources.findIndex((source) => source.name === name) !== index)
 if (repeated) exitWithUsage(`two --from arguments share the name ${repeated.name}`)
 
-const prepared = await prepareDatasets(sources, options.data).catch((error: unknown) => exitWithUsage(String(error)))
+const prepared = await prepareDatasets(sources, options.data).catch((error: unknown) => fail(String(error)))
 for (const { name, items } of prepared) console.log(`${name}: ${items} images`)

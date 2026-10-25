@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { datasetNamePattern, parseManifest, type Manifest, type ManifestItem } from '@poof/contracts'
+import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
 import type { Env } from '../config/env.js'
 import { linkOrCopy } from './link-or-copy.js'
 
@@ -48,13 +48,12 @@ export class Datasets {
     const dir = this.taskDir(taskId)
     await mkdir(join(dir, 'input'), { recursive: true })
     await mkdir(join(dir, 'out'), { recursive: true })
-    const inputs: ManifestItem[] = []
+    const manifest: TaskManifest = { items: [] }
     for (const [i, item] of items.entries()) {
       const file = `${i}-${item.file}`
       await linkOrCopy(join(this.root, 'datasets', dataset.name, item.file), join(dir, 'input', file))
-      inputs.push({ ...item, file })
+      manifest.items.push({ file })
     }
-    const manifest: Manifest = { items: inputs }
     await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))
     return dir
   }

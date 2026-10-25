@@ -53,5 +53,6 @@ describe('prepareDatasets', () => {
     const prepared = join(data, 'datasets', 'small')
     await prepareDatasets([{ name: 'small', dir: prepared }], data)
     expect(await readFile(join(prepared, 'a.jpg'), 'utf8')).toBe('image a.jpg')
+    expect((await readdir(prepared)).sort()).toEqual(['a.jpg', 'manifest.json'])
   })
 })
