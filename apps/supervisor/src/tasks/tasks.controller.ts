@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common'
-import type { PresetName } from '@poof/core'
-import { presets } from '@poof/imaging'
+import { presetNames, type PresetName } from '@poof/core'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Response } from 'express'
@@ -10,7 +9,7 @@ export class SubmitTask {
   @IsString()
   dataset: string
 
-  @IsIn(Object.keys(presets))
+  @IsIn(presetNames)
   preset: PresetName
 
   @IsNumber()

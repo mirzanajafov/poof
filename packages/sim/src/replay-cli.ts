@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
-import { defaultTimeoutRule, isExhibitPolicyName } from '@poof/core'
+import { defaultTimeoutRule, isExhibitPolicyName, isPresetName } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems } from './replay.ts'
@@ -20,9 +20,9 @@ const { values } = parseArgs({
   },
 })
 
-interface ExhibitRun {
+interface RecordedRun {
   id: string
-  params: ExhibitParams
+  params: Omit<ExhibitParams, 'policy' | 'preset'> & { policy: string; preset: string }
   stats: ExhibitStats
 }
 
@@ -43,9 +43,12 @@ const speed = Number(values.speed)
 const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
-const runs = JSON.parse(readFileSync(values.runs!, 'utf8')) as ExhibitRun[]
-const unknownPolicy = runs.find((run) => !isExhibitPolicyName(run.params.policy))
-if (unknownPolicy) throw new Error(`run ${unknownPolicy.id} has no simulator policy for ${unknownPolicy.params.policy}`)
+const runs = (JSON.parse(readFileSync(values.runs!, 'utf8')) as RecordedRun[]).map(({ id, params, stats }) => {
+  const { policy, preset } = params
+  if (!isExhibitPolicyName(policy)) throw new Error(`run ${id} has no simulator policy for ${policy}`)
+  if (!isPresetName(preset)) throw new Error(`run ${id} has no cost model for ${preset}`)
+  return { id, params: { ...params, policy, preset }, stats }
+})
 const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
 
 function measured(preset: string): Map<string, number> {
@@ -69,15 +72,15 @@ function simulated(result: RunResult): Numbers {
   }
 }
 
-function real(run: ExhibitRun): Numbers {
+function real(stats: ExhibitStats): Numbers {
   return {
-    submitted: run.stats.submitted,
-    rejected: run.stats.rejected,
-    met: run.stats.met,
-    peakProcesses: run.stats.peakProcesses,
-    spawns: run.stats.spawns,
-    timeouts: run.stats.exits.timeout ?? 0,
-    items: run.stats.items,
+    submitted: stats.submitted,
+    rejected: stats.rejected,
+    met: stats.met,
+    peakProcesses: stats.peakProcesses,
+    spawns: stats.spawns,
+    timeouts: stats.exits.timeout ?? 0,
+    items: stats.items,
   }
 }
 
@@ -86,7 +89,7 @@ const rows = runs.map((run) => {
   return {
     policy: run.params.policy,
     seed: run.params.seed,
-    real: real(run),
+    real: real(run.stats),
     sim: simulated(replay(run.params, items, calibration, timeoutRule)),
   }
 })

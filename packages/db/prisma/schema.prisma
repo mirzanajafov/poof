@@ -31,6 +31,12 @@ enum WorkerExit {
   KILLED
 }
 
+enum ExhibitStatus {
+  RUNNING
+  DONE
+  ABORTED
+}
+
 model Task {
   id           String       @id @default(uuid()) @db.Uuid
   dataset      String
@@ -62,6 +68,8 @@ model Lease {
   taskId    String     @db.Uuid
   task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   parentId  String?    @db.Uuid
+  parent    Lease?     @relation("LeaseTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Lease[]    @relation("LeaseTree")
   depth     Int        @default(0)
   lo        Int
   hi        Int
@@ -107,12 +115,6 @@ model Decision {
 
   @@index([taskId])
   @@index([at])
-}
-
-enum ExhibitStatus {
-  RUNNING
-  DONE
-  ABORTED
 }
 
 model Exhibit {

@@ -1,4 +1,4 @@
-import type { ExhibitPolicyName, PresetName } from '@poof/core'
+import type { ExhibitPolicyName, LeaseState, PresetName } from '@poof/core'
 import type { ExitReason } from './workers.ts'
 
 export interface ExhibitParams {
@@ -63,7 +63,7 @@ export interface ExhibitLeaseView {
   lo: number
   hi: number
   cursor: number
-  state: 'pending' | 'starting' | 'running' | 'done'
+  state: LeaseState
   pid: number | null
 }
 

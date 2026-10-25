@@ -21,7 +21,7 @@ export interface Inflight {
   since: number
 }
 
-export interface WorkerExit {
+export interface ExitReport {
   reason: ExitReason
   code: number | null
   signal: NodeJS.Signals | null
@@ -32,7 +32,7 @@ export interface WorkerExit {
 export interface HandleEvents {
   item: [ItemDone | ItemDead]
   leaseDone: [LeaseDone]
-  exit: [WorkerExit]
+  exit: [ExitReport]
 }
 
 interface Tracked {

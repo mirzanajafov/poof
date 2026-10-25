@@ -15,6 +15,7 @@ import {
   type Preemption,
   type RunningLease,
   type LeaseInfo,
+  type LeaseState,
   type PolicyConfig,
   type SplitRequest,
   type StartRequest,
@@ -107,7 +108,6 @@ export interface RunResult {
   series: Sample[]
 }
 
-type LeaseState = 'pending' | 'starting' | 'running' | 'done'
 type ProcessState = 'starting' | 'busy' | 'idle' | 'gone'
 
 interface SimTask {

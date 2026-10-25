@@ -5,6 +5,7 @@ import {
   expectedCostMs,
   serverCostModels,
   type Arrival,
+  type PresetName,
   type TimeoutRule,
 } from '@poof/core'
 import type { Calibration } from './calibration.ts'
@@ -31,9 +32,9 @@ export const capacityCores = 1.32
 export function replayItems(
   manifest: readonly ManifestItem[],
   measured: ReadonlyMap<string, number>,
-  preset: string,
+  preset: PresetName,
 ): ReplayItem[] {
-  const model = serverCostModels[preset]!
+  const model = serverCostModels[preset]
   return manifest.map((item) => {
     const mp = (item.width * item.height) / 1e6
     const costMs = measured.get(item.file)

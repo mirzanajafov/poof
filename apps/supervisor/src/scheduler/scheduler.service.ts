@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  type BeforeApplicationShutdown,
-  type OnApplicationBootstrap,
-} from '@nestjs/common'
+import { Injectable, Logger, type BeforeApplicationShutdown, type OnApplicationBootstrap } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { PoolSnapshot } from '@poof/contracts'
 import {
@@ -16,12 +10,14 @@ import {
   priorWorkRatio,
   serverCostModels,
   updateWorkRatio,
+  isPresetName,
   workRatio,
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
+import type { LeaseState, TaskStatus } from '@poof/db'
 import { resume, SpanStatusCode, traceIdOf, within, type Context, type Span } from '@poof/tracing'
-import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
+import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type ExitReport } from '@poof/worker'
 import type { Env } from '../config/env.js'
 import { Datasets } from '../datasets/datasets.service.js'
 import { Database, Events, Traces } from '../infra/infra.module.js'
@@ -52,9 +48,6 @@ type Settings = Pick<
   | 'CHECKPOINT_MS'
   | 'MAX_TASK_ITEMS'
 >
-
-type TaskStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED'
-type LeaseState = 'PENDING' | 'RUNNING' | 'DONE'
 
 interface TaskState {
   id: string
@@ -154,7 +147,6 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     }
     const dataset = await this.datasets.get(request.dataset)
     const model = serverCostModels[request.preset]
-    if (!model) throw new NotFoundException(`no cost model for ${request.preset}`)
     const offset = request.offset ?? 0
     const count = Math.min(request.count ?? dataset.items.length, this.settings.MAX_TASK_ITEMS)
     const items = this.datasets.select(dataset, offset, count)
@@ -531,7 +523,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     this.claim(worker)
   }
 
-  private onExit(worker: PoolWorker, exit: WorkerExit): void {
+  private onExit(worker: PoolWorker, exit: ExitReport): void {
     this.workers.delete(worker)
     this.persist(() =>
       this.db.client.worker.update({
@@ -545,7 +537,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     if (!this.stopping && !this.paused) void this.spawn()
   }
 
-  private release(lease: Lease, exit: WorkerExit): void {
+  private release(lease: Lease, exit: ExitReport): void {
     const task = lease.task
     lease.worker = null
     if (exit.reason !== 'normal')
@@ -597,7 +589,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return this.writes
   }
 
-  private fail(task: TaskState, reason: string, kind = 'fail'): void {
+  private fail(task: TaskState, reason: string, kind: 'fail' | 'cancel' = 'fail'): void {
     if (task.status === 'DONE' || task.status === 'FAILED') return
     task.status = 'FAILED'
     for (const lease of task.leases) {
@@ -682,8 +674,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     })
     for (const row of rows) {
       const dataset = await this.datasets.get(row.dataset).catch(() => null)
-      const model = serverCostModels[row.preset]
-      if (!dataset || !model) {
+      if (!dataset || !isPresetName(row.preset)) {
         await this.db.client.$transaction([
           this.db.client.task.update({ where: { id: row.id }, data: { status: 'FAILED', finishedAt: new Date() } }),
           this.db.client.lease.updateMany({
@@ -697,10 +688,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         continue
       }
       const items = this.datasets.select(dataset, row.offset, row.items)
+      const model = serverCostModels[row.preset]
       const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
       const task: TaskState = {
         id: row.id,
-        preset: row.preset as PresetName,
+        preset: row.preset,
         items: row.items,
         submittedAt: row.submittedAt.getTime(),
         deadline: row.deadline.getTime(),
