@@ -7,7 +7,7 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { PoolSnapshot, PresetName } from '@poof/contracts'
+import type { PoolSnapshot } from '@poof/contracts'
 import {
   admits,
   Breaker,
@@ -17,6 +17,7 @@ import {
   serverCostModels,
   updateWorkRatio,
   workRatio,
+  type PresetName,
   type WorkRatio,
 } from '@poof/core'
 import { resume, SpanStatusCode, traceIdOf, within, type Context, type Span } from '@poof/tracing'

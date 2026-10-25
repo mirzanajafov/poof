@@ -1,4 +1,4 @@
-import type { PresetName } from '@poof/contracts'
+import type { PresetName } from '@poof/core'
 
 export interface Assignment {
   type: 'assign'

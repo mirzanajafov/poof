@@ -1,4 +1,4 @@
-import type { BreakerState } from '@poof/contracts'
+export type PresetName = 'webp-1600' | 'avif-1600' | 'thumb-320'
 
 export interface Estimate {
   mean: number
@@ -31,6 +31,8 @@ export interface LeaseInfo {
   itemMs: Estimate
   trueRemainingMs?: number
 }
+
+export type BreakerState = 'closed' | 'open' | 'half-open'
 
 export interface View {
   now: number

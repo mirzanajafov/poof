@@ -1,6 +1,7 @@
-import { copyFile, link, rm } from 'node:fs/promises'
+import { copyFile, link, rename } from 'node:fs/promises'
 
 export async function linkOrCopy(source: string, target: string): Promise<void> {
-  await rm(target, { force: true })
-  await link(source, target).catch(() => copyFile(source, target))
+  const temp = `${target}.${process.pid}.tmp`
+  await link(source, temp).catch(() => copyFile(source, temp))
+  await rename(temp, target)
 }

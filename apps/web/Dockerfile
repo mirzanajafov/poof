@@ -3,9 +3,11 @@ RUN npm install -g pnpm@11.21.0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/core/package.json packages/core/
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter "@poof/web..."
 COPY packages/contracts packages/contracts
+COPY packages/core packages/core
 COPY apps/web apps/web
 COPY packages/sim/results/server packages/sim/results/server
 ARG NEXT_PUBLIC_LIVE_URL=

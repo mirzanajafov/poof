@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common'
-import type { PresetName } from '@poof/contracts'
+import type { PresetName } from '@poof/core'
 import { presets } from '@poof/imaging'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
-import type { BreakerState, ExhibitSnapshot, ExhibitStats, ManifestItem, PresetName } from '@poof/contracts'
+import { emptyExhibitStats, type ExhibitSnapshot, type ExhibitStats, type ManifestItem } from '@poof/contracts'
 import {
   admits,
   allocate,
@@ -12,11 +12,13 @@ import {
   planSplit,
   serverCostModels,
   updateEstimate,
+  type BreakerState,
   type Estimate,
   type Grants,
   type LeaseInfo,
   type PolicyConfig,
   type Preemption,
+  type PresetName,
   type SplitRequest,
   type StartRequest,
   type TaskInfo,
@@ -39,27 +41,6 @@ export interface EngineOptions {
   tickMs: number
   tracer: Tracer
   trace?: Context
-}
-
-export function emptyExhibitStats(): ExhibitStats {
-  return {
-    submitted: 0,
-    rejected: 0,
-    done: 0,
-    met: 0,
-    cancelled: 0,
-    failed: 0,
-    items: 0,
-    deadLettered: 0,
-    spawns: 0,
-    spawnFailures: 0,
-    splits: 0,
-    preemptions: 0,
-    adoptions: 0,
-    exits: {},
-    peakProcesses: 0,
-    maxDepth: 0,
-  }
 }
 
 type Status = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED'

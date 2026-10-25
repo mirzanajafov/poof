@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { parseManifest, type ExhibitParams, type ExhibitPolicyName, type ExhibitStats } from '@poof/contracts'
-import { defaultTimeoutRule } from '@poof/core'
+import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
+import { defaultTimeoutRule, isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems } from './replay.ts'
@@ -45,6 +45,8 @@ const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
 const runs = JSON.parse(readFileSync(values.runs!, 'utf8')) as ExhibitRun[]
+const unknownPolicy = runs.find((run) => !isExhibitPolicyName(run.params.policy))
+if (unknownPolicy) throw new Error(`run ${unknownPolicy.id} has no simulator policy for ${unknownPolicy.params.policy}`)
 const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
 
 function measured(preset: string): Map<string, number> {

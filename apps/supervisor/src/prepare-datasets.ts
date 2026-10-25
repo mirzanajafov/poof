@@ -1,9 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { datasetNamePattern, parseManifest } from '@poof/contracts'
+import { datasetNamePattern } from '@poof/contracts'
 import { parseDatasetSource } from './datasets/dataset-source.js'
-import { linkOrCopy } from './datasets/link-or-copy.js'
+import { prepareDatasets } from './datasets/prepare.js'
 
 function exitWithUsage(problem: string): never {
   console.error(`${problem}\nusage: prepare-datasets --from <name>=<dir> [--from ...] --data <DATA_DIR>`)
@@ -25,7 +23,7 @@ function readOptions() {
 
 const options = readOptions()
 if (!options.from?.length) exitWithUsage('missing --from')
-const data = options.data ?? exitWithUsage('missing --data, and DATA_DIR is not set')
+if (!options.data) exitWithUsage('missing --data, and DATA_DIR is not set')
 
 const sources = options.from.map(
   (spec) =>
@@ -35,21 +33,5 @@ const sources = options.from.map(
 const repeated = sources.find(({ name }, index) => sources.findIndex((source) => source.name === name) !== index)
 if (repeated) exitWithUsage(`two --from arguments share the name ${repeated.name}`)
 
-const prepared = await Promise.all(
-  sources.map(async ({ name, dir }) => {
-    const path = join(dir, 'manifest.json')
-    try {
-      return { name, dir, manifest: parseManifest(await readFile(path, 'utf8'), path) }
-    } catch (error) {
-      return exitWithUsage(`cannot read --from ${name}=${dir}: ${String(error)}`)
-    }
-  }),
-)
-
-for (const { name, dir, manifest } of prepared) {
-  const target = join(data, 'datasets', name)
-  await mkdir(target, { recursive: true })
-  for (const item of manifest.items) await linkOrCopy(join(dir, item.file), join(target, item.file))
-  await writeFile(join(target, 'manifest.json'), JSON.stringify(manifest))
-  console.log(`${name}: ${manifest.items.length} images`)
-}
+const prepared = await prepareDatasets(sources, options.data).catch((error: unknown) => exitWithUsage(String(error)))
+for (const { name, items } of prepared) console.log(`${name}: ${items} images`)

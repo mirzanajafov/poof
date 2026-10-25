@@ -1,4 +1,3 @@
-import type { ExhibitPolicyName } from '@poof/contracts'
 import type { PolicyConfig } from './types.ts'
 
 const defaults = {
@@ -56,6 +55,24 @@ export const policies = {
 } satisfies Record<string, PolicyConfig>
 
 export type PolicyKey = keyof typeof policies
+
+export const exhibitPolicyNames = [
+  'pool',
+  'never',
+  'static-4',
+  'box',
+  'timer+budget',
+  'forecast',
+  'forecast+budget',
+  'forecast+preempt',
+] as const
+
+export type ExhibitPolicyName = (typeof exhibitPolicyNames)[number]
+
+export function isExhibitPolicyName(name: string): name is ExhibitPolicyName {
+  const names: readonly string[] = exhibitPolicyNames
+  return names.includes(name)
+}
 
 export const exhibitPolicies: Record<ExhibitPolicyName, PolicyConfig> = {
   pool: policies.pool,

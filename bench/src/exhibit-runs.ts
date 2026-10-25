@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { isExhibitPolicyName } from '@poof/contracts'
+import { isExhibitPolicyName } from '@poof/core'
 
 const { values } = parseArgs({
   options: {

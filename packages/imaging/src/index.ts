@@ -1,4 +1,4 @@
-import type { PresetName } from '@poof/contracts'
+import type { PresetName } from '@poof/core'
 import sharp, { type Sharp } from 'sharp'
 
 export interface Preset {

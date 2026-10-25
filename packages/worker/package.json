@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@poof/contracts": "workspace:*",
+    "@poof/core": "workspace:*",
     "@poof/imaging": "workspace:*",
     "sharp": "^0.35.5"
   },

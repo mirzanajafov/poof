@@ -1,6 +1,7 @@
 'use client'
 
-import type { ExhibitLeaseView, ExhibitPolicyName, ExhibitSnapshot } from '@poof/contracts'
+import type { ExhibitLeaseView, ExhibitSnapshot } from '@poof/contracts'
+import type { ExhibitPolicyName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
 import { seconds, short } from '@/lib/format'
@@ -121,7 +122,7 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
     <div className="mt-4 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm">
-          Running <span className="font-semibold">{exhibit.policy}</span> ·{' '}
+          Running <span className="font-semibold">{exhibit.params.policy}</span> ·{' '}
           <span className="tabular text-muted">{seconds(left)} left</span>
         </p>
         <Link href={`/exhibits/${exhibit.id}`} className="text-xs text-accent-ink underline">

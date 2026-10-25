@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@poof/contracts": "workspace:*",
+    "@poof/core": "workspace:*",
     "@poof/imaging": "workspace:*",
     "ioredis": "^5.8.0",
     "sharp": "^0.35.5"

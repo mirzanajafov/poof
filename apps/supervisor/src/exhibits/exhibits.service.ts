@@ -7,14 +7,20 @@ import {
   type BeforeApplicationShutdown,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { ExhibitEnd, ExhibitParams, ExhibitSnapshot, ExhibitStats } from '@poof/contracts'
+import {
+  emptyExhibitStats,
+  type ExhibitEnd,
+  type ExhibitParams,
+  type ExhibitSnapshot,
+  type ExhibitStats,
+} from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, expectedCostMs, serverCostModels, type Arrival } from '@poof/core'
 import { within, type Context, type Span } from '@poof/tracing'
 import type { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
 import { Database, Events, Traces } from '../infra/infra.module.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
-import { emptyExhibitStats, LeaseEngine } from './lease-engine.js'
+import { LeaseEngine } from './lease-engine.js'
 
 interface Current {
   id: string
@@ -81,13 +87,14 @@ export class Exhibits implements BeforeApplicationShutdown {
       },
       trace,
     )
+    const policy = exhibitPolicies[params.policy]
     let engine: LeaseEngine | null = null
-    if (params.policy !== 'pool') {
+    if (policy.engine === 'lease') {
       await this.scheduler.pause(endsAt + 15_000)
       engine = new LeaseEngine(
         {
           exhibitId: id,
-          policy: exhibitPolicies[params.policy],
+          policy,
           budget: this.settings.BUDGET,
           maxProcesses: this.settings.EXHIBIT_MAX_PROCESSES,
           capacityCores: this.settings.CAPACITY_CORES,
@@ -236,17 +243,9 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   state(): ExhibitSnapshot | null {
-    return this.current ? this.snapshot(this.current) : null
-  }
-
-  private snapshot(current: Current): ExhibitSnapshot {
-    const base = {
-      id: current.id,
-      params: current.params,
-      startedAt: current.startedAt,
-      endsAt: current.endsAt,
-      policy: current.params.policy,
-    }
+    const current = this.current
+    if (!current) return null
+    const base = { id: current.id, params: current.params, startedAt: current.startedAt, endsAt: current.endsAt }
     if (current.engine) return { ...base, ...current.engine.snapshot() }
     return {
       ...base,

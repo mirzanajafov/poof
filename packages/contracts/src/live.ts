@@ -1,5 +1,6 @@
-import type { ExhibitEnd, ExhibitPolicyName, ExhibitSnapshot, ExhibitStats } from './exhibits.ts'
-import type { BreakerState, ExitReason, PresetName } from './vocabulary.ts'
+import type { BreakerState, ExhibitPolicyName, PresetName } from '@poof/core'
+import type { ExhibitEnd, ExhibitSnapshot, ExhibitStats } from './exhibits.ts'
+import type { ExitReason } from './workers.ts'
 
 export const liveEventsChannel = 'poof:events'
 export const poolSnapshotKey = 'poof:live'

@@ -1,4 +1,3 @@
-import type { BreakerState } from '@poof/contracts'
 import {
   admits,
   allocate,
@@ -10,6 +9,7 @@ import {
   itemTimeoutMs,
   planSplit,
   updateEstimate,
+  type BreakerState,
   type Estimate,
   type Grants,
   type Preemption,

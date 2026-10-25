@@ -1,5 +1,5 @@
-import type { ExhibitParams, ExhibitPolicyName } from '@poof/contracts'
-import { exhibitSchedule } from '@poof/core'
+import type { ExhibitParams } from '@poof/contracts'
+import { exhibitSchedule, type ExhibitPolicyName } from '@poof/core'
 import { describe, expect, it } from 'vitest'
 import { capacityCores, replay, replayItems } from '../src/replay.ts'
 import { calibration } from './fixture.ts'

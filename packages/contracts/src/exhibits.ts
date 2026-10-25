@@ -1,22 +1,5 @@
-import type { ExitReason, PresetName } from './vocabulary.ts'
-
-export const exhibitPolicyNames = [
-  'pool',
-  'never',
-  'static-4',
-  'box',
-  'timer+budget',
-  'forecast',
-  'forecast+budget',
-  'forecast+preempt',
-] as const
-
-export type ExhibitPolicyName = (typeof exhibitPolicyNames)[number]
-
-export function isExhibitPolicyName(name: string): name is ExhibitPolicyName {
-  const names: readonly string[] = exhibitPolicyNames
-  return names.includes(name)
-}
+import type { ExhibitPolicyName, PresetName } from '@poof/core'
+import type { ExitReason } from './workers.ts'
 
 export interface ExhibitParams {
   policy: ExhibitPolicyName
@@ -50,6 +33,27 @@ export interface ExhibitStats {
   maxDepth: number
 }
 
+export function emptyExhibitStats(): ExhibitStats {
+  return {
+    submitted: 0,
+    rejected: 0,
+    done: 0,
+    met: 0,
+    cancelled: 0,
+    failed: 0,
+    items: 0,
+    deadLettered: 0,
+    spawns: 0,
+    spawnFailures: 0,
+    splits: 0,
+    preemptions: 0,
+    adoptions: 0,
+    exits: {},
+    peakProcesses: 0,
+    maxDepth: 0,
+  }
+}
+
 export type ExhibitEnd = 'DONE' | 'ABORTED'
 
 export interface ExhibitLeaseView {
@@ -76,7 +80,6 @@ export interface ExhibitSnapshot {
   params: ExhibitParams
   startedAt: number
   endsAt: number
-  policy: ExhibitPolicyName
   budget: number | null
   processes: number
   stats: ExhibitStats

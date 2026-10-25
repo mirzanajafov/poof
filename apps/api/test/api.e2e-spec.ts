@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import {
+  liveEventsChannel,
+  poolSnapshotKey,
+  type LiveBatch,
+  type LiveEvent,
+  type LiveSnapshot,
+  type LiveSocketEvents,
+  type PoolSnapshot,
+} from '@poof/contracts'
 import { io, type Socket } from 'socket.io-client'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -183,14 +192,16 @@ describe('exhibits', () => {
 describe('live view', () => {
   it('sends a snapshot on connect and relays supervisor events in batches', async () => {
     running = await start(supervisor.url)
-    await running.redis.set('poof:live', JSON.stringify({ budget: 2, workers: [] }))
-    const socket: Socket = io(running.url, { transports: ['websocket'] })
-    const snapshot = await new Promise<{ live: { budget: number } }>((resolve) => socket.once('snapshot', resolve))
-    expect(snapshot.live.budget).toBe(2)
-    const batch = new Promise<{ events: Array<{ kind: string }> }>((resolve) => socket.on('events', resolve))
+    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
+    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
+    const socket: Socket<LiveSocketEvents> = io(running.url, { transports: ['websocket'] })
+    const snapshot = await new Promise<LiveSnapshot>((resolve) => socket.once('snapshot', resolve))
+    expect(snapshot.live?.budget).toBe(2)
+    const batch = new Promise<LiveBatch>((resolve) => socket.on('events', resolve))
     await new Promise((resolve) => setTimeout(resolve, 100))
-    await running.redis.publish('poof:events', JSON.stringify({ kind: 'item', task: 't', item: 1 }))
-    await running.redis.publish('poof:events', JSON.stringify({ kind: 'item', task: 't', item: 2 }))
+    const item = (n: number): LiveEvent => ({ kind: 'item', at: 0, task: 't', lease: 'l', item: n, ok: true })
+    await running.redis.publish(liveEventsChannel, JSON.stringify(item(1)))
+    await running.redis.publish(liveEventsChannel, JSON.stringify(item(2)))
     const received = await batch
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()

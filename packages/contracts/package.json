@@ -15,6 +15,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@poof/core": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^6.0.2",
