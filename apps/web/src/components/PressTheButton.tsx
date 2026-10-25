@@ -1,8 +1,8 @@
 'use client'
 
+import type { DatasetSummary } from '@poof/contracts'
 import Link from 'next/link'
 import { useState } from 'react'
-import type { Dataset } from '@/lib/types'
 
 type Outcome =
   | { kind: 'accepted'; id: string; items: number; predictedSeconds: number }
@@ -13,7 +13,7 @@ const presets = [
   { value: 'thumb-320', label: 'Thumbnail, 320 px' },
 ]
 
-export function PressTheButton({ datasets }: { datasets: Dataset[] }) {
+export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
   const [dataset, setDataset] = useState(datasets[0]?.name ?? 'synthetic')
   const [preset, setPreset] = useState(presets[0]!.value)
   const [count, setCount] = useState(60)

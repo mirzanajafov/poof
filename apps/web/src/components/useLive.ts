@@ -1,12 +1,12 @@
 'use client'
 
+import type { LiveEvent, LiveSnapshot, LiveSocketEvents } from '@poof/contracts'
 import { useEffect, useRef, useState } from 'react'
-import { io } from 'socket.io-client'
-import type { LiveEvent, Snapshot } from '@/lib/types'
+import { io, type Socket } from 'socket.io-client'
 
 export interface Live {
   connected: boolean
-  snapshot: Snapshot
+  snapshot: LiveSnapshot
   events: LiveEvent[]
   processes: number[]
   throughput: number
@@ -17,7 +17,7 @@ const KEEP_POINTS = 120
 
 export function useLive(): Live {
   const [connected, setConnected] = useState(false)
-  const [snapshot, setSnapshot] = useState<Snapshot>({ live: null, exhibit: null })
+  const [snapshot, setSnapshot] = useState<LiveSnapshot>({ live: null, exhibit: null })
   const [events, setEvents] = useState<LiveEvent[]>([])
   const [processes, setProcesses] = useState<number[]>([])
   const [throughput, setThroughput] = useState(0)
@@ -27,12 +27,12 @@ export function useLive(): Live {
 
   useEffect(() => {
     since.current = Date.now()
-    const socket = io(process.env.NEXT_PUBLIC_LIVE_URL ?? window.location.origin, {
+    const socket: Socket<LiveSocketEvents> = io(process.env.NEXT_PUBLIC_LIVE_URL ?? window.location.origin, {
       transports: ['websocket', 'polling'],
     })
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
-    socket.on('snapshot', (next: Snapshot) => {
+    socket.on('snapshot', (next) => {
       setSnapshot(next)
       const id = next.exhibit?.id ?? null
       if (id !== exhibitId.current) {
@@ -44,7 +44,7 @@ export function useLive(): Live {
       items.current = items.current.filter((t) => now - t < 10_000)
       setThroughput(items.current.length / Math.min(10, Math.max(1, (now - since.current) / 1000)))
     })
-    socket.on('events', (batch: { events: LiveEvent[] }) => {
+    socket.on('events', (batch) => {
       const now = Date.now()
       for (const event of batch.events) if (event.kind === 'item' && event.ok) items.current.push(now)
       const kept = batch.events.filter((e) => e.kind !== 'item')

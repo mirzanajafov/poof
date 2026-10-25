@@ -1,3 +1,4 @@
+import type { ExhibitPolicyName } from '@poof/contracts'
 import type { PolicyConfig } from './types.ts'
 
 const defaults = {
@@ -55,6 +56,17 @@ export const policies = {
 } satisfies Record<string, PolicyConfig>
 
 export type PolicyKey = keyof typeof policies
+
+export const exhibitPolicies: Record<ExhibitPolicyName, PolicyConfig> = {
+  pool: policies.pool,
+  never: policies.never,
+  'static-4': policies.static,
+  box: policies.box,
+  'timer+budget': policies.timerManaged,
+  forecast: policies.forecast,
+  'forecast+budget': policies.forecastManaged,
+  'forecast+preempt': policies.forecastPreempt,
+}
 
 export function variant(base: PolicyConfig, overrides: Partial<PolicyConfig>): PolicyConfig {
   return { ...base, ...overrides }

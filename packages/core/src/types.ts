@@ -1,3 +1,5 @@
+import type { BreakerState } from '@poof/contracts'
+
 export interface Estimate {
   mean: number
   variance: number
@@ -29,8 +31,6 @@ export interface LeaseInfo {
   itemMs: Estimate
   trueRemainingMs?: number
 }
-
-export type BreakerState = 'closed' | 'open' | 'half-open'
 
 export interface View {
   now: number

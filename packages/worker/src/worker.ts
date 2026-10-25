@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { parseManifest, type Manifest } from '@poof/contracts'
 import { configureSharp, presets, processItem } from '@poof/imaging'
-import type { Assignment, FromWorker, ItemDead, ItemDone, Manifest, ToWorker } from './protocol.ts'
+import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './protocol.ts'
 
 configureSharp()
 if (process.platform === 'linux') await writeFile('/proc/self/oom_score_adj', '1000').catch(() => undefined)
@@ -30,7 +31,8 @@ function send(message: FromWorker): Promise<void> {
 async function manifest(taskDir: string): Promise<Manifest> {
   let cached = manifests.get(taskDir)
   if (!cached) {
-    cached = JSON.parse(await readFile(join(taskDir, 'manifest.json'), 'utf8')) as Manifest
+    const path = join(taskDir, 'manifest.json')
+    cached = parseManifest(await readFile(path, 'utf8'), path)
     await mkdir(join(taskDir, 'out'), { recursive: true })
     manifests.set(taskDir, cached)
     if (manifests.size > 8) manifests.delete(manifests.keys().next().value!)

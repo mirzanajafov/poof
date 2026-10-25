@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { parseManifest, type ExhibitParams, type ExhibitPolicyName, type ExhibitStats } from '@poof/contracts'
 import { defaultTimeoutRule } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
-import { replay, replayItems, type ExhibitRun } from './replay.ts'
+import { replay, replayItems } from './replay.ts'
 import { mean, quantile } from './stats.ts'
 
 const { values } = parseArgs({
@@ -18,6 +19,13 @@ const { values } = parseArgs({
     out: { type: 'string' },
   },
 })
+
+interface ExhibitRun {
+  id: string
+  policy: ExhibitPolicyName
+  params: ExhibitParams
+  stats: ExhibitStats
+}
 
 interface Numbers {
   submitted: number
@@ -37,11 +45,7 @@ const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
 const runs = JSON.parse(readFileSync(values.runs!, 'utf8')) as ExhibitRun[]
-const manifest = (
-  JSON.parse(readFileSync(values.manifest!, 'utf8')) as {
-    items: Array<{ file: string; width: number; height: number }>
-  }
-).items
+const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
 
 function measured(preset: string): Map<string, number> {
   const walls = new Map<string, number[]>()
@@ -82,7 +86,7 @@ const rows = runs.map((run) => {
     policy: run.policy,
     seed: run.params.seed,
     real: real(run),
-    sim: simulated(replay(run, items, calibration, timeoutRule)),
+    sim: simulated(replay(run.params, items, calibration, timeoutRule)),
   }
 })
 

@@ -175,6 +175,7 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `packages/core`        | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit schedule |
 | `packages/sim`         | the simulator, its scenarios, results and charts, and the replay of real runs                                            |
+| `packages/contracts`   | what crosses a process boundary: live events, snapshots, exhibit names and stats, the dataset manifest and its parser    |
 | `packages/worker`      | the worker process and the handle that limits it                                                                         |
 | `packages/tracing`     | OpenTelemetry setup, off unless an endpoint is set                                                                       |
 | `packages/db`          | Prisma schema and migrations                                                                                             |

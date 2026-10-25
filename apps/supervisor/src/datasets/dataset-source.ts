@@ -1,4 +1,4 @@
-import { datasetNamePattern } from './dataset-name.js'
+import { datasetNamePattern } from '@poof/contracts'
 
 export function parseDatasetSource(spec: string): { name: string; dir: string } | undefined {
   const separator = spec.indexOf('=')

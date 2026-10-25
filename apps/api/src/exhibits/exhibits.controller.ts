@@ -69,7 +69,7 @@ export class ExhibitsController {
 
   @Get('current')
   async current() {
-    const state = await this.cache.json('poof:exhibit')
+    const state = await this.cache.exhibitSnapshot()
     if (!state) throw new NotFoundException('no exhibit is running')
     return state
   }

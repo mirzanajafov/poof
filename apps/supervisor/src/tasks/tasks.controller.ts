@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common'
-import { presets, type PresetName } from '@poof/imaging'
+import type { PresetName } from '@poof/contracts'
+import { presets } from '@poof/imaging'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Response } from 'express'

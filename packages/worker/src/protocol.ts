@@ -1,4 +1,4 @@
-import type { PresetName } from '@poof/imaging'
+import type { PresetName } from '@poof/contracts'
 
 export interface Assignment {
   type: 'assign'
@@ -69,11 +69,3 @@ export interface LeaseDone {
 }
 
 export type FromWorker = Ready | Beat | ItemDone | ItemDead | Shrunk | LeaseDone
-
-export interface ManifestItem {
-  file: string
-}
-
-export interface Manifest {
-  items: ManifestItem[]
-}

@@ -34,8 +34,6 @@ export default defineConfig(
       '@typescript-eslint/prefer-for-of': 'off',
       '@typescript-eslint/prefer-optional-chain': 'off',
       '@typescript-eslint/require-await': 'off',
-      '@typescript-eslint/restrict-template-expressions': 'off',
-      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
       'no-useless-assignment': 'off',
     },
   },

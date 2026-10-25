@@ -1,5 +1,12 @@
 import { Global, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import {
+  exhibitSnapshotKey,
+  poolSnapshotKey,
+  type ExhibitSnapshot,
+  type LiveSnapshot,
+  type PoolSnapshot,
+} from '@poof/contracts'
 import { createPrisma, PrismaClient } from '@poof/db'
 import { startTracing, type Tracer, type Tracing } from '@poof/tracing'
 import { Redis } from 'ioredis'
@@ -29,7 +36,16 @@ export class Cache implements OnApplicationShutdown {
     this.redis.on('error', () => undefined)
   }
 
-  async json<T>(key: string): Promise<T | null> {
+  exhibitSnapshot(): Promise<ExhibitSnapshot | null> {
+    return this.json<ExhibitSnapshot>(exhibitSnapshotKey)
+  }
+
+  async liveSnapshot(): Promise<LiveSnapshot> {
+    const [live, exhibit] = await Promise.all([this.json<PoolSnapshot>(poolSnapshotKey), this.exhibitSnapshot()])
+    return { live, exhibit }
+  }
+
+  private async json<T>(key: string): Promise<T | null> {
     const raw = await this.redis.get(key).catch(() => null)
     return raw ? (JSON.parse(raw) as T) : null
   }

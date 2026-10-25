@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { isExhibitPolicyName } from '@poof/contracts'
 
 const { values } = parseArgs({
   options: {
@@ -15,6 +16,9 @@ const { values } = parseArgs({
   },
 })
 
+const policies = values.policies!.split(',')
+const invalid = policies.filter((policy) => !isExhibitPolicyName(policy))
+if (invalid.length > 0) throw new Error(`no exhibit policy ${invalid.join(', ')}`)
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
@@ -29,7 +33,7 @@ async function call(
 
 const runs: unknown[] = []
 for (const seed of values.seeds!.split(',').map(Number)) {
-  for (const policy of values.policies!.split(',')) {
+  for (const policy of policies) {
     while ((await call('/api/exhibits/current')).status === 200) await sleep(5000)
     const started = await call('/api/exhibits', {
       method: 'POST',

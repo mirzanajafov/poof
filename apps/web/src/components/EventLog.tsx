@@ -1,7 +1,7 @@
 'use client'
 
+import type { LiveEvent } from '@poof/contracts'
 import { describe } from '@/lib/format'
-import type { LiveEvent } from '@/lib/types'
 
 export function EventLog({ events }: { events: LiveEvent[] }) {
   const lines = events.map((event) => ({ event, text: describe(event) })).filter((l) => l.text)

@@ -1,11 +1,11 @@
+import type { DatasetSummary } from '@poof/contracts'
 import { LiveDashboard } from '@/components/LiveDashboard'
 import { api } from '@/lib/api'
-import type { Dataset } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const datasets = (await api<Dataset[]>('/datasets')) ?? []
+  const datasets = (await api<DatasetSummary[]>('/datasets')) ?? []
   return (
     <>
       <section className="mb-6 max-w-3xl">

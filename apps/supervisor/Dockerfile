@@ -2,6 +2,7 @@ FROM node:24-bookworm-slim AS manifests
 RUN npm install -g pnpm@11.21.0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
+COPY packages/contracts/package.json packages/contracts/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/imaging/package.json packages/imaging/
@@ -20,6 +21,7 @@ CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM manifests AS build
 RUN pnpm install --frozen-lockfile --filter "@poof/supervisor..."
+COPY packages/contracts packages/contracts
 COPY packages/core packages/core
 COPY packages/db packages/db
 COPY packages/imaging packages/imaging
@@ -31,6 +33,7 @@ RUN pnpm --filter "@poof/supervisor..." build
 FROM manifests AS runtime
 RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/supervisor..." \
   && find node_modules/.pnpm -path "*/@prisma/client/runtime/*" \( -name "*.map" -o \( -name "query_compiler_*" ! -name "*postgresql*" \) \) -delete
+COPY --from=build /app/packages/contracts/dist packages/contracts/dist
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/db/dist packages/db/dist
 COPY --from=build /app/packages/imaging/dist packages/imaging/dist

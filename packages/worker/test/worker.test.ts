@@ -21,7 +21,7 @@ async function makeTask(name: string, count: number, corrupt: number[] = []): Pr
           .jpeg()
           .toBuffer()
     await writeFile(join(taskDir, 'input', file), body)
-    items.push({ file })
+    items.push({ file, width: 800, height: 600 })
   }
   await writeFile(join(taskDir, 'manifest.json'), JSON.stringify({ items }))
   return taskDir

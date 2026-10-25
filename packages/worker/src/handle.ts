@@ -2,6 +2,7 @@ import { fork, type ChildProcess } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import type { ExitReason } from '@poof/contracts'
 import type { Assignment, FromWorker, ItemDead, ItemDone, LeaseDone, Shrunk } from './protocol.ts'
 
 export interface Limits {
@@ -13,8 +14,6 @@ export interface Limits {
 }
 
 export const defaultLimits: Limits = { rssMb: 512, heartbeatMs: 1000, missedBeats: 3, killGraceMs: 2000, watchMs: 200 }
-
-export type ExitReason = 'normal' | 'crash' | 'memory' | 'timeout' | 'heartbeat' | 'killed'
 
 export interface Inflight {
   lease: string

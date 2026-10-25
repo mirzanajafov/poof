@@ -1,7 +1,7 @@
-import type { ExhibitLease } from './types'
+import type { ExhibitLeaseView } from '@poof/contracts'
 
 export interface Placed {
-  lease: ExhibitLease
+  lease: ExhibitLeaseView
   x: number
   y: number
 }
@@ -13,10 +13,10 @@ export interface Layout {
   height: number
 }
 
-export function layoutLeases(leases: readonly ExhibitLease[], columnWidth = 64, rowHeight = 56): Layout {
+export function layoutLeases(leases: readonly ExhibitLeaseView[], columnWidth = 64, rowHeight = 56): Layout {
   const byId = new Map(leases.map((l) => [l.id, l]))
-  const children = new Map<string, ExhibitLease[]>()
-  const roots: ExhibitLease[] = []
+  const children = new Map<string, ExhibitLeaseView[]>()
+  const roots: ExhibitLeaseView[] = []
   for (const lease of leases) {
     if (lease.parent && byId.has(lease.parent)) {
       children.set(lease.parent, [...(children.get(lease.parent) ?? []), lease])
@@ -31,7 +31,7 @@ export function layoutLeases(leases: readonly ExhibitLease[], columnWidth = 64, 
   const edges: Array<{ from: string; to: string }> = []
   let column = 0
   let deepest = 0
-  const visit = (lease: ExhibitLease, depth: number): number => {
+  const visit = (lease: ExhibitLeaseView, depth: number): number => {
     deepest = Math.max(deepest, depth)
     const kids = children.get(lease.id) ?? []
     let x: number

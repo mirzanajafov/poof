@@ -74,18 +74,16 @@ describe('read model', () => {
     expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
   })
 
-  it('lists the datasets on disk', async () => {
+  it('lists the datasets on disk that the supervisor would serve', async () => {
     running = await start(supervisor.url)
-    await mkdir(join(running.dataDir, 'datasets', 'tiny'), { recursive: true })
-    await writeFile(
-      join(running.dataDir, 'datasets', 'tiny', 'manifest.json'),
-      JSON.stringify({
-        items: [
-          { file: 'a.jpg', width: 4000, height: 3000 },
-          { file: 'b.jpg', width: 1000, height: 1000 },
-        ],
-      }),
-    )
+    const items = [
+      { file: 'a.jpg', width: 4000, height: 3000 },
+      { file: 'b.jpg', width: 1000, height: 1000 },
+    ]
+    for (const name of ['tiny', 'Not_A_Name']) {
+      await mkdir(join(running.dataDir, 'datasets', name), { recursive: true })
+      await writeFile(join(running.dataDir, 'datasets', name, 'manifest.json'), JSON.stringify({ items }))
+    }
     const res = await http().get('/api/datasets')
     expect(res.body).toEqual([{ name: 'tiny', items: 2, meanMp: 6.5 }])
   })

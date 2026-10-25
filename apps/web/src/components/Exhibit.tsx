@@ -1,12 +1,12 @@
 'use client'
 
+import type { ExhibitLeaseView, ExhibitPolicyName, ExhibitSnapshot } from '@poof/contracts'
 import Link from 'next/link'
 import { useState } from 'react'
 import { seconds, short } from '@/lib/format'
 import { layoutLeases } from '@/lib/tree'
-import type { ExhibitLease, ExhibitSnapshot } from '@/lib/types'
 
-const choices = [
+const choices: Array<{ policy: ExhibitPolicyName; title: string; text: string }> = [
   {
     policy: 'box',
     title: 'The box',
@@ -30,7 +30,7 @@ const choices = [
 ]
 
 export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot | null; processes: number[] }) {
-  const [policy, setPolicy] = useState('box')
+  const [policy, setPolicy] = useState<ExhibitPolicyName>('box')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -106,7 +106,7 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
   const s = exhibit.stats
   const kills = Object.entries(s.exits)
     .filter(([reason]) => reason !== 'normal')
-    .reduce((sum, [, n]) => sum + n, 0)
+    .reduce((sum, [, n]) => sum + (n ?? 0), 0)
   const stats = [
     ['Processes now', String(exhibit.processes)],
     ['Peak', String(s.peakProcesses)],
@@ -159,14 +159,14 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
   )
 }
 
-const stateClass: Record<ExhibitLease['state'], string> = {
+const stateClass: Record<ExhibitLeaseView['state'], string> = {
   running: 'fill-accent',
   starting: 'fill-faint',
   pending: 'fill-raised stroke-faint',
   done: 'fill-good',
 }
 
-function LeaseTree({ leases }: { leases: ExhibitLease[] }) {
+function LeaseTree({ leases }: { leases: ExhibitLeaseView[] }) {
   const layout = layoutLeases(leases, 22, 30)
   const pad = 10
   const at = new Map(layout.nodes.map((n) => [n.lease.id, n]))

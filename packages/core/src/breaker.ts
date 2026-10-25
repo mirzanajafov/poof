@@ -1,4 +1,4 @@
-import type { BreakerState } from './types.ts'
+import type { BreakerState } from '@poof/contracts'
 
 export interface BreakerConfig {
   window: number
