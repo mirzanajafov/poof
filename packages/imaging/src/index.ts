@@ -1,4 +1,4 @@
-import type { PresetName } from '@poof/core'
+import { isPresetName, type PresetName } from '@poof/core'
 import sharp, { type Sharp } from 'sharp'
 
 export interface Preset {
@@ -30,9 +30,8 @@ export const presets: Record<PresetName, Preset> = {
 export const maxInputPixels = 100_000_000
 
 export function presetByName(name: string): Preset {
-  const preset = presets[name as PresetName]
-  if (!preset) throw new Error(`unknown preset ${name}`)
-  return preset
+  if (!isPresetName(name)) throw new Error(`unknown preset ${name}`)
+  return presets[name]
 }
 
 export function configureSharp(): void {

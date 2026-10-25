@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, Headers, NotFoundException, Post } from '@nestjs/common'
 import type { ExhibitParams } from '@poof/contracts'
-import { exhibitPolicyNames, type ExhibitPolicyName, type PresetName } from '@poof/core'
-import { presets } from '@poof/imaging'
+import { exhibitPolicyNames, presetNames, type ExhibitPolicyName, type PresetName } from '@poof/core'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import { Exhibits } from './exhibits.service.js'
@@ -26,7 +25,7 @@ export class StartExhibit {
   dataset?: string
 
   @IsOptional()
-  @IsIn(Object.keys(presets))
+  @IsIn(presetNames)
   preset?: PresetName
 
   @IsOptional()

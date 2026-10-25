@@ -159,12 +159,15 @@ describe('exhibits', () => {
     expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
   })
 
-  it('refuses an exhibit policy it does not know', async () => {
+  it('refuses an exhibit policy or preset it does not know', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()
-    const res = await http().post('/exhibits').send({ policy: 'nope', durationSeconds: 30 })
-    expect(res.status).toBe(400)
-    expect(res.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
+    const policy = await http().post('/exhibits').send({ policy: 'nope', durationSeconds: 30 })
+    expect(policy.status).toBe(400)
+    expect(policy.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
+    const preset = await http().post('/exhibits').send({ policy: 'box', durationSeconds: 30, preset: 'png-9000' })
+    expect(preset.status).toBe(400)
+    expect(preset.body.message).toEqual([expect.stringMatching(/^preset must be one of/)])
     expect(await running.db.exhibit.count()).toBe(before)
   })
 

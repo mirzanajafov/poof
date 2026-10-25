@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  type BeforeApplicationShutdown,
-} from '@nestjs/common'
+import { ConflictException, Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
   emptyExhibitStats,
@@ -78,7 +72,6 @@ export class Exhibits implements BeforeApplicationShutdown {
   private async begin(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     const dataset = await this.datasets.get(params.dataset)
     const model = serverCostModels[params.preset]
-    if (!model) throw new NotFoundException(`no cost model for ${params.preset}`)
     const id = randomUUID()
     const startedAt = Date.now()
     const endsAt = startedAt + params.durationSeconds * 1000

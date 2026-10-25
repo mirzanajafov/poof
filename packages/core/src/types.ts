@@ -1,5 +1,3 @@
-export type PresetName = 'webp-1600' | 'avif-1600' | 'thumb-320'
-
 export interface Estimate {
   mean: number
   variance: number
@@ -14,7 +12,7 @@ export interface TaskInfo {
   deadline: number
 }
 
-export type LeaseState = 'pending' | 'starting' | 'running' | 'done' | 'dead' | 'adopted'
+export type LeaseState = 'pending' | 'starting' | 'running' | 'done'
 
 export interface LeaseInfo {
   id: string

@@ -1,10 +1,12 @@
+import type { PresetName } from './presets.ts'
+
 export interface CostModel {
   coefMs: number
   exponent: number
   logResidualSd: number
 }
 
-export const serverCostModels: Record<string, CostModel> = {
+export const serverCostModels: Record<PresetName, CostModel> = {
   'webp-1600': { coefMs: 151.8, exponent: 0.399, logResidualSd: 0.283 },
   'thumb-320': { coefMs: 15.97, exponent: 0.575, logResidualSd: 0.363 },
   'avif-1600': { coefMs: 3508.8, exponent: 0.183, logResidualSd: 0.497 },

@@ -16,6 +16,7 @@ import {
   type Estimate,
   type Grants,
   type LeaseInfo,
+  type LeaseState,
   type PolicyConfig,
   type Preemption,
   type PresetName,
@@ -23,11 +24,12 @@ import {
   type StartRequest,
   type TaskInfo,
 } from '@poof/core'
+import type { TaskStatus } from '@poof/db'
 import { SpanStatusCode, traceIdOf, within, type Context, type Span, type Tracer } from '@poof/tracing'
-import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
+import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type ExitReport } from '@poof/worker'
 import type { Dataset, Datasets } from '../datasets/datasets.service.js'
 import type { Database, Events } from '../infra/infra.module.js'
-import { exitColumn } from '../workers/exit.js'
+import { exitColumn, leaseColumn } from '../infra/columns.js'
 
 export interface EngineOptions {
   exhibitId: string
@@ -43,8 +45,6 @@ export interface EngineOptions {
   trace?: Context
 }
 
-type Status = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED'
-
 interface ExhibitTask {
   info: TaskInfo
   preset: PresetName
@@ -55,7 +55,7 @@ interface ExhibitTask {
   dead: number
   attempts: Map<number, number>
   leases: ExhibitLease[]
-  status: Status
+  status: Exclude<TaskStatus, 'REJECTED'>
   span: Span
 }
 
@@ -67,7 +67,7 @@ interface ExhibitLease {
   lo: number
   hi: number
   cursor: number
-  state: 'pending' | 'starting' | 'running' | 'done'
+  state: LeaseState
   worker: ExhibitWorker | null
   startedAt: number | null
   lastSplitAt: number | null
@@ -121,7 +121,7 @@ export class LeaseEngine {
     offset: number,
   ): Promise<boolean> {
     if (this.stopped) return false
-    const model = serverCostModels[preset]!
+    const model = serverCostModels[preset]
     const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
     const predictedMs = predicted.reduce((sum, v) => sum + v, 0)
     const now = Date.now()
@@ -596,7 +596,7 @@ export class LeaseEngine {
     worker.handle.stop()
   }
 
-  private onExit(worker: ExhibitWorker, exit: WorkerExit): void {
+  private onExit(worker: ExhibitWorker, exit: ExitReport): void {
     this.workers.delete(worker)
     this.stats.exits[exit.reason] = (this.stats.exits[exit.reason] ?? 0) + 1
     this.persist(() =>
@@ -631,7 +631,7 @@ export class LeaseEngine {
     this.persist(() =>
       this.db.client.lease.update({
         where: { id: lease.id },
-        data: { state: lease.state === 'done' ? 'DONE' : 'PENDING', cursor: lease.cursor, workerId: null },
+        data: { state: leaseColumn[lease.state], cursor: lease.cursor, workerId: null },
       }),
     )
     if (this.options.policy.deadLetter && task.dead > this.options.deadLetterShare * task.info.items) this.fail(task)
