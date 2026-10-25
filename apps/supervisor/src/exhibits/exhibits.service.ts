@@ -27,11 +27,12 @@ interface Current {
   params: ExhibitParams
   dataset: Dataset
   engine: LeaseEngine | null
-  pool: { submitted: number; rejected: number; tasks: string[] }
+  pool: { submitted: number; rejected: number; tasks: string[]; stats: ExhibitStats }
   startedAt: number
   endsAt: number
   timers: NodeJS.Timeout[]
   arriving: Promise<void>
+  finishing: Promise<ExhibitStats> | null
   span: Span
 }
 
@@ -39,7 +40,7 @@ interface Current {
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
-  private poolStats = emptyExhibitStats()
+  private starting: Promise<unknown> | null = null
   private readonly settings: Pick<
     Env,
     'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
@@ -64,7 +65,17 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
-    if (this.current) throw new ConflictException('an exhibit is already running')
+    if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
+    const starting = this.begin(params, trace)
+    this.starting = starting
+    try {
+      return await starting
+    } finally {
+      this.starting = null
+    }
+  }
+
+  private async begin(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     const dataset = await this.datasets.get(params.dataset)
     const model = serverCostModels[params.preset]
     if (!model) throw new NotFoundException(`no cost model for ${params.preset}`)
@@ -116,15 +127,15 @@ export class Exhibits implements BeforeApplicationShutdown {
       params,
       dataset,
       engine,
-      pool: { submitted: 0, rejected: 0, tasks: [] },
+      pool: { submitted: 0, rejected: 0, tasks: [], stats: emptyExhibitStats() },
       startedAt,
       endsAt,
       timers: [],
       arriving: Promise.resolve(),
+      finishing: null,
       span,
     }
     this.current = current
-    this.poolStats = emptyExhibitStats()
     const itemMs = dataset.items.map((item) => expectedCostMs(model, (item.width * item.height) / 1e6))
     const arrivals = exhibitSchedule(
       {
@@ -144,14 +155,23 @@ export class Exhibits implements BeforeApplicationShutdown {
         setTimeout(() => this.schedule(current, () => this.arrive(current, arrival, itemMs)), arrival.at),
       )
     }
-    current.timers.push(setTimeout(() => void this.finish('DONE'), params.durationSeconds * 1000))
-    current.timers.push(setInterval(() => void this.publishState(), 1000))
+    current.timers.push(
+      setTimeout(
+        () =>
+          void this.finish('DONE').catch((error: unknown) =>
+            this.logger.error(`exhibit ${id} did not finish cleanly: ${String(error)}`),
+          ),
+        params.durationSeconds * 1000,
+      ),
+    )
+    current.timers.push(setInterval(() => void this.publishState(current), 1000))
+    this.events.saveExhibitSnapshot(this.snapshot(current))
     this.events.publish({ kind: 'exhibit.started', exhibit: id, policy: params.policy, endsAt })
     return { id, endsAt }
   }
 
   private async arrive(current: Current, arrival: Arrival, itemMs: number[]): Promise<void> {
-    if (this.current !== current) return
+    if (current.finishing) return
     const { params, dataset } = current
     const items = this.datasets.select(dataset, arrival.offset, arrival.count)
     let predictedMs = 0
@@ -182,30 +202,39 @@ export class Exhibits implements BeforeApplicationShutdown {
       .catch((error: unknown) => this.logger.error(`exhibit arrival failed: ${String(error)}`))
   }
 
-  async finish(status: ExhibitEnd): Promise<ExhibitStats | null> {
+  finish(status: ExhibitEnd): Promise<ExhibitStats | null> {
     const current = this.current
-    if (!current) return null
-    this.current = null
+    if (!current) return Promise.resolve(null)
+    current.finishing ??= this.end(current, status)
+    return current.finishing
+  }
+
+  private async end(current: Current, status: ExhibitEnd): Promise<ExhibitStats> {
     for (const timer of current.timers) clearTimeout(timer)
-    await current.arriving
-    const stats = current.engine ? await current.engine.stop() : await this.finishPool(current)
-    await this.db.client.exhibit.update({
-      where: { id: current.id },
-      data: { status, endedAt: new Date(), stats: { ...stats } },
-    })
-    if (current.engine) this.scheduler.resume()
-    current.span.setAttributes({
-      'poof.status': status,
-      'poof.submitted': stats.submitted,
-      'poof.rejected': stats.rejected,
-      'poof.met': stats.met,
-      'poof.spawns': stats.spawns,
-      'poof.splits': stats.splits,
-      'poof.peak_processes': stats.peakProcesses,
-    })
-    current.span.end()
-    this.events.publish({ kind: 'exhibit.ended', exhibit: current.id, status, stats })
-    return stats
+    try {
+      await current.arriving
+      const stats = current.engine ? await current.engine.stop() : await this.finishPool(current)
+      await this.db.client.exhibit.update({
+        where: { id: current.id },
+        data: { status, endedAt: new Date(), stats: { ...stats } },
+      })
+      current.span.setAttributes({
+        'poof.status': status,
+        'poof.submitted': stats.submitted,
+        'poof.rejected': stats.rejected,
+        'poof.met': stats.met,
+        'poof.spawns': stats.spawns,
+        'poof.splits': stats.splits,
+        'poof.peak_processes': stats.peakProcesses,
+      })
+      current.span.end()
+      this.events.publish({ kind: 'exhibit.ended', exhibit: current.id, status, stats })
+      return stats
+    } finally {
+      if (current.engine) this.scheduler.resume()
+      this.current = null
+      this.events.clearExhibitSnapshot()
+    }
   }
 
   private async finishPool(current: Current): Promise<ExhibitStats> {
@@ -235,28 +264,29 @@ export class Exhibits implements BeforeApplicationShutdown {
     return stats
   }
 
-  private async publishState(): Promise<void> {
-    const current = this.current
-    if (!current) return
-    if (!current.engine) this.poolStats = await this.poolCounts(current).catch(() => this.poolStats)
-    this.events.saveExhibitSnapshot(this.state())
+  private async publishState(current: Current): Promise<void> {
+    if (!current.engine) current.pool.stats = await this.poolCounts(current).catch(() => current.pool.stats)
+    if (!current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
   }
 
   state(): ExhibitSnapshot | null {
-    const current = this.current
-    if (!current) return null
+    return this.current ? this.snapshot(this.current) : null
+  }
+
+  private snapshot(current: Current): ExhibitSnapshot {
     const base = { id: current.id, params: current.params, startedAt: current.startedAt, endsAt: current.endsAt }
     if (current.engine) return { ...base, ...current.engine.snapshot() }
     return {
       ...base,
       budget: this.settings.BUDGET,
       processes: this.scheduler.health().workers,
-      stats: this.poolStats,
+      stats: current.pool.stats,
       tasks: [],
     }
   }
 
   async beforeApplicationShutdown(): Promise<void> {
+    await this.starting?.catch(() => undefined)
     await this.finish('ABORTED')
   }
 }

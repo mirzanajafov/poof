@@ -4,13 +4,17 @@ import { join } from 'node:path'
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { createPrisma, type PrismaClient } from '@poof/db'
+import { Redis } from 'ioredis'
 import sharp from 'sharp'
 import { inject } from 'vitest'
 import { AppModule, configureApp } from '../src/app.module.js'
 
+const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387/4'
+
 export interface Running {
   app: INestApplication
   db: PrismaClient
+  redis: Redis
   close(): Promise<void>
 }
 
@@ -66,12 +70,14 @@ async function noisy(root: string, name: string, count: number): Promise<void> {
 export async function start(dataDir: string, env: Record<string, string> = {}): Promise<Running> {
   Object.assign(process.env, {
     DATABASE_URL: inject('databaseUrl'),
-    REDIS_URL: process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387',
+    REDIS_URL: redisUrl,
     DATA_DIR: dataDir,
     BUDGET: '2',
     CHECKPOINT_MS: '200',
     ...env,
   })
+  const redis = new Redis(redisUrl)
+  await redis.flushdb()
   const moduleRef = await Test.createTestingModule({ imports: [AppModule.register()] }).compile()
   const app = configureApp(moduleRef.createNestApplication({ logger: false }))
   await app.init()
@@ -79,9 +85,11 @@ export async function start(dataDir: string, env: Record<string, string> = {}): 
   return {
     app,
     db,
+    redis,
     async close() {
       await app.close()
       await db.$disconnect()
+      await redis.quit()
     },
   }
 }

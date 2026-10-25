@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises'
+import { exhibitSnapshotKey } from '@poof/contracts'
+import { policies } from '@poof/core'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { policies } from '@poof/core'
 import { makeData, start, until, type Running } from './harness.js'
 
 let dataDir: string
@@ -21,6 +22,18 @@ afterAll(async () => {
 })
 
 const http = () => request(running!.app.getHttpServer())
+
+const onTheLiveView = async () => (await running!.redis.exists(exhibitSnapshotKey)) === 1
+
+async function waitUntilOnTheLiveView() {
+  await until(onTheLiveView, 2000)
+}
+
+async function waitUntilOffTheLiveView() {
+  await until(async () => !(await onTheLiveView()), 2000)
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+  expect(await onTheLiveView()).toBe(false)
+}
 
 async function ended(id: string) {
   return until(async () => {
@@ -49,8 +62,10 @@ describe('exhibits', () => {
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 600, count: 10 })
     expect(blocked.status).toBe(503)
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0)
+    await waitUntilOnTheLiveView()
     const exhibit = await ended(res.body.id)
     expect(exhibit.status).toBe('DONE')
+    await waitUntilOffTheLiveView()
     const stats = exhibit.stats as { peakProcesses: number; submitted: number; done: number; spawns: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.done).toBeGreaterThan(0)
@@ -133,6 +148,7 @@ describe('exhibits', () => {
     expect(res.status).toBe(201)
     expect((await http().get('/health')).body.paused).toBe(false)
     const exhibit = await ended(res.body.id)
+    await waitUntilOffTheLiveView()
     const stats = exhibit.stats as { submitted: number; done: number; peakProcesses: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.peakProcesses).toBe(2)
@@ -152,7 +168,25 @@ describe('exhibits', () => {
     expect(await running.db.exhibit.count()).toBe(before)
   })
 
-  it('aborts a running exhibit', async () => {
+  it('starts only one of two exhibits sent at the same moment', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    const body = { policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' }
+    const statuses = await Promise.all([1, 2].map(async () => (await http().post('/exhibits').send(body)).status))
+    expect(statuses.sort()).toEqual([201, 409])
+    expect(await running.db.exhibit.count()).toBe(before + 1)
+  })
+
+  it('keeps the pool paused for an exhibit that starts while the last one is stopping', async () => {
+    running = await start(dataDir)
+    const body = { policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' }
+    expect((await http().post('/exhibits').send(body)).status).toBe(201)
+    const [, next] = await Promise.all([http().delete('/exhibits/current'), http().post('/exhibits').send(body)])
+    const { paused } = (await http().get('/health')).body
+    expect(next.status === 409 || paused).toBe(true)
+  })
+
+  it('aborts a running exhibit and takes it off the live view at once', async () => {
     running = await start(dataDir)
     const res = await http()
       .post('/exhibits')
@@ -160,9 +194,11 @@ describe('exhibits', () => {
     expect(res.status).toBe(201)
     expect((await http().post('/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
     expect((await http().get('/exhibits/current')).status).toBe(200)
+    await waitUntilOnTheLiveView()
     expect((await http().delete('/exhibits/current')).status).toBe(200)
     const exhibit = await running.db.exhibit.findUniqueOrThrow({ where: { id: res.body.id } })
     expect(exhibit.status).toBe('ABORTED')
     expect((await http().get('/exhibits/current')).status).toBe(404)
+    await waitUntilOffTheLiveView()
   })
 })
