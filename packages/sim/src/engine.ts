@@ -1,17 +1,16 @@
 import {
   admits,
-  allocate,
-  Breaker,
+  Breakers,
   decide,
   emptyEstimate,
   defaultTimeoutRule,
   expectedCostMs,
+  grant,
   itemTimeoutMs,
   planSplit,
   updateEstimate,
   type BreakerState,
   type Estimate,
-  type Grants,
   type Preemption,
   type RunningLease,
   type LeaseInfo,
@@ -173,7 +172,7 @@ export class Simulation {
   private readonly tasks: SimTask[] = []
   private readonly active = new Set<SimTask>()
   private readonly processes = new Set<SimProcess>()
-  private readonly breakers = new Map<string, Breaker>()
+  private readonly breakers = new Breakers<string>()
   private readonly typeRatio = new Map<string, Estimate>()
   private spawnEstimate: Estimate = emptyEstimate
   private readonly cpu = { usefulMs: 0, spawnMs: 0, lostMs: 0 }
@@ -250,15 +249,6 @@ export class Simulation {
 
   private get spawnMs(): number {
     return this.spawnEstimate.count > 0 ? this.spawnEstimate.mean : this.options.calibration.spawnMs
-  }
-
-  private breaker(type: string): Breaker {
-    let breaker = this.breakers.get(type)
-    if (!breaker) {
-      breaker = new Breaker()
-      this.breakers.set(type, breaker)
-    }
-    return breaker
   }
 
   private correction(type: string): number {
@@ -345,19 +335,15 @@ export class Simulation {
     return lease
   }
 
-  private liveProcesses(): number {
-    return this.processes.size
-  }
-
-  private spawn(lease: SimLease | null): SimProcess | null {
-    if (this.liveProcesses() >= this.machine.maxProcesses) {
+  private spawn(lease: SimLease | null, warm = false): SimProcess | null {
+    if (this.processes.size >= this.machine.maxProcesses) {
       this.counts.spawnFailures++
       return null
     }
     const process: SimProcess = {
       id: this.nextProcessId++,
-      state: 'starting',
-      spawnLeft: this.options.calibration.spawnMs,
+      state: warm ? 'idle' : 'starting',
+      spawnLeft: warm ? 0 : this.options.calibration.spawnMs,
       spawnedAt: this.now,
       lease,
       rss: this.options.calibration.baseRssMb,
@@ -365,7 +351,7 @@ export class Simulation {
       yielding: false,
     }
     this.processes.add(process)
-    this.counts.spawns++
+    if (!warm) this.counts.spawns++
     this.peaks.processes = Math.max(this.peaks.processes, this.processes.size)
     if (lease) {
       lease.process = process
@@ -377,22 +363,16 @@ export class Simulation {
 
   private fillPool(warm = false): void {
     while (this.processes.size < this.options.budget) {
-      const process = this.spawn(null)
-      if (!process) break
-      if (warm) {
-        this.counts.spawns--
-        process.spawnLeft = 0
-        process.state = 'idle'
-      }
+      if (!this.spawn(null, warm)) break
     }
   }
 
   private breakerState(type: string): BreakerState {
-    return this.policy.breaker ? this.breaker(type).state(this.now) : 'closed'
+    return this.policy.breaker ? this.breakers.get(type).state(this.now) : 'closed'
   }
 
   private breakerAllows(type: string): boolean {
-    return !this.policy.breaker || this.breaker(type).allows(this.now)
+    return !this.policy.breaker || this.breakers.get(type).allows(this.now)
   }
 
   private view(): View {
@@ -425,9 +405,7 @@ export class Simulation {
         leases.push(info)
       }
     }
-    const breakers = new Map<string, BreakerState>()
-    for (const type of this.breakers.keys()) breakers.set(type, this.breakerState(type))
-    return { now: this.now, tasks, leases, breakers, spawnMs: this.spawnMs, killSwitch: false }
+    return { now: this.now, tasks, leases, breakers: this.breakers.states(this.now), spawnMs: this.spawnMs }
   }
 
   private currentSpeed(): number {
@@ -452,17 +430,8 @@ export class Simulation {
       leaseId: String(lease.id),
       deadline: lease.task.info.deadline,
     }))
-    let grants: Grants
-    if (this.policy.budget) {
-      const free = this.options.budget - this.liveProcesses()
-      grants = allocate(free, starts, requests, this.now, this.spawnMs, this.policy.fanout, this.preemption())
-    } else {
-      grants = {
-        starts: starts.map((s) => s.leaseId),
-        splits: new Map(requests.map((r) => [r.leaseId, r.k])),
-        preempt: [],
-      }
-    }
+    const free = this.options.budget - this.processes.size
+    const grants = grant(this.policy, free, starts, requests, this.now, this.spawnMs, this.preemption())
     const byId = new Map<string, SimLease>()
     for (const task of this.active) for (const lease of task.leases) byId.set(String(lease.id), lease)
     const requestById = new Map(requests.map((r) => [r.leaseId, r]))
@@ -482,7 +451,7 @@ export class Simulation {
     for (const process of this.processes) {
       if (process.yielding) yielding++
       const lease = process.lease
-      if (process.yielding || !lease || lease.state !== 'running') continue
+      if (process.yielding || lease?.state !== 'running') continue
       running.push({
         leaseId: String(lease.id),
         deadline: lease.task.info.deadline,
@@ -604,7 +573,7 @@ export class Simulation {
   private crashesOn(task: SimTask, item: number): boolean {
     if (task.plan.poison[item]) return true
     const outage = this.workload.scenario.poison?.outage
-    return outage !== undefined && outage.type === task.info.type && inWindow(outage, this.now)
+    return outage?.type === task.info.type && inWindow(outage, this.now)
   }
 
   private completeItem(process: SimProcess, lease: SimLease): void {
@@ -629,7 +598,7 @@ export class Simulation {
     lease.itemMs = updateEstimate(lease.itemMs, this.now - lease.inflightStart)
     const ratio = this.typeRatio.get(task.info.type) ?? emptyEstimate
     this.typeRatio.set(task.info.type, updateEstimate(ratio, cost / task.predicted[item]!, 0.02))
-    if (this.policy.breaker) this.breaker(task.info.type).record(true, this.now)
+    if (this.policy.breaker) this.breakers.get(task.info.type).record(true, this.now)
     this.settle(task)
     this.startItem(process, lease)
   }
@@ -657,7 +626,7 @@ export class Simulation {
     lease.inflight = false
     task.attempts[item] = Math.min(255, task.attempts[item]! + 1)
     if (this.policy.breaker) {
-      const breaker = this.breaker(task.info.type)
+      const breaker = this.breakers.get(task.info.type)
       const before = breaker.opened
       breaker.record(false, this.now)
       this.counts.breakerOpened += breaker.opened - before

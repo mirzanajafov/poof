@@ -42,8 +42,11 @@ function collect(handle: WorkerHandle) {
   const leaseDone = (lease: string) =>
     new Promise<LeaseDone>((resolve) => {
       const found = leases.find((l) => l.lease === lease)
-      if (found) return resolve(found)
-      handle.on('leaseDone', (l) => l.lease === lease && resolve(l))
+      if (found) resolve(found)
+      else
+        handle.on('leaseDone', (l) => {
+          if (l.lease === lease) resolve(l)
+        })
     })
   return { items, leases, exited, leaseDone }
 }

@@ -54,8 +54,6 @@ export const policies = {
   },
 } satisfies Record<string, PolicyConfig>
 
-export type PolicyKey = keyof typeof policies
-
 export const exhibitPolicyNames = [
   'pool',
   'never',

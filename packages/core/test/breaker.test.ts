@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Breaker } from '../src/breaker.ts'
+import { Breaker, Breakers } from '../src/breaker.ts'
 import { emptyEstimate, updateEstimate, upperMean } from '../src/estimate.ts'
 
 describe('Breaker', () => {
@@ -40,6 +40,21 @@ describe('Breaker', () => {
     expect(bad.state(30_200)).toBe('open')
     expect(bad.state(60_100)).toBe('half-open')
     expect(bad.opened).toBe(2)
+  })
+})
+
+describe('Breakers', () => {
+  it('keeps one breaker per type and reports the state of each', () => {
+    const breakers = new Breakers<string>()
+    for (let i = 0; i < 10; i++) breakers.get('thumb-320').record(false, 0)
+    breakers.get('webp-1600').record(true, 0)
+    expect(breakers.get('thumb-320')).toBe(breakers.get('thumb-320'))
+    expect(breakers.states(1)).toEqual(
+      new Map([
+        ['thumb-320', 'open'],
+        ['webp-1600', 'closed'],
+      ]),
+    )
   })
 })
 

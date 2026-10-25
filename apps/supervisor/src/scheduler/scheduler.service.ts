@@ -4,11 +4,10 @@ import { ConfigService } from '@nestjs/config'
 import type { PoolSnapshot } from '@poof/contracts'
 import {
   admits,
-  Breaker,
-  expectedCostMs,
+  Breakers,
   itemTimeoutMs,
   priorWorkRatio,
-  serverCostModels,
+  predictedCostMs,
   updateWorkRatio,
   isPresetName,
   workRatio,
@@ -94,7 +93,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private readonly settings: Settings
   private readonly tasks = new Map<string, TaskState>()
   private readonly workers = new Set<PoolWorker>()
-  private readonly breakers = new Map<PresetName, Breaker>()
+  private readonly breakers = new Breakers<PresetName>()
   private readonly ratios = new Map<PresetName, WorkRatio>()
   private writes: Promise<unknown> = Promise.resolve()
   private timers: NodeJS.Timeout[] = []
@@ -147,11 +146,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       return { accepted: false, id: null, reason: 'an exhibit is running', retryAfterSeconds, code: 503 }
     }
     const dataset = await this.datasets.get(request.dataset)
-    const model = serverCostModels[request.preset]
     const offset = request.offset ?? 0
     const count = Math.min(request.count ?? dataset.items.length, this.settings.MAX_TASK_ITEMS)
     const items = this.datasets.select(dataset, offset, count)
-    const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
+    const predicted = Float64Array.from(items, (item) => predictedCostMs(request.preset, item))
     const predictedMs = predicted.reduce((sum, v) => sum + v, 0)
     const now = Date.now()
     const id = randomUUID()
@@ -304,7 +302,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         dead: t.dead,
         deadline: t.deadline,
       })),
-      breakers: Object.fromEntries([...this.breakers].map(([type, b]) => [type, b.state(Date.now())])),
+      breakers: Object.fromEntries(this.breakers.states(Date.now())),
     }
   }
 
@@ -320,17 +318,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return workRatio(this.ratios.get(preset) ?? this.prior())
   }
 
-  private breaker(preset: PresetName): Breaker {
-    let breaker = this.breakers.get(preset)
-    if (!breaker) {
-      breaker = new Breaker()
-      this.breakers.set(preset, breaker)
-    }
-    return breaker
-  }
-
   private record(preset: PresetName, ok: boolean): void {
-    const breaker = this.breaker(preset)
+    const breaker = this.breakers.get(preset)
     const before = breaker.state(Date.now())
     breaker.record(ok, Date.now())
     const after = breaker.state(Date.now())
@@ -354,6 +343,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       setTimeout(() => void this.spawn(), 1000).unref()
       return
     }
+    this.addWorker(handle)
+  }
+
+  private addWorker(handle: WorkerHandle): void {
     const worker: PoolWorker = { id: randomUUID(), handle, lease: null, items: 0, retiring: false }
     this.workers.add(worker)
     this.persist(() => this.db.client.worker.create({ data: { id: worker.id, pid: handle.pid } }))
@@ -361,7 +354,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
     handle.on('exit', (exit) => this.onExit(worker, exit))
     this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: handle.pid })
-    if (this.stopping) return handle.kill('killed')
+    if (this.stopping) {
+      handle.kill('killed')
+      return
+    }
     this.claim(worker)
   }
 
@@ -373,11 +369,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const now = Date.now()
     let best: TaskState | null = null
     for (const task of this.active()) {
-      if (this.breaker(task.preset).state(now) === 'open') continue
+      if (this.breakers.get(task.preset).state(now) === 'open') continue
       if (!task.leases.some((l) => l.state === 'pending')) continue
       if (!best || rank(task, now) < rank(best, now)) best = task
     }
-    if (!best || !this.breaker(best.preset).allows(now)) return null
+    if (!best || !this.breakers.get(best.preset).allows(now)) return null
     return best.leases.find((l) => l.state === 'pending') ?? null
   }
 
@@ -445,7 +441,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
 
   private onItem(worker: PoolWorker, message: ItemDone | ItemDead): void {
     const lease = worker.lease
-    if (!lease || lease.id !== message.lease) return
+    if (lease?.id !== message.lease) return
     const task = lease.task
     worker.items++
     this.traceImage(lease.span, message)
@@ -505,7 +501,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
 
   private onLeaseDone(worker: PoolWorker, message: LeaseDone): void {
     const lease = worker.lease
-    if (!lease || lease.id !== message.lease) return
+    if (lease?.id !== message.lease) return
     lease.state = 'done'
     lease.cursor = Math.max(lease.cursor, message.hi)
     lease.worker = null
@@ -545,7 +541,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       lease.span?.setStatus({ code: SpanStatusCode.ERROR, message: `worker ${exit.reason}` })
     lease.span?.end()
     lease.span = null
-    if (exit.inflight && exit.inflight.lease === lease.id && exit.reason !== 'normal' && !this.stopping) {
+    if (exit.inflight?.lease === lease.id && exit.reason !== 'normal' && !this.stopping) {
       const item = exit.inflight.item
       const attempts = (task.attempts.get(item) ?? 0) + 1
       task.attempts.set(item, attempts)
@@ -690,11 +686,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         continue
       }
       const items = this.datasets.select(dataset, row.offset, row.items)
-      const model = serverCostModels[row.preset]
-      const predicted = Float64Array.from(items, (item) => expectedCostMs(model, (item.width * item.height) / 1e6))
+      const preset = row.preset
+      const predicted = Float64Array.from(items, (item) => predictedCostMs(preset, item))
       const task: TaskState = {
         id: row.id,
-        preset: row.preset,
+        preset,
         items: row.items,
         submittedAt: row.submittedAt.getTime(),
         deadline: row.deadline.getTime(),

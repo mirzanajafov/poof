@@ -19,3 +19,7 @@ export function medianCostMs(model: CostModel, mp: number): number {
 export function expectedCostMs(model: CostModel, mp: number): number {
   return medianCostMs(model, mp) * Math.exp(model.logResidualSd ** 2 / 2)
 }
+
+export function predictedCostMs(preset: PresetName, image: { width: number; height: number }): number {
+  return expectedCostMs(serverCostModels[preset], (image.width * image.height) / 1e6)
+}
