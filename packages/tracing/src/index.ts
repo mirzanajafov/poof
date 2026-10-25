@@ -17,7 +17,7 @@ import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 
 export { SpanKind, SpanStatusCode } from '@opentelemetry/api'
-export type { Context, Span, Tracer } from '@opentelemetry/api'
+export type { Attributes, Context, Span, Tracer } from '@opentelemetry/api'
 
 export interface Tracing {
   readonly enabled: boolean

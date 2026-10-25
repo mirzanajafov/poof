@@ -37,7 +37,11 @@ export class Datasets {
   }
 
   select(dataset: Dataset, offset: number, count: number): ManifestItem[] {
-    return Array.from({ length: count }, (_, i) => dataset.items[(offset + i) % dataset.items.length]!)
+    const start = offset % dataset.items.length
+    const laps = Math.ceil((start + count) / dataset.items.length)
+    return Array.from({ length: laps }, () => dataset.items)
+      .flat()
+      .slice(start, start + count)
   }
 
   taskDir(taskId: string): string {

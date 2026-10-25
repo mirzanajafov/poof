@@ -59,6 +59,7 @@ function linuxRssMb(pid: number): number | null {
 
 export class WorkerHandle extends EventEmitter<HandleEvents> {
   readonly limits: Limits
+  readonly exited: Promise<ExitReport>
   private child: ChildProcess | null = null
   private readonly leases: Tracked[] = []
   private since = 0
@@ -74,6 +75,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   constructor(options: { limits?: Partial<Limits> } = {}) {
     super()
     this.limits = { ...defaultLimits, ...options.limits }
+    this.exited = new Promise((resolve) => this.once('exit', resolve))
   }
 
   get inflight(): Inflight | null {
@@ -99,7 +101,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
       })
       this.child = child
       this.pid = child.pid ?? 0
-      child.stderr!.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         this.stderr = (this.stderr + chunk.toString()).slice(-4096)
       })
       const onEarlyExit = (code: number | null) =>
@@ -122,14 +124,17 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
 
   assign(assignment: Omit<Assignment, 'type'>, itemTimeoutMs: number): void {
     if (this.leases.length === 0) this.since = Date.now()
+    if (!this.child) throw new Error(`worker ${this.pid} is not running`)
     this.leases.push({ lease: assignment.lease, cursor: assignment.lo, hi: assignment.hi, itemTimeoutMs })
-    this.child!.send({ type: 'assign', ...assignment })
+    this.child.send({ type: 'assign', ...assignment })
   }
 
   shrink(lease: string, cut: number): Promise<Shrunk> {
+    const child = this.child
+    if (!child) return Promise.resolve({ type: 'shrunk', lease, ok: false })
     return new Promise((resolve) => {
       this.pendingShrinks.set(lease, resolve)
-      this.child!.send({ type: 'shrink', lease, cut })
+      child.send({ type: 'shrink', lease, cut })
     })
   }
 

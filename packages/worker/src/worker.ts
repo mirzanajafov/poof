@@ -24,8 +24,11 @@ function rssMb(): number {
   return process.memoryUsage.rss() / 1024 / 1024
 }
 
+if (!process.send) throw new Error('a worker runs only as a child process with an IPC channel')
+const post = process.send.bind(process)
+
 function send(message: FromWorker): Promise<void> {
-  return new Promise((resolve) => process.send!(message, () => resolve()))
+  return new Promise((resolve) => post(message, () => resolve()))
 }
 
 async function manifest(taskDir: string): Promise<TaskManifest> {
@@ -35,7 +38,8 @@ async function manifest(taskDir: string): Promise<TaskManifest> {
     cached = parseTaskManifest(await readFile(path, 'utf8'), path)
     await mkdir(join(taskDir, 'out'), { recursive: true })
     manifests.set(taskDir, cached)
-    if (manifests.size > 8) manifests.delete(manifests.keys().next().value!)
+    const [oldest] = manifests.keys()
+    if (manifests.size > 8 && oldest !== undefined) manifests.delete(oldest)
   }
   return cached
 }
@@ -78,8 +82,7 @@ async function processOne(assignment: Assignment, item: number, since: NodeJS.Cp
 async function drain(): Promise<void> {
   if (running) return
   running = true
-  while (queue.length > 0) {
-    const assignment = queue.shift()!
+  for (let assignment = queue.shift(); assignment; assignment = queue.shift()) {
     current = { assignment, cursor: assignment.lo, hi: assignment.hi }
     let mark = process.cpuUsage()
     while (current.cursor < current.hi) {

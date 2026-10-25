@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { WorkerHandle, type Limits, type ExitReport } from '../src/handle.ts'
+import { WorkerHandle, type Limits } from '../src/handle.ts'
 import type { ItemDead, ItemDone, LeaseDone } from '../src/protocol.ts'
 
 let root: string
@@ -38,7 +38,6 @@ function collect(handle: WorkerHandle) {
   const leases: LeaseDone[] = []
   handle.on('item', (item) => items.push(item))
   handle.on('leaseDone', (lease) => leases.push(lease))
-  const exited = new Promise<ExitReport>((resolve) => handle.once('exit', resolve))
   const leaseDone = (lease: string) =>
     new Promise<LeaseDone>((resolve) => {
       const found = leases.find((l) => l.lease === lease)
@@ -48,7 +47,7 @@ function collect(handle: WorkerHandle) {
           if (l.lease === lease) resolve(l)
         })
     })
-  return { items, leases, exited, leaseDone }
+  return { items, leases, exited: handle.exited, leaseDone }
 }
 
 const assignment = (taskDir: string, lease: string, lo: number, hi: number) => ({

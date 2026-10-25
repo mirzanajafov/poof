@@ -7,6 +7,7 @@ import { ExhibitsController } from './exhibits/exhibits.controller.js'
 import { Exhibits } from './exhibits/exhibits.service.js'
 import { InfraModule } from './infra/infra.module.js'
 import { Scheduler } from './scheduler/scheduler.service.js'
+import { TaskStore } from './tasks/task-store.js'
 import { TasksController } from './tasks/tasks.controller.js'
 
 @Module({})
@@ -16,7 +17,7 @@ export class AppModule {
       module: AppModule,
       imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv, ignoreEnvFile: true }), InfraModule],
       controllers: [TasksController, ExhibitsController],
-      providers: [Datasets, Scheduler, Exhibits, Janitor],
+      providers: [Datasets, TaskStore, Scheduler, Exhibits, Janitor],
     }
   }
 }
