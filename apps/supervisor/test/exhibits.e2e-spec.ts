@@ -143,6 +143,13 @@ describe('exhibits', () => {
     expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
   })
 
+  it('refuses an exhibit policy it does not know', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    expect((await http().post('/exhibits').send({ policy: 'nope', durationSeconds: 30 })).status).toBe(400)
+    expect(await running.db.exhibit.count()).toBe(before)
+  })
+
   it('aborts a running exhibit', async () => {
     running = await start(dataDir)
     const res = await http()

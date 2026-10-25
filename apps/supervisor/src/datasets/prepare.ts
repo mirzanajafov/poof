@@ -1,14 +1,19 @@
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, constants, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseManifest } from '@poof/contracts'
 import type { DatasetSource } from './dataset-source.js'
-import { replaceWithLinkOrCopy } from './link-or-copy.js'
+import { replaceFile, replaceWithLinkOrCopy } from './files.js'
 
 async function check({ name, dir }: DatasetSource) {
   const path = join(dir, 'manifest.json')
   const manifest = parseManifest(await readFile(path, 'utf8'), path)
-  await Promise.all(manifest.items.map((item) => access(join(dir, item.file))))
+  await Promise.all(manifest.items.map((item) => readableFile(join(dir, item.file))))
   return { name, dir, manifest }
+}
+
+async function readableFile(path: string): Promise<void> {
+  if (!(await stat(path)).isFile()) throw new Error(`${path} is not a file`)
+  await access(path, constants.R_OK)
 }
 
 export async function prepareDatasets(
@@ -21,9 +26,7 @@ export async function prepareDatasets(
     const target = join(dataDir, 'datasets', name)
     await mkdir(target, { recursive: true })
     for (const item of manifest.items) await replaceWithLinkOrCopy(join(dir, item.file), join(target, item.file))
-    const temp = join(target, `manifest.json.${process.pid}.tmp`)
-    await writeFile(temp, JSON.stringify(manifest))
-    await rename(temp, join(target, 'manifest.json'))
+    await replaceFile(join(target, 'manifest.json'), (temp) => writeFile(temp, JSON.stringify(manifest)))
     prepared.push({ name, items: manifest.items.length })
   }
   return prepared

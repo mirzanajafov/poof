@@ -24,7 +24,7 @@ export interface DatasetSummary {
   meanMp: number
 }
 
-const fileNamePattern = /^(?!\.\.?$)[^/\\]+$/
+const fileNamePattern = /^(?!\.\.?$|manifest\.json$)[^/\\]+$/
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

@@ -4,7 +4,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
 import type { Env } from '../config/env.js'
-import { linkOrCopy } from './link-or-copy.js'
+import { linkOrCopy } from './files.js'
 
 export interface Dataset {
   name: string

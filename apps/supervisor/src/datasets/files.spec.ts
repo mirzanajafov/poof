@@ -2,7 +2,7 @@ import { link, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { replaceWithLinkOrCopy } from './link-or-copy.js'
+import { replaceWithLinkOrCopy } from './files.js'
 
 let dir: string
 

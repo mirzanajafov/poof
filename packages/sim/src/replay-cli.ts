@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
-import { defaultTimeoutRule, isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
+import { defaultTimeoutRule, isExhibitPolicyName } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems } from './replay.ts'
@@ -22,7 +22,6 @@ const { values } = parseArgs({
 
 interface ExhibitRun {
   id: string
-  policy: ExhibitPolicyName
   params: ExhibitParams
   stats: ExhibitStats
 }
@@ -85,7 +84,7 @@ function real(run: ExhibitRun): Numbers {
 const rows = runs.map((run) => {
   const items = replayItems(manifest, measured(run.params.preset), run.params.preset)
   return {
-    policy: run.policy,
+    policy: run.params.policy,
     seed: run.params.seed,
     real: real(run),
     sim: simulated(replay(run.params, items, calibration, timeoutRule)),

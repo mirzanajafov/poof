@@ -179,6 +179,13 @@ describe('exhibits', () => {
     expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(3600)
   })
 
+  it('refuses an exhibit policy it does not know without asking the supervisor', async () => {
+    running = await start(supervisor.url)
+    const before = supervisor.calls.length
+    expect((await http().post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })).status).toBe(400)
+    expect(supervisor.calls).toHaveLength(before)
+  })
+
   it('only lets the admin abort an exhibit', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 200, body: { submitted: 3 } })
