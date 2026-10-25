@@ -24,7 +24,17 @@ describe('parseManifest', () => {
   })
 
   it('refuses a file name that would leave the dataset directory or replace its manifest', () => {
-    for (const file of ['../secret.jpg', 'sub/a.jpg', 'sub\\a.jpg', '..', '.', 'manifest.json', '', 7]) {
+    for (const file of [
+      '../secret.jpg',
+      'sub/a.jpg',
+      'sub\\a.jpg',
+      '..',
+      '.',
+      'manifest.json',
+      'Manifest.JSON',
+      '',
+      7,
+    ]) {
       expect(() => parseManifest(manifest([{ ...image, file }]), 'm.json')).toThrow(
         'm.json: item 0 needs a plain file name',
       )

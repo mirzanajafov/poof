@@ -50,7 +50,9 @@ describe('prepareDatasets', () => {
   it('refuses a source that lists a directory as an image', async () => {
     const dir = await source('odd', ['a.jpg'], ['a.jpg', 'nested'])
     await mkdir(join(dir, 'nested'))
-    await expect(prepareDatasets([{ name: 'odd', dir }], join(root, 'data'))).rejects.toThrow(/nested is not a file/)
+    await expect(prepareDatasets([{ name: 'odd', dir }], join(root, 'data'))).rejects.toThrow(
+      /nested is not a regular file/,
+    )
   })
 
   it('prepares a dataset over itself without losing an image', async () => {

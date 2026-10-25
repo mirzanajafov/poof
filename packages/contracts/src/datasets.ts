@@ -24,7 +24,7 @@ export interface DatasetSummary {
   meanMp: number
 }
 
-const fileNamePattern = /^(?!\.\.?$|manifest\.json$)[^/\\]+$/
+const fileNamePattern = /^(?!\.\.?$|manifest\.json$)[^/\\]+$/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -34,7 +34,11 @@ function isDimension(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0
 }
 
-function parseItems(text: string, origin: string) {
+function parseItems<T>(
+  text: string,
+  origin: string,
+  toItem: (fields: Record<string, unknown>, file: string, at: string) => T,
+): { source: unknown; items: T[] } {
   let json: unknown
   try {
     json = JSON.parse(text)
@@ -45,30 +49,24 @@ function parseItems(text: string, origin: string) {
     throw new Error(`${origin} lists no items`)
   }
   const items = json.items.map((item: unknown, index) => {
-    if (!isRecord(item)) throw new Error(`${origin}: item ${index} is not an object`)
+    const at = `${origin}: item ${index}`
+    if (!isRecord(item)) throw new Error(`${at} is not an object`)
     const { file } = item
-    if (typeof file !== 'string' || !fileNamePattern.test(file)) {
-      throw new Error(`${origin}: item ${index} needs a plain file name`)
-    }
-    return { file, fields: item }
+    if (typeof file !== 'string' || !fileNamePattern.test(file)) throw new Error(`${at} needs a plain file name`)
+    return toItem(item, file, at)
   })
   return { source: json.source, items }
 }
 
 export function parseTaskManifest(text: string, origin: string): TaskManifest {
-  return { items: parseItems(text, origin).items.map(({ file }) => ({ file })) }
+  return { items: parseItems(text, origin, (_, file) => ({ file })).items }
 }
 
 export function parseManifest(text: string, origin: string): Manifest {
-  const { source, items } = parseItems(text, origin)
+  const { source, items } = parseItems(text, origin, ({ width, height }, file, at) => {
+    if (!isDimension(width) || !isDimension(height)) throw new Error(`${at} needs a positive integer width and height`)
+    return { file, width, height }
+  })
   if (source !== undefined && typeof source !== 'string') throw new Error(`${origin} has a source that is not text`)
-  return {
-    source,
-    items: items.map(({ file, fields: { width, height } }, index) => {
-      if (!isDimension(width) || !isDimension(height)) {
-        throw new Error(`${origin}: item ${index} needs a positive integer width and height`)
-      }
-      return { file, width, height }
-    }),
-  }
+  return { source, items }
 }

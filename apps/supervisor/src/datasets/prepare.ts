@@ -1,4 +1,4 @@
-import { access, constants, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { access, constants, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseManifest } from '@poof/contracts'
 import type { DatasetSource } from './dataset-source.js'
@@ -12,7 +12,7 @@ async function check({ name, dir }: DatasetSource) {
 }
 
 async function readableFile(path: string): Promise<void> {
-  if (!(await stat(path)).isFile()) throw new Error(`${path} is not a file`)
+  if (!(await lstat(path)).isFile()) throw new Error(`${path} is not a regular file`)
   await access(path, constants.R_OK)
 }
 

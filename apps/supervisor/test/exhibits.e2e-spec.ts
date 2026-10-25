@@ -146,7 +146,9 @@ describe('exhibits', () => {
   it('refuses an exhibit policy it does not know', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()
-    expect((await http().post('/exhibits').send({ policy: 'nope', durationSeconds: 30 })).status).toBe(400)
+    const res = await http().post('/exhibits').send({ policy: 'nope', durationSeconds: 30 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
     expect(await running.db.exhibit.count()).toBe(before)
   })
 

@@ -7,8 +7,13 @@ export async function linkOrCopy(source: string, target: string): Promise<void> 
 export async function replaceFile(target: string, write: (temp: string) => Promise<void>): Promise<void> {
   const temp = `${target}.${process.pid}.tmp`
   await rm(temp, { force: true })
-  await write(temp)
-  await rename(temp, target)
+  try {
+    await write(temp)
+    await rename(temp, target)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
 }
 
 async function sameFile(a: string, b: string): Promise<boolean> {

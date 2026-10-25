@@ -181,9 +181,10 @@ describe('exhibits', () => {
 
   it('refuses an exhibit policy it does not know without asking the supervisor', async () => {
     running = await start(supervisor.url)
-    const before = supervisor.calls.length
-    expect((await http().post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })).status).toBe(400)
-    expect(supervisor.calls).toHaveLength(before)
+    const res = await http().post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
+    expect(supervisor.calls).toHaveLength(0)
   })
 
   it('only lets the admin abort an exhibit', async () => {

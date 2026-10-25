@@ -1,4 +1,4 @@
-import { link, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -30,5 +30,12 @@ describe('replaceWithLinkOrCopy', () => {
     await replaceWithLinkOrCopy(join(dir, 'image.jpg'), join(dir, 'linked.jpg'))
     expect(await readFile(join(dir, 'image.jpg'), 'utf8')).toBe('only copy')
     expect((await readdir(dir)).sort()).toEqual(['image.jpg', 'linked.jpg'])
+  })
+
+  it('removes its temporary file when the target cannot be replaced', async () => {
+    await writeFile(join(dir, 'source.jpg'), 'new')
+    await mkdir(join(dir, 'target.jpg'))
+    await expect(replaceWithLinkOrCopy(join(dir, 'source.jpg'), join(dir, 'target.jpg'))).rejects.toThrow()
+    expect((await readdir(dir)).sort()).toEqual(['source.jpg', 'target.jpg'])
   })
 })
