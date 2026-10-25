@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { defaultTimeoutRule } from '@poof/core'
+import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
+import { defaultTimeoutRule, isExhibitPolicyName } from '@poof/core'
 import { defaultResultsDir, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
-import { replay, replayItems, type ExhibitRun } from './replay.ts'
+import { replay, replayItems } from './replay.ts'
 import { mean, quantile } from './stats.ts'
 
 const { values } = parseArgs({
@@ -18,6 +19,12 @@ const { values } = parseArgs({
     out: { type: 'string' },
   },
 })
+
+interface ExhibitRun {
+  id: string
+  params: ExhibitParams
+  stats: ExhibitStats
+}
 
 interface Numbers {
   submitted: number
@@ -37,11 +44,9 @@ const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 
   samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
 }
 const runs = JSON.parse(readFileSync(values.runs!, 'utf8')) as ExhibitRun[]
-const manifest = (
-  JSON.parse(readFileSync(values.manifest!, 'utf8')) as {
-    items: Array<{ file: string; width: number; height: number }>
-  }
-).items
+const unknownPolicy = runs.find((run) => !isExhibitPolicyName(run.params.policy))
+if (unknownPolicy) throw new Error(`run ${unknownPolicy.id} has no simulator policy for ${unknownPolicy.params.policy}`)
+const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
 
 function measured(preset: string): Map<string, number> {
   const walls = new Map<string, number[]>()
@@ -79,10 +84,10 @@ function real(run: ExhibitRun): Numbers {
 const rows = runs.map((run) => {
   const items = replayItems(manifest, measured(run.params.preset), run.params.preset)
   return {
-    policy: run.policy,
+    policy: run.params.policy,
     seed: run.params.seed,
     real: real(run),
-    sim: simulated(replay(run, items, calibration, timeoutRule)),
+    sim: simulated(replay(run.params, items, calibration, timeoutRule)),
   }
 })
 

@@ -1,15 +1,15 @@
 'use client'
 
+import type { PoolSnapshot } from '@poof/contracts'
 import Link from 'next/link'
 import { short, until } from '@/lib/format'
-import type { LiveSnapshot } from '@/lib/types'
 
 export function Tiles({
   live,
   throughput,
   connected,
 }: {
-  live: LiveSnapshot | null
+  live: PoolSnapshot | null
   throughput: number
   connected: boolean
 }) {
@@ -35,7 +35,7 @@ export function Tiles({
   )
 }
 
-export function Workers({ live }: { live: LiveSnapshot | null }) {
+export function Workers({ live }: { live: PoolSnapshot | null }) {
   if (!live) return null
   const slots = Array.from({ length: Math.max(live.budget, live.workers.length) }, (_, i) => live.workers[i] ?? null)
   return (
@@ -81,7 +81,7 @@ export function Workers({ live }: { live: LiveSnapshot | null }) {
   )
 }
 
-export function Queue({ live }: { live: LiveSnapshot | null }) {
+export function Queue({ live }: { live: PoolSnapshot | null }) {
   if (!live) return null
   const now = Date.now()
   const tasks = [...live.tasks].sort((a, b) => a.deadline - b.deadline)

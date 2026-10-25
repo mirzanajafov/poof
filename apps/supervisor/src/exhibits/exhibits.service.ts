@@ -8,48 +8,19 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
-  exhibitSchedule,
-  expectedCostMs,
-  policies,
-  serverCostModels,
-  type Arrival,
-  type PolicyConfig,
-} from '@poof/core'
-import type { PresetName } from '@poof/imaging'
+  emptyExhibitStats,
+  type ExhibitEnd,
+  type ExhibitParams,
+  type ExhibitSnapshot,
+  type ExhibitStats,
+} from '@poof/contracts'
+import { exhibitPolicies, exhibitSchedule, expectedCostMs, serverCostModels, type Arrival } from '@poof/core'
 import { within, type Context, type Span } from '@poof/tracing'
 import type { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
 import { Database, Events, Traces } from '../infra/infra.module.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
-import { LeaseEngine, type ExhibitStats } from './lease-engine.js'
-
-export const exhibitPolicies: Record<string, PolicyConfig | null> = {
-  pool: null,
-  ...Object.fromEntries(
-    [
-      policies.never,
-      policies.static,
-      policies.box,
-      policies.timerManaged,
-      policies.forecast,
-      policies.forecastManaged,
-      policies.forecastPreempt,
-    ].map((p) => [p.name, p]),
-  ),
-}
-
-export interface ExhibitParams {
-  policy: string
-  durationSeconds: number
-  utilization: number
-  dataset: string
-  preset: PresetName
-  minItems: number
-  maxItems: number
-  slackMin: number
-  slackMax: number
-  seed: number
-}
+import { LeaseEngine } from './lease-engine.js'
 
 interface Current {
   id: string
@@ -64,30 +35,11 @@ interface Current {
   span: Span
 }
 
-const emptyStats = (): ExhibitStats => ({
-  submitted: 0,
-  rejected: 0,
-  done: 0,
-  met: 0,
-  cancelled: 0,
-  failed: 0,
-  items: 0,
-  deadLettered: 0,
-  spawns: 0,
-  spawnFailures: 0,
-  splits: 0,
-  preemptions: 0,
-  adoptions: 0,
-  exits: {},
-  peakProcesses: 0,
-  maxDepth: 0,
-})
-
 @Injectable()
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
-  private poolStats: ExhibitStats = emptyStats()
+  private poolStats = emptyExhibitStats()
   private readonly settings: Pick<
     Env,
     'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
@@ -113,8 +65,6 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     if (this.current) throw new ConflictException('an exhibit is already running')
-    if (!(params.policy in exhibitPolicies)) throw new NotFoundException(`no exhibit policy ${params.policy}`)
-    const policy = exhibitPolicies[params.policy] ?? null
     const dataset = await this.datasets.get(params.dataset)
     const model = serverCostModels[params.preset]
     if (!model) throw new NotFoundException(`no cost model for ${params.preset}`)
@@ -137,8 +87,9 @@ export class Exhibits implements BeforeApplicationShutdown {
       },
       trace,
     )
+    const policy = exhibitPolicies[params.policy]
     let engine: LeaseEngine | null = null
-    if (policy) {
+    if (policy.engine === 'lease') {
       await this.scheduler.pause(endsAt + 15_000)
       engine = new LeaseEngine(
         {
@@ -173,7 +124,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       span,
     }
     this.current = current
-    this.poolStats = emptyStats()
+    this.poolStats = emptyExhibitStats()
     const itemMs = dataset.items.map((item) => expectedCostMs(model, (item.width * item.height) / 1e6))
     const arrivals = exhibitSchedule(
       {
@@ -195,7 +146,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     }
     current.timers.push(setTimeout(() => void this.finish('DONE'), params.durationSeconds * 1000))
     current.timers.push(setInterval(() => void this.publishState(), 1000))
-    this.events.publish('exhibit.started', { exhibit: id, policy: params.policy, endsAt })
+    this.events.publish({ kind: 'exhibit.started', exhibit: id, policy: params.policy, endsAt })
     return { id, endsAt }
   }
 
@@ -231,7 +182,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       .catch((error: unknown) => this.logger.error(`exhibit arrival failed: ${String(error)}`))
   }
 
-  async finish(status: 'DONE' | 'ABORTED'): Promise<ExhibitStats | null> {
+  async finish(status: ExhibitEnd): Promise<ExhibitStats | null> {
     const current = this.current
     if (!current) return null
     this.current = null
@@ -253,7 +204,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       'poof.peak_processes': stats.peakProcesses,
     })
     current.span.end()
-    this.events.publish('exhibit.ended', { exhibit: current.id, status, stats })
+    this.events.publish({ kind: 'exhibit.ended', exhibit: current.id, status, stats })
     return stats
   }
 
@@ -270,7 +221,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       where: { exhibitId: current.id },
       select: { status: true, done: true, deadLettered: true, deadline: true, finishedAt: true },
     })
-    const stats = emptyStats()
+    const stats = emptyExhibitStats()
     stats.submitted = current.pool.submitted
     stats.rejected = current.pool.rejected
     stats.peakProcesses = this.settings.BUDGET
@@ -288,17 +239,16 @@ export class Exhibits implements BeforeApplicationShutdown {
     const current = this.current
     if (!current) return
     if (!current.engine) this.poolStats = await this.poolCounts(current).catch(() => this.poolStats)
-    this.events.snapshot('poof:exhibit', this.state())
+    this.events.saveExhibitSnapshot(this.state())
   }
 
-  state() {
+  state(): ExhibitSnapshot | null {
     const current = this.current
     if (!current) return null
     const base = { id: current.id, params: current.params, startedAt: current.startedAt, endsAt: current.endsAt }
     if (current.engine) return { ...base, ...current.engine.snapshot() }
     return {
       ...base,
-      policy: 'pool',
       budget: this.settings.BUDGET,
       processes: this.scheduler.health().workers,
       stats: this.poolStats,

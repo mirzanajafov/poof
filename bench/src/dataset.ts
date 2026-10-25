@@ -1,11 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { parseManifest, type ManifestItem } from '@poof/contracts'
 
-export interface DatasetItem {
-  file: string
-  width: number
-  height: number
-  bytes: number
+export interface DatasetItem extends ManifestItem {
   mp: number
 }
 
@@ -16,8 +13,10 @@ export interface Dataset {
 }
 
 export async function loadDataset(dir: string): Promise<Dataset> {
-  const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as Omit<Dataset, 'dir'>
-  return { dir, ...manifest }
+  const path = join(dir, 'manifest.json')
+  const { source, items } = parseManifest(await readFile(path, 'utf8'), path)
+  if (!source) throw new Error(`${path} does not say where its images come from`)
+  return { dir, source, items: items.map((item) => ({ ...item, mp: (item.width * item.height) / 1e6 })) }
 }
 
 export function itemPath(dataset: Dataset, item: DatasetItem): string {

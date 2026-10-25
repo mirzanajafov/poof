@@ -91,7 +91,7 @@ const maxMp = Number(values['max-mp'])
 const quality = Number(values.quality)
 
 await mkdir(out, { recursive: true })
-const items: DatasetItem[] = []
+const items: Array<DatasetItem & { bytes: number }> = []
 for (let i = 0; i < count; i++) {
   const rand = mulberry32(seed * 1000 + i)
   const mp = Math.exp(Math.log(minMp) + rand() * (Math.log(maxMp) - Math.log(minMp)))

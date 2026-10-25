@@ -55,6 +55,12 @@ importers:
       '@nestjs/websockets':
         specifier: ^12.0.1
         version: 12.1.2(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(@nestjs/platform-socket.io@12.1.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@poof/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -125,6 +131,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^12.0.1
         version: 12.1.2(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@poof/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -189,6 +198,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       next:
         specifier: 16.3.6
         version: 16.3.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -241,6 +256,12 @@ importers:
 
   bench:
     dependencies:
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../packages/core
       '@poof/imaging':
         specifier: workspace:*
         version: link:../packages/imaging
@@ -257,6 +278,22 @@ importers:
       typescript:
         specifier: ^6.0.2
         version: 6.0.3
+
+  packages/contracts:
+    dependencies:
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.0
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@1.8.0))(vite@8.3.2(@types/node@24.19.0)(jiti@2.7.0))
 
   packages/core:
     devDependencies:
@@ -300,6 +337,9 @@ importers:
 
   packages/imaging:
     dependencies:
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../core
       sharp:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@24.19.0)
@@ -313,6 +353,9 @@ importers:
 
   packages/sim:
     dependencies:
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@poof/core':
         specifier: workspace:*
         version: link:../core
@@ -363,6 +406,12 @@ importers:
 
   packages/worker:
     dependencies:
+      '@poof/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@poof/core':
+        specifier: workspace:*
+        version: link:../core
       '@poof/imaging':
         specifier: workspace:*
         version: link:../imaging

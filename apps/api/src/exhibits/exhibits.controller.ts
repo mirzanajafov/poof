@@ -15,7 +15,8 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+import { exhibitPolicyNames, type ExhibitPolicyName } from '@poof/core'
+import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
 import type { Env } from '../config/env.js'
 import { Admin, AdminGuard, RateLimit, RateLimitGuard } from '../guards/guards.js'
@@ -23,8 +24,8 @@ import { Cache, Database } from '../infra/infra.module.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 
 export class StartExhibit {
-  @IsString()
-  policy: string
+  @IsIn(exhibitPolicyNames)
+  policy: ExhibitPolicyName
 
   @IsInt()
   @Min(10)
@@ -69,7 +70,7 @@ export class ExhibitsController {
 
   @Get('current')
   async current() {
-    const state = await this.cache.json('poof:exhibit')
+    const state = await this.cache.exhibitSnapshot()
     if (!state) throw new NotFoundException('no exhibit is running')
     return state
   }

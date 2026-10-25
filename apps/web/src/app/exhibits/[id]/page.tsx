@@ -1,10 +1,10 @@
+import type { ExhibitParams, ExhibitStats } from '@poof/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Refresh } from '@/components/Refresh'
 import { api } from '@/lib/api'
 import { seconds, short } from '@/lib/format'
-import type { ExhibitStats } from '@/lib/types'
 
 interface ExhibitDetail {
   id: string
@@ -12,7 +12,7 @@ interface ExhibitDetail {
   status: string
   startedAt: string
   endedAt: string | null
-  params: { durationSeconds: number; utilization: number; dataset: string; seed: number }
+  params: ExhibitParams
   stats: ExhibitStats | null
   tasks: Array<{
     id: string

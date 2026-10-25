@@ -1,10 +1,10 @@
+import type { ExhibitParams, ManifestItem } from '@poof/contracts'
 import {
+  exhibitPolicies,
   exhibitSchedule,
   expectedCostMs,
-  policies,
   serverCostModels,
   type Arrival,
-  type PolicyConfig,
   type TimeoutRule,
 } from '@poof/core'
 import type { Calibration } from './calibration.ts'
@@ -18,38 +18,6 @@ export interface ReplayItem {
   predictedMs: number
 }
 
-export interface ExhibitParams {
-  durationSeconds: number
-  utilization: number
-  minItems: number
-  maxItems: number
-  slackMin: number
-  slackMax: number
-  seed: number
-  dataset: string
-  preset: string
-}
-
-export interface RealStats {
-  submitted: number
-  rejected: number
-  done: number
-  met: number
-  cancelled: number
-  items: number
-  spawns: number
-  splits: number
-  peakProcesses: number
-  exits: Record<string, number>
-}
-
-export interface ExhibitRun {
-  id: string
-  policy: string
-  params: ExhibitParams
-  stats: RealStats
-}
-
 export const replayMachine: MachineSpec = {
   name: 'cage',
   cores: 1.5,
@@ -60,15 +28,8 @@ export const replayMachine: MachineSpec = {
 
 export const capacityCores = 1.32
 
-export function replayPolicy(name: string): PolicyConfig {
-  if (name === 'pool') return policies.pool
-  const policy = Object.values(policies).find((p) => p.name === name)
-  if (!policy) throw new Error(`no simulator policy for ${name}`)
-  return policy
-}
-
 export function replayItems(
-  manifest: Array<{ file: string; width: number; height: number }>,
+  manifest: readonly ManifestItem[],
   measured: ReadonlyMap<string, number>,
   preset: string,
 ): ReplayItem[] {
@@ -147,18 +108,18 @@ export class ReplayArrivals implements Arrivals {
 }
 
 export function replay(
-  run: ExhibitRun,
+  params: ExhibitParams,
   items: ReplayItem[],
   calibration: Calibration,
   timeoutRule?: TimeoutRule,
 ): RunResult {
   return new Simulation({
-    scenario: new ReplayArrivals(run.params, items).scenario,
-    arrivals: new ReplayArrivals(run.params, items),
+    scenario: new ReplayArrivals(params, items).scenario,
+    arrivals: new ReplayArrivals(params, items),
     machine: replayMachine,
-    policy: replayPolicy(run.policy),
+    policy: exhibitPolicies[params.policy],
     calibration,
-    seed: run.params.seed,
+    seed: params.seed,
     budget: 2,
     itemTimeouts: true,
     warmPool: true,

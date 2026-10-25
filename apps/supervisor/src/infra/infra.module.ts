@@ -1,5 +1,13 @@
 import { Global, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import {
+  exhibitSnapshotKey,
+  liveEventsChannel,
+  poolSnapshotKey,
+  type ExhibitSnapshot,
+  type LiveEventBody,
+  type PoolSnapshot,
+} from '@poof/contracts'
 import { createPrisma, PrismaClient } from '@poof/db'
 import { startTracing, type Tracer, type Tracing } from '@poof/tracing'
 import { Redis } from 'ioredis'
@@ -27,11 +35,19 @@ export class Events implements OnApplicationShutdown {
     this.redis.on('error', () => undefined)
   }
 
-  publish(kind: string, payload: Record<string, unknown>): void {
-    void this.redis.publish('poof:events', JSON.stringify({ kind, at: Date.now(), ...payload })).catch(() => undefined)
+  publish(event: LiveEventBody): void {
+    void this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })).catch(() => undefined)
   }
 
-  snapshot(key: string, value: unknown): void {
+  savePoolSnapshot(snapshot: PoolSnapshot): void {
+    this.save(poolSnapshotKey, snapshot)
+  }
+
+  saveExhibitSnapshot(snapshot: ExhibitSnapshot | null): void {
+    this.save(exhibitSnapshotKey, snapshot)
+  }
+
+  private save(key: string, value: PoolSnapshot | ExhibitSnapshot | null): void {
     void this.redis.set(key, JSON.stringify(value), 'EX', 30).catch(() => undefined)
   }
 

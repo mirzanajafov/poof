@@ -1,13 +1,13 @@
 'use client'
 
-import type { Dataset } from '@/lib/types'
+import type { DatasetSummary } from '@poof/contracts'
 import { EventLog } from './EventLog'
 import { ExhibitPanel } from './Exhibit'
 import { Queue, Tiles, Workers } from './Pool'
 import { PressTheButton } from './PressTheButton'
 import { useLive } from './useLive'
 
-export function LiveDashboard({ datasets }: { datasets: Dataset[] }) {
+export function LiveDashboard({ datasets }: { datasets: DatasetSummary[] }) {
   const { connected, snapshot, events, processes, throughput } = useLive()
   const exhibitRunning = snapshot.exhibit !== null
   return (

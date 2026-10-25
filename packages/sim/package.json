@@ -11,6 +11,7 @@
     "replay": "node dist/replay-cli.js"
   },
   "dependencies": {
+    "@poof/contracts": "workspace:*",
     "@poof/core": "workspace:*"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import type { ExitReason } from '@poof/worker'
+import type { ExitReason } from '@poof/contracts'
 
 export const exitColumn: Record<ExitReason, 'NORMAL' | 'CRASH' | 'MEMORY' | 'TIMEOUT' | 'HEARTBEAT' | 'KILLED'> = {
   normal: 'NORMAL',

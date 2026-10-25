@@ -1,19 +1,14 @@
-import { copyFile, link, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
 import type { Env } from '../config/env.js'
-import { datasetNamePattern } from './dataset-name.js'
-
-export interface DatasetItem {
-  file: string
-  width: number
-  height: number
-}
+import { linkOrCopy } from './files.js'
 
 export interface Dataset {
   name: string
-  items: DatasetItem[]
+  items: ManifestItem[]
 }
 
 @Injectable()
@@ -29,18 +24,19 @@ export class Datasets {
     if (!datasetNamePattern.test(name)) throw new NotFoundException(`no dataset ${name}`)
     const cached = this.cache.get(name)
     if (cached) return cached
-    let raw: string
+    const path = join(this.root, 'datasets', name, 'manifest.json')
+    let text: string
     try {
-      raw = await readFile(join(this.root, 'datasets', name, 'manifest.json'), 'utf8')
+      text = await readFile(path, 'utf8')
     } catch {
       throw new NotFoundException(`no dataset ${name}`)
     }
-    const dataset: Dataset = { name, items: (JSON.parse(raw) as { items: DatasetItem[] }).items }
+    const dataset: Dataset = { name, items: parseManifest(text, path).items }
     this.cache.set(name, dataset)
     return dataset
   }
 
-  select(dataset: Dataset, offset: number, count: number): DatasetItem[] {
+  select(dataset: Dataset, offset: number, count: number): ManifestItem[] {
     return Array.from({ length: count }, (_, i) => dataset.items[(offset + i) % dataset.items.length]!)
   }
 
@@ -48,19 +44,17 @@ export class Datasets {
     return join(this.root, 'tasks', taskId)
   }
 
-  async createTask(taskId: string, dataset: Dataset, items: DatasetItem[]): Promise<string> {
+  async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<string> {
     const dir = this.taskDir(taskId)
     await mkdir(join(dir, 'input'), { recursive: true })
     await mkdir(join(dir, 'out'), { recursive: true })
-    const files: Array<{ file: string }> = []
+    const manifest: TaskManifest = { items: [] }
     for (const [i, item] of items.entries()) {
-      const file = `${i}-${basename(item.file)}`
-      const source = join(this.root, 'datasets', dataset.name, item.file)
-      const target = join(dir, 'input', file)
-      await link(source, target).catch(() => copyFile(source, target))
-      files.push({ file })
+      const file = `${i}-${item.file}`
+      await linkOrCopy(join(this.root, 'datasets', dataset.name, item.file), join(dir, 'input', file))
+      manifest.items.push({ file })
     }
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify({ items: files }))
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))
     return dir
   }
 

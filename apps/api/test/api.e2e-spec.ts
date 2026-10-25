@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import {
+  liveEventsChannel,
+  poolSnapshotKey,
+  type LiveBatch,
+  type LiveEvent,
+  type LiveSnapshot,
+  type LiveSocketEvents,
+  type PoolSnapshot,
+} from '@poof/contracts'
 import { io, type Socket } from 'socket.io-client'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -74,18 +83,16 @@ describe('read model', () => {
     expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
   })
 
-  it('lists the datasets on disk', async () => {
+  it('lists the datasets on disk that the supervisor would serve', async () => {
     running = await start(supervisor.url)
-    await mkdir(join(running.dataDir, 'datasets', 'tiny'), { recursive: true })
-    await writeFile(
-      join(running.dataDir, 'datasets', 'tiny', 'manifest.json'),
-      JSON.stringify({
-        items: [
-          { file: 'a.jpg', width: 4000, height: 3000 },
-          { file: 'b.jpg', width: 1000, height: 1000 },
-        ],
-      }),
-    )
+    const items = [
+      { file: 'a.jpg', width: 4000, height: 3000 },
+      { file: 'b.jpg', width: 1000, height: 1000 },
+    ]
+    for (const name of ['tiny', 'Not_A_Name']) {
+      await mkdir(join(running.dataDir, 'datasets', name), { recursive: true })
+      await writeFile(join(running.dataDir, 'datasets', name, 'manifest.json'), JSON.stringify({ items }))
+    }
     const res = await http().get('/api/datasets')
     expect(res.body).toEqual([{ name: 'tiny', items: 2, meanMp: 6.5 }])
   })
@@ -172,6 +179,14 @@ describe('exhibits', () => {
     expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(3600)
   })
 
+  it('refuses an exhibit policy it does not know without asking the supervisor', async () => {
+    running = await start(supervisor.url)
+    const res = await http().post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
+    expect(supervisor.calls).toHaveLength(0)
+  })
+
   it('only lets the admin abort an exhibit', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 200, body: { submitted: 3 } })
@@ -185,14 +200,16 @@ describe('exhibits', () => {
 describe('live view', () => {
   it('sends a snapshot on connect and relays supervisor events in batches', async () => {
     running = await start(supervisor.url)
-    await running.redis.set('poof:live', JSON.stringify({ budget: 2, workers: [] }))
-    const socket: Socket = io(running.url, { transports: ['websocket'] })
-    const snapshot = await new Promise<{ live: { budget: number } }>((resolve) => socket.once('snapshot', resolve))
-    expect(snapshot.live.budget).toBe(2)
-    const batch = new Promise<{ events: Array<{ kind: string }> }>((resolve) => socket.on('events', resolve))
+    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
+    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
+    const socket: Socket<LiveSocketEvents> = io(running.url, { transports: ['websocket'] })
+    const snapshot = await new Promise<LiveSnapshot>((resolve) => socket.once('snapshot', resolve))
+    expect(snapshot.live?.budget).toBe(2)
+    const batch = new Promise<LiveBatch>((resolve) => socket.on('events', resolve))
     await new Promise((resolve) => setTimeout(resolve, 100))
-    await running.redis.publish('poof:events', JSON.stringify({ kind: 'item', task: 't', item: 1 }))
-    await running.redis.publish('poof:events', JSON.stringify({ kind: 'item', task: 't', item: 2 }))
+    const item = (n: number): LiveEvent => ({ kind: 'item', at: 0, task: 't', lease: 'l', item: n, ok: true })
+    await running.redis.publish(liveEventsChannel, JSON.stringify(item(1)))
+    await running.redis.publish(liveEventsChannel, JSON.stringify(item(2)))
     const received = await batch
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()

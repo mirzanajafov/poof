@@ -171,18 +171,19 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 
 ## Where things are
 
-|                        |                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `packages/core`        | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit schedule |
-| `packages/sim`         | the simulator, its scenarios, results and charts, and the replay of real runs                                            |
-| `packages/worker`      | the worker process and the handle that limits it                                                                         |
-| `packages/tracing`     | OpenTelemetry setup, off unless an endpoint is set                                                                       |
-| `packages/db`          | Prisma schema and migrations                                                                                             |
-| `packages/imaging`     | the presets                                                                                                              |
-| `apps/supervisor`      | the scheduler, the lease engine for exhibits, datasets and the janitor                                                   |
-| `apps/api`, `apps/web` | the public API and the dashboard                                                                                         |
-| `bench`                | the calibration benchmarks, the exhibit driver, the cage sampler and their results                                       |
-| `deploy`               | the deploy script and the backup container                                                                               |
+|                        |                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core`        | the policies: pain, split sizing, EDF tokens with preemption, admission, breaker, cost model, timeouts, exhibit names and schedule |
+| `packages/sim`         | the simulator, its scenarios, results and charts, and the replay of real runs                                                      |
+| `packages/contracts`   | what crosses a process boundary: live events, snapshots, exhibit params and stats, the dataset and task manifests                  |
+| `packages/worker`      | the worker process and the handle that limits it                                                                                   |
+| `packages/tracing`     | OpenTelemetry setup, off unless an endpoint is set                                                                                 |
+| `packages/db`          | Prisma schema and migrations                                                                                                       |
+| `packages/imaging`     | the presets                                                                                                                        |
+| `apps/supervisor`      | the scheduler, the lease engine for exhibits, datasets and the janitor                                                             |
+| `apps/api`, `apps/web` | the public API and the dashboard                                                                                                   |
+| `bench`                | the calibration benchmarks, the exhibit driver, the cage sampler and their results                                                 |
+| `deploy`               | the deploy script and the backup container                                                                                         |
 
 ## What's next
 

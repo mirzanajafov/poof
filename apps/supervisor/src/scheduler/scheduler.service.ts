@@ -7,6 +7,7 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import type { PoolSnapshot } from '@poof/contracts'
 import {
   admits,
   Breaker,
@@ -16,9 +17,9 @@ import {
   serverCostModels,
   updateWorkRatio,
   workRatio,
+  type PresetName,
   type WorkRatio,
 } from '@poof/core'
-import type { PresetName } from '@poof/imaging'
 import { resume, SpanStatusCode, traceIdOf, within, type Context, type Span } from '@poof/tracing'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
 import type { Env } from '../config/env.js'
@@ -99,8 +100,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private readonly settings: Settings
   private readonly tasks = new Map<string, TaskState>()
   private readonly workers = new Set<PoolWorker>()
-  private readonly breakers = new Map<string, Breaker>()
-  private readonly ratios = new Map<string, WorkRatio>()
+  private readonly breakers = new Map<PresetName, Breaker>()
+  private readonly ratios = new Map<PresetName, WorkRatio>()
   private writes: Promise<unknown> = Promise.resolve()
   private timers: NodeJS.Timeout[] = []
   private stopping = false
@@ -130,7 +131,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   async onApplicationBootstrap(): Promise<void> {
     await this.recover()
     this.timers.push(setInterval(() => this.checkpoint(), this.settings.CHECKPOINT_MS))
-    this.timers.push(setInterval(() => this.events.snapshot('poof:live', this.snapshot()), 1000))
+    this.timers.push(setInterval(() => this.events.savePoolSnapshot(this.snapshot()), 1000))
     for (let i = 0; i < this.settings.BUDGET; i++) void this.spawn()
   }
 
@@ -203,7 +204,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       await this.db.client.decision.create({
         data: { kind: 'reject', taskId: id, detail: { workMs: candidate.workMs, backlogMs, retryAfterSeconds } },
       })
-      this.events.publish('task.rejected', { task: id, retryAfterSeconds })
+      this.events.publish({ kind: 'task.rejected', task: id, exhibit: options.exhibitId ?? null })
       span.setAttributes({
         'poof.outcome': 'rejected',
         'poof.work_ms': Math.round(candidate.workMs),
@@ -257,7 +258,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }),
     ])
     this.tasks.set(id, task)
-    this.events.publish('task.accepted', { task: id, items: task.items, deadline })
+    this.events.publish({ kind: 'task.accepted', task: id, items: task.items, deadline })
     this.dispatch()
     return { accepted: true, id, items: task.items, predictedSeconds: Math.round(predictedMs / 1000) }
   }
@@ -291,7 +292,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     }
   }
 
-  snapshot() {
+  snapshot(): PoolSnapshot {
     return {
       at: Date.now(),
       budget: this.settings.BUDGET,
@@ -309,7 +310,6 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         done: t.done,
         dead: t.dead,
         deadline: t.deadline,
-        status: t.status,
       })),
       breakers: Object.fromEntries([...this.breakers].map(([type, b]) => [type, b.state(Date.now())])),
     }
@@ -323,11 +323,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return priorWorkRatio(this.settings.ADMISSION_PRIOR_RATIO, 20 * 300)
   }
 
-  private ratio(preset: string): number {
+  private ratio(preset: PresetName): number {
     return workRatio(this.ratios.get(preset) ?? this.prior())
   }
 
-  private breaker(preset: string): Breaker {
+  private breaker(preset: PresetName): Breaker {
     let breaker = this.breakers.get(preset)
     if (!breaker) {
       breaker = new Breaker()
@@ -336,14 +336,14 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return breaker
   }
 
-  private record(preset: string, ok: boolean): void {
+  private record(preset: PresetName, ok: boolean): void {
     const breaker = this.breaker(preset)
     const before = breaker.state(Date.now())
     breaker.record(ok, Date.now())
     const after = breaker.state(Date.now())
     if (after !== before) {
       this.persist(() => this.db.client.breakerEvent.create({ data: { type: preset, state: after } }))
-      this.events.publish('breaker', { preset, state: after })
+      this.events.publish({ kind: 'breaker', preset, state: after })
     }
   }
 
@@ -367,7 +367,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     handle.on('item', (message) => this.onItem(worker, message))
     handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
     handle.on('exit', (exit) => this.onExit(worker, exit))
-    this.events.publish('worker.spawned', { worker: worker.id, pid: handle.pid })
+    this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: handle.pid })
     if (this.stopping) return handle.kill('killed')
     this.claim(worker)
   }
@@ -440,7 +440,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         data: { state: 'RUNNING', workerId: worker.id, cursor: lease.cursor },
       }),
     )
-    this.events.publish('lease.claimed', {
+    this.events.publish({
+      kind: 'lease.claimed',
       task: task.id,
       lease: lease.id,
       worker: worker.id,
@@ -467,7 +468,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     lease.cursor = message.item + 1
     lease.dirty = true
     task.dirty = true
-    this.events.publish('item', { task: task.id, item: message.item, ok: message.ok, worker: worker.id })
+    this.events.publish({ kind: 'item', task: task.id, lease: lease.id, item: message.item, ok: message.ok })
     this.settle(task)
   }
 
@@ -505,7 +506,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     this.persist(() =>
       this.db.client.deadLetter.create({ data: { taskId: task.id, item, attempts, error: error.slice(0, 500) } }),
     )
-    this.events.publish('item.dead', { task: task.id, item, attempts, error: error.slice(0, 200) })
+    this.events.publish({ kind: 'item.dead', task: task.id, item, attempts, error: error.slice(0, 200) })
     if (task.dead > this.settings.DEAD_LETTER_SHARE * task.items) this.fail(task, 'too many dead letters')
   }
 
@@ -538,7 +539,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         data: { endedAt: new Date(), exit: exitColumn[exit.reason], items: worker.items },
       }),
     )
-    this.events.publish('worker.exit', { worker: worker.id, reason: exit.reason, inflight: exit.inflight })
+    this.events.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
     const lease = worker.lease
     if (lease) this.release(lease, exit)
     if (!this.stopping && !this.paused) void this.spawn()
@@ -613,7 +614,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         this.db.client.decision.create({ data: { kind, taskId: task.id, detail: { reason, dead: task.dead } } }),
       ]),
     )
-    this.events.publish('task.failed', { task: task.id, reason })
+    this.events.publish({ kind: 'task.failed', task: task.id, reason })
     task.span.setAttributes({
       'poof.outcome': kind === 'cancel' ? 'cancelled' : 'failed',
       'poof.reason': reason,
@@ -637,7 +638,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }),
     )
     const met = finishedAt.getTime() <= task.deadline
-    this.events.publish('task.done', { task: task.id, met, dead: task.dead })
+    this.events.publish({ kind: 'task.done', task: task.id, met, dead: task.dead })
     task.span.setAttributes({ 'poof.outcome': met ? 'met' : 'late', 'poof.done': task.done, 'poof.dead': task.dead })
     task.span.end(finishedAt)
     this.forgetLater(task)

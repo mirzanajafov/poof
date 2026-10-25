@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { parseTaskManifest, type TaskManifest } from '@poof/contracts'
 import { configureSharp, presets, processItem } from '@poof/imaging'
-import type { Assignment, FromWorker, ItemDead, ItemDone, Manifest, ToWorker } from './protocol.ts'
+import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './protocol.ts'
 
 configureSharp()
 if (process.platform === 'linux') await writeFile('/proc/self/oom_score_adj', '1000').catch(() => undefined)
@@ -13,7 +14,7 @@ interface Current {
 }
 
 const heartbeatMs = Number(process.env.POOF_HEARTBEAT_MS ?? 1000)
-const manifests = new Map<string, Manifest>()
+const manifests = new Map<string, TaskManifest>()
 const queue: Assignment[] = []
 let current: Current | null = null
 let running = false
@@ -27,10 +28,11 @@ function send(message: FromWorker): Promise<void> {
   return new Promise((resolve) => process.send!(message, () => resolve()))
 }
 
-async function manifest(taskDir: string): Promise<Manifest> {
+async function manifest(taskDir: string): Promise<TaskManifest> {
   let cached = manifests.get(taskDir)
   if (!cached) {
-    cached = JSON.parse(await readFile(join(taskDir, 'manifest.json'), 'utf8')) as Manifest
+    const path = join(taskDir, 'manifest.json')
+    cached = parseTaskManifest(await readFile(path, 'utf8'), path)
     await mkdir(join(taskDir, 'out'), { recursive: true })
     manifests.set(taskDir, cached)
     if (manifests.size > 8) manifests.delete(manifests.keys().next().value!)

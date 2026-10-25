@@ -43,7 +43,7 @@ const maxBytes = Number(values['max-mb']) * 1e6
 const perQuery = Math.ceil(count / queries.length)
 
 await mkdir(out, { recursive: true })
-const items: Array<DatasetItem & { nasaId: string; title: string }> = []
+const items: Array<DatasetItem & { bytes: number; nasaId: string; title: string }> = []
 for (const query of queries) {
   const search = await json<SearchResult>(
     `https://images-api.nasa.gov/search?q=${encodeURIComponent(query)}&media_type=image&page_size=60`,

@@ -1,3 +1,5 @@
+export type PresetName = 'webp-1600' | 'avif-1600' | 'thumb-320'
+
 export interface Estimate {
   mean: number
   variance: number

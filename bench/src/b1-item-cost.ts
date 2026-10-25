@@ -56,7 +56,7 @@ for (const name of values.presets!.split(',')) {
           source: dataset.source,
           file: item.file,
           mp: item.mp,
-          bytes: item.bytes,
+          bytes: input.length,
           preset: name,
           pass,
           readMs,

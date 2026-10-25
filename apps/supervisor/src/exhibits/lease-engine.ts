@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
+import { emptyExhibitStats, type ExhibitSnapshot, type ExhibitStats, type ManifestItem } from '@poof/contracts'
 import {
   admits,
   allocate,
@@ -17,21 +18,14 @@ import {
   type LeaseInfo,
   type PolicyConfig,
   type Preemption,
+  type PresetName,
   type SplitRequest,
   type StartRequest,
   type TaskInfo,
 } from '@poof/core'
-import type { PresetName } from '@poof/imaging'
 import { SpanStatusCode, traceIdOf, within, type Context, type Span, type Tracer } from '@poof/tracing'
-import {
-  WorkerHandle,
-  type ExitReason,
-  type ItemDead,
-  type ItemDone,
-  type LeaseDone,
-  type WorkerExit,
-} from '@poof/worker'
-import type { Dataset, DatasetItem, Datasets } from '../datasets/datasets.service.js'
+import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type WorkerExit } from '@poof/worker'
+import type { Dataset, Datasets } from '../datasets/datasets.service.js'
 import type { Database, Events } from '../infra/infra.module.js'
 import { exitColumn } from '../workers/exit.js'
 
@@ -47,25 +41,6 @@ export interface EngineOptions {
   tickMs: number
   tracer: Tracer
   trace?: Context
-}
-
-export interface ExhibitStats {
-  submitted: number
-  rejected: number
-  done: number
-  met: number
-  cancelled: number
-  failed: number
-  items: number
-  deadLettered: number
-  spawns: number
-  spawnFailures: number
-  splits: number
-  preemptions: number
-  adoptions: number
-  exits: Partial<Record<ExitReason, number>>
-  peakProcesses: number
-  maxDepth: number
 }
 
 type Status = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED'
@@ -115,30 +90,13 @@ export class LeaseEngine {
   private readonly tasks = new Map<string, ExhibitTask>()
   private readonly leases = new Map<string, ExhibitLease>()
   private readonly workers = new Set<ExhibitWorker>()
-  private readonly breakers = new Map<string, Breaker>()
+  private readonly breakers = new Map<PresetName, Breaker>()
   private spawnEstimate: Estimate = emptyEstimate
   private reserved = 0
   private writes: Promise<unknown> = Promise.resolve()
   private timer: NodeJS.Timeout | null = null
   private stopped = false
-  readonly stats: ExhibitStats = {
-    submitted: 0,
-    rejected: 0,
-    done: 0,
-    met: 0,
-    cancelled: 0,
-    failed: 0,
-    items: 0,
-    deadLettered: 0,
-    spawns: 0,
-    spawnFailures: 0,
-    splits: 0,
-    preemptions: 0,
-    adoptions: 0,
-    exits: {},
-    peakProcesses: 0,
-    maxDepth: 0,
-  }
+  readonly stats = emptyExhibitStats()
 
   constructor(
     private readonly options: EngineOptions,
@@ -157,7 +115,7 @@ export class LeaseEngine {
 
   async submit(
     dataset: Dataset,
-    items: DatasetItem[],
+    items: ManifestItem[],
     preset: PresetName,
     deadlineMs: number,
     offset: number,
@@ -202,7 +160,7 @@ export class LeaseEngine {
       if (!admits({ id, deadline: deadlineMs, workMs: predictedMs }, backlog, now, this.options.capacityCores)) {
         this.stats.rejected++
         this.persist(() => this.db.client.task.create({ data: { ...base, status: 'REJECTED' } }))
-        this.events.publish('task.rejected', { task: id, exhibit: this.options.exhibitId })
+        this.events.publish({ kind: 'task.rejected', task: id, exhibit: this.options.exhibitId })
         span.setAttribute('poof.outcome', 'rejected')
         span.end()
         return false
@@ -233,12 +191,7 @@ export class LeaseEngine {
     const size = Math.ceil(task.info.items / Math.max(1, this.options.policy.upfront))
     for (let lo = 0; lo < task.info.items; lo += size)
       this.createLease(task, lo, Math.min(task.info.items, lo + size), null, 0)
-    this.events.publish('task.accepted', {
-      task: id,
-      items: items.length,
-      deadline: deadlineMs,
-      exhibit: this.options.exhibitId,
-    })
+    this.events.publish({ kind: 'task.accepted', task: id, items: items.length, deadline: deadlineMs })
     return true
   }
 
@@ -274,9 +227,8 @@ export class LeaseEngine {
     return this.stats
   }
 
-  snapshot() {
+  snapshot(): Pick<ExhibitSnapshot, 'budget' | 'processes' | 'stats' | 'tasks'> {
     return {
-      policy: this.options.policy.name,
       budget: this.options.policy.budget ? this.options.budget : null,
       processes: this.workers.size,
       stats: this.stats,
@@ -307,7 +259,7 @@ export class LeaseEngine {
     this.writes = this.writes.then(write).catch((error: unknown) => this.logger.error(error))
   }
 
-  private breaker(type: string): Breaker {
+  private breaker(type: PresetName): Breaker {
     let breaker = this.breakers.get(type)
     if (!breaker) {
       breaker = new Breaker()
@@ -316,7 +268,7 @@ export class LeaseEngine {
     return breaker
   }
 
-  private breakerState(type: string): BreakerState {
+  private breakerState(type: PresetName): BreakerState {
     return this.options.policy.breaker ? this.breaker(type).state(Date.now()) : 'closed'
   }
 
@@ -361,7 +313,15 @@ export class LeaseEngine {
         data: { id: lease.id, taskId: task.info.id, parentId: lease.parentId, depth, lo, hi, cursor: lo },
       }),
     )
-    this.events.publish('lease.created', { task: task.info.id, lease: lease.id, parent: lease.parentId, depth, lo, hi })
+    this.events.publish({
+      kind: 'lease.created',
+      task: task.info.id,
+      lease: lease.id,
+      parent: lease.parentId,
+      depth,
+      lo,
+      hi,
+    })
     return lease
   }
 
@@ -536,7 +496,7 @@ export class LeaseEngine {
         worker.handle.on('item', (message) => this.onItem(worker, message))
         worker.handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
         worker.handle.on('exit', (exit) => this.onExit(worker, exit))
-        this.events.publish('worker.spawned', { worker: worker.id, pid: worker.handle.pid, lease: lease.id })
+        this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: worker.handle.pid })
         this.assign(worker, lease)
       },
       () => {
@@ -597,7 +557,7 @@ export class LeaseEngine {
     } else {
       this.deadLetter(task, message.item, message.attempts, message.error)
     }
-    this.events.publish('item', { task: task.info.id, lease: lease.id, item: message.item, ok: message.ok })
+    this.events.publish({ kind: 'item', task: task.info.id, lease: lease.id, item: message.item, ok: message.ok })
     this.settle(task)
   }
 
@@ -645,7 +605,7 @@ export class LeaseEngine {
         data: { endedAt: new Date(), exit: exitColumn[exit.reason] },
       }),
     )
-    this.events.publish('worker.exit', { worker: worker.id, reason: exit.reason })
+    this.events.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
     const lease = worker.lease
     if (!lease || this.stopped) return
     const task = lease.task
@@ -712,7 +672,7 @@ export class LeaseEngine {
         data: { status: 'DONE', finishedAt: new Date(finishedAt), done: task.done, deadLettered: task.dead },
       }),
     )
-    this.events.publish('task.done', { task: task.info.id, met, exhibit: this.options.exhibitId })
+    this.events.publish({ kind: 'task.done', task: task.info.id, met, dead: task.dead })
     task.span.setAttributes({ 'poof.outcome': met ? 'met' : 'late', 'poof.done': task.done, 'poof.dead': task.dead })
     task.span.end(finishedAt)
   }

@@ -1,12 +1,14 @@
 import { Body, Controller, Delete, Get, Headers, NotFoundException, Post } from '@nestjs/common'
-import { presets, type PresetName } from '@poof/imaging'
+import type { ExhibitParams } from '@poof/contracts'
+import { exhibitPolicyNames, type ExhibitPolicyName, type PresetName } from '@poof/core'
+import { presets } from '@poof/imaging'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
-import { exhibitPolicies, Exhibits, type ExhibitParams } from './exhibits.service.js'
+import { Exhibits } from './exhibits.service.js'
 
 export class StartExhibit {
-  @IsIn(Object.keys(exhibitPolicies))
-  policy: string
+  @IsIn(exhibitPolicyNames)
+  policy: ExhibitPolicyName
 
   @IsInt()
   @Min(10)
