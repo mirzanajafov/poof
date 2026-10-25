@@ -334,7 +334,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private async spawn(): Promise<void> {
-    if (this.stopping) return
+    if (this.stopping || this.paused) return
     const handle = new WorkerHandle({ limits: { rssMb: this.settings.WORKER_RSS_MB } })
     try {
       await handle.start()

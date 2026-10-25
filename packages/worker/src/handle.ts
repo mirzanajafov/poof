@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { ExitReason } from '@poof/contracts'
-import type { Assignment, FromWorker, ItemDead, ItemDone, LeaseDone, Shrunk } from './protocol.ts'
+import type { Assignment, FromWorker, ItemDead, ItemDone, LeaseDone, Ready, Shrunk } from './protocol.ts'
 
 export interface Limits {
   rssMb: number
@@ -145,25 +145,32 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
     setTimeout(() => this.child?.kill('SIGKILL'), this.limits.killGraceMs).unref()
   }
 
-  private onMessage(message: FromWorker): void {
-    if (message.type === 'beat') {
-      this.lastBeat = Date.now()
-      this.reportedRssMb = message.rssMb
-    } else if (message.type === 'item') {
-      const lease = this.leases[0]
-      if (lease?.lease === message.lease) lease.cursor = message.item + 1
-      this.since = Date.now()
-      this.lastBeat = Date.now()
-      this.emit('item', message)
-    } else if (message.type === 'leaseDone') {
-      this.leases.shift()
-      this.since = Date.now()
-      this.emit('leaseDone', message)
-    } else if (message.type === 'shrunk') {
-      const tracked = this.leases.find((l) => l.lease === message.lease)
-      if (tracked && message.ok) tracked.hi = message.cut
-      this.pendingShrinks.get(message.lease)?.(message)
-      this.pendingShrinks.delete(message.lease)
+  private onMessage(message: Exclude<FromWorker, Ready>): void {
+    switch (message.type) {
+      case 'beat':
+        this.lastBeat = Date.now()
+        this.reportedRssMb = message.rssMb
+        break
+      case 'item': {
+        const lease = this.leases[0]
+        if (lease?.lease === message.lease) lease.cursor = message.item + 1
+        this.since = Date.now()
+        this.lastBeat = Date.now()
+        this.emit('item', message)
+        break
+      }
+      case 'leaseDone':
+        this.leases.shift()
+        this.since = Date.now()
+        this.emit('leaseDone', message)
+        break
+      case 'shrunk': {
+        const tracked = this.leases.find((l) => l.lease === message.lease)
+        if (tracked && message.ok) tracked.hi = message.cut
+        this.pendingShrinks.get(message.lease)?.(message)
+        this.pendingShrinks.delete(message.lease)
+        break
+      }
     }
   }
 
