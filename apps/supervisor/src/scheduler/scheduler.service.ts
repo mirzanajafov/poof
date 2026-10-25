@@ -12,16 +12,17 @@ import {
   updateWorkRatio,
   isPresetName,
   workRatio,
+  type LeaseState,
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
-import type { LeaseState, TaskStatus } from '@poof/db'
+import type { TaskStatus } from '@poof/db'
 import { resume, SpanStatusCode, traceIdOf, within, type Context, type Span } from '@poof/tracing'
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type ExitReport } from '@poof/worker'
 import type { Env } from '../config/env.js'
 import { Datasets } from '../datasets/datasets.service.js'
 import { Database, Events, Traces } from '../infra/infra.module.js'
-import { exitColumn } from '../workers/exit.js'
+import { exitColumn, leaseColumn } from '../infra/columns.js'
 
 export interface SubmitRequest {
   dataset: string
@@ -62,7 +63,7 @@ interface TaskState {
   dead: number
   attempts: Map<number, number>
   leases: Lease[]
-  status: TaskStatus
+  status: Exclude<TaskStatus, 'REJECTED'>
   dirty: boolean
   span: Span
 }
@@ -237,7 +238,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         lo,
         hi,
         cursor: lo,
-        state: 'PENDING',
+        state: 'pending',
         worker: null,
         dirty: false,
         span: null,
@@ -373,11 +374,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     let best: TaskState | null = null
     for (const task of this.active()) {
       if (this.breaker(task.preset).state(now) === 'open') continue
-      if (!task.leases.some((l) => l.state === 'PENDING')) continue
+      if (!task.leases.some((l) => l.state === 'pending')) continue
       if (!best || rank(task, now) < rank(best, now)) best = task
     }
     if (!best || !this.breaker(best.preset).allows(now)) return null
-    return best.leases.find((l) => l.state === 'PENDING') ?? null
+    return best.leases.find((l) => l.state === 'pending') ?? null
   }
 
   private claim(worker: PoolWorker): void {
@@ -385,7 +386,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const lease = this.next()
     if (!lease) return
     const task = lease.task
-    lease.state = 'RUNNING'
+    lease.state = 'running'
     lease.worker = worker
     worker.lease = lease
     if (task.status === 'QUEUED') {
@@ -505,7 +506,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private onLeaseDone(worker: PoolWorker, message: LeaseDone): void {
     const lease = worker.lease
     if (!lease || lease.id !== message.lease) return
-    lease.state = 'DONE'
+    lease.state = 'done'
     lease.cursor = Math.max(lease.cursor, message.hi)
     lease.worker = null
     worker.lease = null
@@ -563,11 +564,11 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }
     }
     const open = task.status === 'QUEUED' || task.status === 'RUNNING'
-    lease.state = open && lease.cursor < lease.hi ? 'PENDING' : 'DONE'
+    lease.state = open && lease.cursor < lease.hi ? 'pending' : 'done'
     this.persist(() =>
       this.db.client.lease.update({
         where: { id: lease.id },
-        data: { state: lease.state, cursor: lease.cursor, workerId: null },
+        data: { state: leaseColumn[lease.state], cursor: lease.cursor, workerId: null },
       }),
     )
     this.settle(task)
@@ -593,8 +594,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     if (task.status === 'DONE' || task.status === 'FAILED') return
     task.status = 'FAILED'
     for (const lease of task.leases) {
-      if (lease.state === 'PENDING') lease.state = 'DONE'
-      else if (lease.state === 'RUNNING' && lease.worker) void lease.worker.handle.shrink(lease.id, lease.cursor + 1)
+      if (lease.state === 'pending') lease.state = 'done'
+      else if (lease.state === 'running' && lease.worker) void lease.worker.handle.shrink(lease.id, lease.cursor + 1)
     }
     this.persist(() =>
       this.db.client.$transaction([
@@ -638,7 +639,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
 
   private forgetLater(task: TaskState): void {
     setTimeout(() => {
-      if (task.leases.every((l) => l.state === 'DONE')) this.tasks.delete(task.id)
+      if (task.leases.every((l) => l.state === 'done')) this.tasks.delete(task.id)
     }, 60_000).unref()
   }
 
@@ -649,7 +650,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       if (task.dirty && (task.status === 'RUNNING' || task.status === 'QUEUED')) tasks.push(task)
       task.dirty = false
       for (const lease of task.leases) {
-        if (lease.dirty && lease.state === 'RUNNING') leases.push(lease)
+        if (lease.dirty && lease.state === 'running') leases.push(lease)
         lease.dirty = false
       }
     }
@@ -675,6 +676,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     for (const row of rows) {
       const dataset = await this.datasets.get(row.dataset).catch(() => null)
       if (!dataset || !isPresetName(row.preset)) {
+        const reason = dataset ? `no preset ${row.preset} after a restart` : 'dataset gone after a restart'
         await this.db.client.$transaction([
           this.db.client.task.update({ where: { id: row.id }, data: { status: 'FAILED', finishedAt: new Date() } }),
           this.db.client.lease.updateMany({
@@ -682,7 +684,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
             data: { state: 'DONE' },
           }),
           this.db.client.decision.create({
-            data: { kind: 'fail', taskId: row.id, detail: { reason: 'dataset gone after a restart' } },
+            data: { kind: 'fail', taskId: row.id, detail: { reason } },
           }),
         ])
         continue
@@ -713,7 +715,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }
       let processed = 0
       for (const l of row.leases) {
-        const state: LeaseState = l.state === 'DONE' ? 'DONE' : 'PENDING'
+        const state: LeaseState = l.state === 'DONE' ? 'done' : 'pending'
         task.leases.push({
           id: l.id,
           task,
@@ -725,8 +727,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
           dirty: false,
           span: null,
         })
-        processed += (state === 'DONE' ? l.hi : l.cursor) - l.lo
-        if (state === 'PENDING') for (let i = l.cursor; i < l.hi; i++) task.remainingMs += predicted[i]!
+        processed += (state === 'done' ? l.hi : l.cursor) - l.lo
+        if (state === 'pending') for (let i = l.cursor; i < l.hi; i++) task.remainingMs += predicted[i]!
       }
       task.leases.sort((a, b) => a.lo - b.lo)
       task.done = processed - task.dead

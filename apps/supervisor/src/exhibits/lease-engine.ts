@@ -29,7 +29,7 @@ import { SpanStatusCode, traceIdOf, within, type Context, type Span, type Tracer
 import { WorkerHandle, type ItemDead, type ItemDone, type LeaseDone, type ExitReport } from '@poof/worker'
 import type { Dataset, Datasets } from '../datasets/datasets.service.js'
 import type { Database, Events } from '../infra/infra.module.js'
-import { exitColumn } from '../workers/exit.js'
+import { exitColumn, leaseColumn } from '../infra/columns.js'
 
 export interface EngineOptions {
   exhibitId: string
@@ -55,7 +55,7 @@ interface ExhibitTask {
   dead: number
   attempts: Map<number, number>
   leases: ExhibitLease[]
-  status: TaskStatus
+  status: Exclude<TaskStatus, 'REJECTED'>
   span: Span
 }
 
@@ -631,7 +631,7 @@ export class LeaseEngine {
     this.persist(() =>
       this.db.client.lease.update({
         where: { id: lease.id },
-        data: { state: lease.state === 'done' ? 'DONE' : 'PENDING', cursor: lease.cursor, workerId: null },
+        data: { state: leaseColumn[lease.state], cursor: lease.cursor, workerId: null },
       }),
     )
     if (this.options.policy.deadLetter && task.dead > this.options.deadLetterShare * task.info.items) this.fail(task)

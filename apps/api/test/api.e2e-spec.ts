@@ -131,6 +131,17 @@ describe('submissions', () => {
     ).toBe(400)
   })
 
+  it('refuses a preset or task status it does not know without asking the supervisor', async () => {
+    running = await start(supervisor.url)
+    const submitted = await http()
+      .post('/api/tasks')
+      .send({ dataset: 'synthetic', preset: 'png-9000', deadlineSeconds: 60 })
+    expect(submitted.status).toBe(400)
+    expect(submitted.body.message).toEqual([expect.stringMatching(/^preset must be one of/)])
+    expect((await http().get('/api/tasks?status=LOST')).status).toBe(400)
+    expect(supervisor.calls).toHaveLength(0)
+  })
+
   it('answers 502 when the supervisor is down', async () => {
     running = await start('http://127.0.0.1:9')
     const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })

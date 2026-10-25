@@ -16,6 +16,8 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { presetNames, type PresetName } from '@poof/core'
+import { TaskStatus } from '@poof/db'
 import { Type } from 'class-transformer'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
@@ -28,8 +30,8 @@ export class SubmitTask {
   @IsString()
   dataset: string
 
-  @IsString()
-  preset: string
+  @IsIn(presetNames)
+  preset: PresetName
 
   @IsNumber()
   @Min(1)
@@ -50,8 +52,8 @@ export class SubmitTask {
 
 export class ListTasks {
   @IsOptional()
-  @IsIn(['QUEUED', 'RUNNING', 'DONE', 'FAILED', 'REJECTED'])
-  status?: 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED' | 'REJECTED'
+  @IsIn(Object.values(TaskStatus))
+  status?: TaskStatus
 
   @IsOptional()
   @Type(() => Number)
