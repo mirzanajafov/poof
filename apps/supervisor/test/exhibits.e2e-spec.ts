@@ -1,18 +1,15 @@
 import { rm } from 'node:fs/promises'
 import { exhibitSnapshotKey } from '@poof/contracts'
 import { policies } from '@poof/core'
-import { Redis } from 'ioredis'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { makeData, redisUrl, start, until, type Running } from './harness.js'
+import { makeData, start, until, type Running } from './harness.js'
 
 let dataDir: string
 let running: Running | null = null
-let redis: Redis
 
 beforeAll(async () => {
   dataDir = await makeData()
-  redis = new Redis(redisUrl)
 })
 
 afterEach(async () => {
@@ -22,13 +19,20 @@ afterEach(async () => {
 
 afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true })
-  await redis.quit()
 })
 
 const http = () => request(running!.app.getHttpServer())
 
-async function offTheLiveView() {
-  await until(async () => (await redis.exists(exhibitSnapshotKey)) === 0, 2000)
+const onTheLiveView = async () => (await running!.redis.exists(exhibitSnapshotKey)) === 1
+
+async function waitUntilOnTheLiveView() {
+  await until(onTheLiveView, 2000)
+}
+
+async function waitUntilOffTheLiveView() {
+  await until(async () => !(await onTheLiveView()), 2000)
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+  expect(await onTheLiveView()).toBe(false)
 }
 
 async function ended(id: string) {
@@ -58,10 +62,10 @@ describe('exhibits', () => {
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 600, count: 10 })
     expect(blocked.status).toBe(503)
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0)
-    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 1, 2000)
+    await waitUntilOnTheLiveView()
     const exhibit = await ended(res.body.id)
     expect(exhibit.status).toBe('DONE')
-    await offTheLiveView()
+    await waitUntilOffTheLiveView()
     const stats = exhibit.stats as { peakProcesses: number; submitted: number; done: number; spawns: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.done).toBeGreaterThan(0)
@@ -144,7 +148,7 @@ describe('exhibits', () => {
     expect(res.status).toBe(201)
     expect((await http().get('/health')).body.paused).toBe(false)
     const exhibit = await ended(res.body.id)
-    await offTheLiveView()
+    await waitUntilOffTheLiveView()
     const stats = exhibit.stats as { submitted: number; done: number; peakProcesses: number }
     expect(stats.submitted).toBeGreaterThan(0)
     expect(stats.peakProcesses).toBe(2)
@@ -172,11 +176,11 @@ describe('exhibits', () => {
     expect(res.status).toBe(201)
     expect((await http().post('/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
     expect((await http().get('/exhibits/current')).status).toBe(200)
-    await until(async () => (await redis.exists(exhibitSnapshotKey)) === 1)
+    await waitUntilOnTheLiveView()
     expect((await http().delete('/exhibits/current')).status).toBe(200)
     const exhibit = await running.db.exhibit.findUniqueOrThrow({ where: { id: res.body.id } })
     expect(exhibit.status).toBe('ABORTED')
     expect((await http().get('/exhibits/current')).status).toBe(404)
-    await offTheLiveView()
+    await waitUntilOffTheLiveView()
   })
 })

@@ -40,6 +40,7 @@ interface Current {
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
+  private starting = false
   private readonly settings: Pick<
     Env,
     'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
@@ -64,7 +65,16 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
-    if (this.current) throw new ConflictException('an exhibit is already running')
+    if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
+    this.starting = true
+    try {
+      return await this.begin(params, trace)
+    } finally {
+      this.starting = false
+    }
+  }
+
+  private async begin(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     const dataset = await this.datasets.get(params.dataset)
     const model = serverCostModels[params.preset]
     if (!model) throw new NotFoundException(`no cost model for ${params.preset}`)
@@ -144,9 +154,17 @@ export class Exhibits implements BeforeApplicationShutdown {
         setTimeout(() => this.schedule(current, () => this.arrive(current, arrival, itemMs)), arrival.at),
       )
     }
-    current.timers.push(setTimeout(() => void this.finish('DONE'), params.durationSeconds * 1000))
+    current.timers.push(
+      setTimeout(
+        () =>
+          void this.finish('DONE').catch((error: unknown) =>
+            this.logger.error(`exhibit ${id} did not finish cleanly: ${String(error)}`),
+          ),
+        params.durationSeconds * 1000,
+      ),
+    )
     current.timers.push(setInterval(() => void this.publishState(current), 1000))
-    void this.publishState(current)
+    this.events.saveExhibitSnapshot(this.snapshot(current))
     this.events.publish({ kind: 'exhibit.started', exhibit: id, policy: params.policy, endsAt })
     return { id, endsAt }
   }
