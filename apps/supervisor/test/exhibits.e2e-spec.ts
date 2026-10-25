@@ -168,6 +168,24 @@ describe('exhibits', () => {
     expect(await running.db.exhibit.count()).toBe(before)
   })
 
+  it('starts only one of two exhibits sent at the same moment', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    const body = { policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' }
+    const statuses = await Promise.all([1, 2].map(async () => (await http().post('/exhibits').send(body)).status))
+    expect(statuses.sort()).toEqual([201, 409])
+    expect(await running.db.exhibit.count()).toBe(before + 1)
+  })
+
+  it('keeps the pool paused for an exhibit that starts while the last one is stopping', async () => {
+    running = await start(dataDir)
+    const body = { policy: 'forecast+budget', durationSeconds: 300, dataset: 'small' }
+    expect((await http().post('/exhibits').send(body)).status).toBe(201)
+    const [, next] = await Promise.all([http().delete('/exhibits/current'), http().post('/exhibits').send(body)])
+    const { paused } = (await http().get('/health')).body
+    expect(next.status === 409 || paused).toBe(true)
+  })
+
   it('aborts a running exhibit and takes it off the live view at once', async () => {
     running = await start(dataDir)
     const res = await http()

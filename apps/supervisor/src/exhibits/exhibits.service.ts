@@ -40,7 +40,7 @@ interface Current {
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
-  private starting = false
+  private starting: Promise<unknown> | null = null
   private readonly settings: Pick<
     Env,
     'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
@@ -66,11 +66,12 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
-    this.starting = true
+    const starting = this.begin(params, trace)
+    this.starting = starting
     try {
-      return await this.begin(params, trace)
+      return await starting
     } finally {
-      this.starting = false
+      this.starting = null
     }
   }
 
@@ -170,7 +171,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   private async arrive(current: Current, arrival: Arrival, itemMs: number[]): Promise<void> {
-    if (this.current !== current || current.finishing) return
+    if (current.finishing) return
     const { params, dataset } = current
     const items = this.datasets.select(dataset, arrival.offset, arrival.count)
     let predictedMs = 0
@@ -265,7 +266,7 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   private async publishState(current: Current): Promise<void> {
     if (!current.engine) current.pool.stats = await this.poolCounts(current).catch(() => current.pool.stats)
-    if (this.current === current && !current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
+    if (!current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
   }
 
   state(): ExhibitSnapshot | null {
@@ -285,6 +286,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   async beforeApplicationShutdown(): Promise<void> {
+    await this.starting?.catch(() => undefined)
     await this.finish('ABORTED')
   }
 }
