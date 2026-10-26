@@ -120,8 +120,8 @@ describe('supervisor', () => {
     })
     const a = await finished(running, taskId(relaxed.body))
     const b = await finished(running, taskId(urgent.body))
-    expect([a.finishedAt, b.finishedAt]).toEqual([expect.any(Date), expect.any(Date)])
-    expect(Number(b.finishedAt)).toBeLessThan(Number(a.finishedAt))
+    if (!a.finishedAt || !b.finishedAt) throw new Error('a finished task has no finish time')
+    expect(b.finishedAt.getTime()).toBeLessThan(a.finishedAt.getTime())
   })
 
   it('fails the tasks it cannot resume after a restart and says why', async () => {

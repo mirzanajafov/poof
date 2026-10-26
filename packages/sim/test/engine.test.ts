@@ -31,8 +31,9 @@ describe('Simulation', () => {
   })
 
   for (const policy of mainPolicies) {
-    it(`${policy.name} keeps every item owned by exactly one lease`, () => {
-      expect(() => run({ policy, scenario: burstScenario, checkInvariants: true })).not.toThrow()
+    it(`${policy.name} keeps every item owned by exactly one lease and finishes no task before it arrives`, () => {
+      const result = run({ policy, scenario: burstScenario, checkInvariants: true })
+      expect(result.tasks.filter((t) => t.finishedAt !== null && t.finishedAt < t.submittedAt)).toEqual([])
     })
   }
 
