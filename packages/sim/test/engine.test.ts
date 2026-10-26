@@ -33,12 +33,14 @@ describe('Simulation', () => {
   for (const policy of mainPolicies) {
     it(`${policy.name} keeps every item owned by exactly one lease`, () => {
       const result = run({ policy, scenario: burstScenario, checkInvariants: true })
-      for (const task of result.tasks) {
-        if (task.finishedAt !== null) expect(task.finishedAt).toBeGreaterThanOrEqual(task.submittedAt)
-      }
-      if (policy.budget) {
-        expect(result.tasks.filter((t) => !t.rejected && !t.failed).every((t) => t.finishedAt !== null)).toBe(true)
-      }
+      expect(result.tasks.filter((t) => t.finishedAt !== null && t.finishedAt < t.submittedAt)).toEqual([])
+    })
+  }
+
+  for (const policy of mainPolicies.filter((p) => p.budget)) {
+    it(`${policy.name} finishes every task it admits`, () => {
+      const result = run({ policy, scenario: burstScenario })
+      expect(result.tasks.filter((t) => !t.rejected && !t.failed && t.finishedAt === null)).toEqual([])
     })
   }
 
