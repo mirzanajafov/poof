@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
@@ -30,25 +31,31 @@ const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 const patienceMs = (2 * Number(values.duration) + 60) * 1000
+if (existsSync(values.out)) throw new Error(`${values.out} already holds runs, so pick another --out`)
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const res = await fetch(`${values.api}${path}`, init).catch((error: unknown) => {
-    throw new Error(`could not reach ${values.api}${path}`, { cause: error })
-  })
+  const res = await fetch(`${values.api}${path}`, { ...init, signal: AbortSignal.timeout(30_000) }).catch(
+    (error: unknown) => {
+      throw new Error(`could not reach ${values.api}${path}`, { cause: error })
+    },
+  )
   const body: unknown = await res.json().catch(() => null)
   return { status: res.status, body }
 }
 
 async function idle(): Promise<void> {
+  const deadline = Date.now() + patienceMs
   while (true) {
     const { status } = await call('/api/exhibits/current')
     if (status === 404) return
     if (status !== 200) throw new Error(`the API answered ${status} for the current exhibit`)
+    if (Date.now() > deadline) throw new Error(`another exhibit is still running ${patienceMs / 1000} s later`)
     await sleep(5000)
   }
 }
 
 async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
+  const deadline = Date.now() + patienceMs
   while (true) {
     await idle()
     const { status, body } = await call('/api/exhibits', {
@@ -64,6 +71,7 @@ async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
     })
     if (status === 201 && isRecord(body) && typeof body.id === 'string') return body.id
     if (status !== 409) throw new Error(`could not start ${policy} seed ${seed}: ${status} ${JSON.stringify(body)}`)
+    if (Date.now() > deadline) throw new Error(`the box stayed busy for ${patienceMs / 1000} s`)
     console.log(`${policy} seed ${seed}: the box is busy, waiting`)
     await sleep(5000)
   }
