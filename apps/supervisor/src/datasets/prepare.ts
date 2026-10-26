@@ -1,11 +1,11 @@
 import { access, constants, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { parseManifest } from '@poof/contracts'
+import { datasetDir, manifestPath, parseManifest } from '@poof/contracts'
 import type { DatasetSource } from './dataset-source.js'
 import { replaceFile, replaceWithLinkOrCopy } from './files.js'
 
 async function check({ name, dir }: DatasetSource) {
-  const path = join(dir, 'manifest.json')
+  const path = manifestPath(dir)
   const manifest = parseManifest(await readFile(path, 'utf8'), path)
   await Promise.all(manifest.items.map((item) => readableFile(join(dir, item.file))))
   return { name, dir, manifest }
@@ -23,10 +23,10 @@ export async function prepareDatasets(
   const checked = await Promise.all(sources.map(check))
   const prepared: Array<{ name: string; items: number }> = []
   for (const { name, dir, manifest } of checked) {
-    const target = join(dataDir, 'datasets', name)
+    const target = datasetDir(dataDir, name)
     await mkdir(target, { recursive: true })
     for (const item of manifest.items) await replaceWithLinkOrCopy(join(dir, item.file), join(target, item.file))
-    await replaceFile(join(target, 'manifest.json'), (temp) => writeFile(temp, JSON.stringify(manifest)))
+    await replaceFile(manifestPath(target), (temp) => writeFile(temp, JSON.stringify(manifest)))
     prepared.push({ name, items: manifest.items.length })
   }
   return prepared

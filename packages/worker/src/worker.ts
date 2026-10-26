@@ -1,7 +1,13 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { parseTaskManifest, type TaskManifest } from '@poof/contracts'
-import { outputFileName } from '@poof/core'
+import {
+  inputDir,
+  manifestPath,
+  outputDir,
+  outputFileName,
+  parseTaskManifest,
+  type TaskManifest,
+} from '@poof/contracts'
 import { configureSharp, presets, processItem } from '@poof/imaging'
 import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './protocol.ts'
 
@@ -35,9 +41,9 @@ function send(message: FromWorker): Promise<void> {
 async function manifest(taskDir: string): Promise<TaskManifest> {
   let cached = manifests.get(taskDir)
   if (!cached) {
-    const path = join(taskDir, 'manifest.json')
+    const path = manifestPath(taskDir)
     cached = parseTaskManifest(await readFile(path, 'utf8'), path)
-    await mkdir(join(taskDir, 'out'), { recursive: true })
+    await mkdir(outputDir(taskDir), { recursive: true })
     manifests.set(taskDir, cached)
     const [oldest] = manifests.keys()
     if (manifests.size > 8 && oldest !== undefined) manifests.delete(oldest)
@@ -52,13 +58,13 @@ async function processOne(assignment: Assignment, item: number, since: NodeJS.Cp
     try {
       const entry = (await manifest(assignment.taskDir)).items[item]
       if (!entry) throw new Error(`no item ${item} in the manifest`)
-      const input = await readFile(join(assignment.taskDir, 'input', entry.file))
+      const input = await readFile(join(inputDir(assignment.taskDir), entry.file))
       const cpu = process.cpuUsage()
       const started = performance.now()
       const output = await processItem(input, preset)
       const wallMs = performance.now() - started
       const used = process.cpuUsage(cpu)
-      const target = join(assignment.taskDir, 'out', outputFileName(item, preset.name))
+      const target = join(outputDir(assignment.taskDir), outputFileName(item, preset.name))
       const temp = `${target}.${process.pid}.tmp`
       await writeFile(temp, output)
       await rename(temp, target)
