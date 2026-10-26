@@ -1,4 +1,4 @@
-import { Injectable, type OnApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common'
 import {
   exhibitSnapshotKey,
   poolSnapshotKey,
@@ -12,6 +12,7 @@ import { Env } from '../config/env.js'
 
 @Injectable()
 export class Cache implements OnApplicationShutdown {
+  private readonly logger = new Logger(Cache.name)
   private readonly redis: Redis
   private subscriber: Redis | null = null
 
@@ -37,9 +38,9 @@ export class Cache implements OnApplicationShutdown {
 
   async increment(key: string, windowMs: number): Promise<number> {
     const results = await unavailableOnFailure(this.redis.multi().incr(key).pexpire(key, windowMs).exec())
-    const [error, count] = results?.[0] ?? [new Error('the transaction was discarded'), null]
-    if (error) throw new UnavailableError('the rate limiter is unavailable', { cause: error })
-    return Number(count)
+    const incr = results?.[0]
+    if (!incr || incr[0]) throw new UnavailableError('the rate limiter is unavailable', { cause: incr?.[0] })
+    return Number(incr[1])
   }
 
   async claim(key: string, seconds: number): Promise<{ claimed: true } | { claimed: false; ttlSeconds: number }> {
@@ -56,7 +57,9 @@ export class Cache implements OnApplicationShutdown {
     this.subscriber.on('message', (received: string, message: string) => {
       if (received === channel) onMessage(message)
     })
-    void this.subscriber.subscribe(channel).catch(() => undefined)
+    this.subscriber.subscribe(channel).catch((error: unknown) => {
+      this.logger.error(`could not subscribe to ${channel}`, error)
+    })
   }
 
   private async json<T>(key: string): Promise<T | null> {

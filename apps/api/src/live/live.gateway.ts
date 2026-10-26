@@ -1,6 +1,13 @@
-import type { OnApplicationShutdown } from '@nestjs/common'
+import { Logger, type OnApplicationShutdown } from '@nestjs/common'
 import { type OnGatewayConnection, type OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
-import { liveEventsChannel, parseLiveEvent, type LiveEvent, type LiveSocketEvents } from '@poof/contracts'
+import {
+  liveEventsChannel,
+  parseLiveEvent,
+  type LiveEvent,
+  type LiveSnapshot,
+  type LiveSocketEvents,
+} from '@poof/contracts'
+import { FailureStreak } from '@poof/nest'
 import type { Server, Socket } from 'socket.io'
 import { Cache } from '../infra/cache.js'
 
@@ -13,6 +20,9 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   @WebSocketServer()
   server: Server<Record<string, never>, LiveSocketEvents>
 
+  private readonly logger = new Logger(LiveGateway.name)
+  private readonly snapshots = new FailureStreak(this.logger, 'reading the live snapshot')
+  private readonly messages = new FailureStreak(this.logger, 'reading live events')
   private buffer: LiveEvent[] = []
   private dropped = 0
   private timers: NodeJS.Timeout[] = []
@@ -22,7 +32,12 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   afterInit(): void {
     this.cache.subscribe(liveEventsChannel, (message) => {
       const event = parseLiveEvent(message)
-      if (!event || this.buffer.length >= MAX_BUFFER) {
+      if (!event) {
+        this.messages.failed(new Error(`not a live event: ${message.slice(0, 200)}`))
+        return
+      }
+      this.messages.succeeded()
+      if (this.buffer.length >= MAX_BUFFER) {
         this.dropped++
         return
       }
@@ -33,7 +48,7 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   }
 
   async handleConnection(client: Socket<Record<string, never>, LiveSocketEvents>): Promise<void> {
-    const snapshot = await this.cache.liveSnapshot().catch(() => null)
+    const snapshot = await this.snapshot()
     if (snapshot) client.emit('snapshot', snapshot)
   }
 
@@ -45,8 +60,19 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
 
   private async broadcastSnapshot(): Promise<void> {
     if (this.server.engine.clientsCount === 0) return
-    const snapshot = await this.cache.liveSnapshot().catch(() => null)
+    const snapshot = await this.snapshot()
     if (snapshot) this.server.emit('snapshot', snapshot)
+  }
+
+  private async snapshot(): Promise<LiveSnapshot | null> {
+    try {
+      const snapshot = await this.cache.liveSnapshot()
+      this.snapshots.succeeded()
+      return snapshot
+    } catch (error) {
+      this.snapshots.failed(error)
+      return null
+    }
   }
 
   onApplicationShutdown(): void {

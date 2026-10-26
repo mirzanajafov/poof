@@ -23,20 +23,31 @@ export type LiveEventBody =
 
 export type LiveEvent = LiveEventBody & { at: number }
 
-const liveEventKinds: Record<LiveEvent['kind'], true> = {
-  'task.accepted': true,
-  'task.rejected': true,
-  'task.done': true,
-  'task.failed': true,
-  'lease.claimed': true,
-  'lease.created': true,
-  item: true,
-  'item.dead': true,
-  'worker.spawned': true,
-  'worker.exit': true,
-  breaker: true,
-  'exhibit.started': true,
-  'exhibit.ended': true,
+type Field = 'string' | 'number' | 'boolean' | 'string or null' | 'object'
+
+type Fields<K extends LiveEventBody['kind']> = Record<Exclude<keyof Extract<LiveEventBody, { kind: K }>, 'kind'>, Field>
+
+const liveEventFields: { [K in LiveEventBody['kind']]: Fields<K> } = {
+  'task.accepted': { task: 'string', items: 'number', deadline: 'number' },
+  'task.rejected': { task: 'string', exhibit: 'string or null' },
+  'task.done': { task: 'string', met: 'boolean', dead: 'number' },
+  'task.failed': { task: 'string', reason: 'string' },
+  'lease.claimed': { task: 'string', lease: 'string', worker: 'string', lo: 'number', hi: 'number' },
+  'lease.created': {
+    task: 'string',
+    lease: 'string',
+    parent: 'string or null',
+    depth: 'number',
+    lo: 'number',
+    hi: 'number',
+  },
+  item: { task: 'string', lease: 'string', item: 'number', ok: 'boolean' },
+  'item.dead': { task: 'string', item: 'number', attempts: 'number', error: 'string' },
+  'worker.spawned': { worker: 'string', pid: 'number' },
+  'worker.exit': { worker: 'string', reason: 'string' },
+  breaker: { preset: 'string', state: 'string' },
+  'exhibit.started': { exhibit: 'string', policy: 'string', endsAt: 'number' },
+  'exhibit.ended': { exhibit: 'string', status: 'string', stats: 'object' },
 }
 
 export function parseLiveEvent(text: string): LiveEvent | null {
@@ -50,15 +61,20 @@ export function parseLiveEvent(text: string): LiveEvent | null {
 }
 
 function isLiveEvent(value: unknown): value is LiveEvent {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'kind' in value &&
-    typeof value.kind === 'string' &&
-    Object.hasOwn(liveEventKinds, value.kind) &&
-    'at' in value &&
-    typeof value.at === 'number'
-  )
+  if (typeof value !== 'object' || value === null || !('kind' in value) || !('at' in value)) return false
+  if (typeof value.at !== 'number' || typeof value.kind !== 'string' || !isKind(value.kind)) return false
+  const fields: Record<string, Field> = liveEventFields[value.kind]
+  return Object.entries(fields).every(([name, field]) => matches(Reflect.get(value, name), field))
+}
+
+function isKind(kind: string): kind is LiveEventBody['kind'] {
+  return Object.hasOwn(liveEventFields, kind)
+}
+
+function matches(value: unknown, field: Field): boolean {
+  if (field === 'string or null') return value === null || typeof value === 'string'
+  if (field === 'object') return typeof value === 'object' && value !== null
+  return typeof value === field
 }
 
 export interface PoolWorkerView {

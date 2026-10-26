@@ -1,4 +1,4 @@
-import { Injectable, type OnApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common'
 import {
   exhibitSnapshotKey,
   liveEventsChannel,
@@ -7,20 +7,21 @@ import {
   type LiveEventBody,
   type PoolSnapshot,
 } from '@poof/contracts'
-import { closeRedis, connectRedis } from '@poof/nest'
+import { closeRedis, connectRedis, FailureStreak } from '@poof/nest'
 import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class Events implements OnApplicationShutdown {
   private readonly redis: Redis
+  private readonly writes = new FailureStreak(new Logger(Events.name), 'writing the live view to Redis')
 
   constructor(env: Env) {
     this.redis = connectRedis(env.REDIS_URL, Events.name)
   }
 
   publish(event: LiveEventBody): void {
-    void this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })).catch(() => undefined)
+    this.run(this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })))
   }
 
   savePoolSnapshot(snapshot: PoolSnapshot): void {
@@ -32,14 +33,25 @@ export class Events implements OnApplicationShutdown {
   }
 
   clearExhibitSnapshot(): void {
-    void this.redis.del(exhibitSnapshotKey).catch(() => undefined)
+    this.run(this.redis.del(exhibitSnapshotKey))
   }
 
   private save(key: string, value: PoolSnapshot | ExhibitSnapshot): void {
-    void this.redis.set(key, JSON.stringify(value), 'EX', 30).catch(() => undefined)
+    this.run(this.redis.set(key, JSON.stringify(value), 'EX', 30))
+  }
+
+  private run(command: Promise<unknown>): void {
+    command.then(
+      () => {
+        this.writes.succeeded()
+      },
+      (error: unknown) => {
+        this.writes.failed(error)
+      },
+    )
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await closeRedis(this.redis).catch(() => undefined)
+    await closeRedis(this.redis)
   }
 }
