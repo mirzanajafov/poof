@@ -1,19 +1,21 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { INestApplication } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Test } from '@nestjs/testing'
-import { createPrisma, type PrismaClient } from '@poof/db'
-import { enableValidationAndShutdownHooks } from '@poof/nest'
+import { hasFields, parseSubmitResult } from '@poof/contracts'
+import { createPrisma, type PrismaClient, type Task } from '@poof/db'
+import { enableValidationAndShutdownHooks, parseEnv } from '@poof/nest'
 import { Redis } from 'ioredis'
 import sharp from 'sharp'
 import { inject } from 'vitest'
 import { AppModule } from '../src/app.module.js'
+import { Env } from '../src/config/env.js'
 
 const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387/4'
 
 export interface Running {
-  app: INestApplication
+  app: NestExpressApplication
   db: PrismaClient
   redis: Redis
   close(): Promise<void>
@@ -69,18 +71,24 @@ async function noisy(root: string, name: string, count: number): Promise<void> {
 }
 
 export async function start(dataDir: string, env: Record<string, string> = {}): Promise<Running> {
-  Object.assign(process.env, {
-    DATABASE_URL: inject('databaseUrl'),
-    REDIS_URL: redisUrl,
-    DATA_DIR: dataDir,
-    BUDGET: '2',
-    CHECKPOINT_MS: '200',
-    ...env,
-  })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
-  const app = enableValidationAndShutdownHooks(moduleRef.createNestApplication({ logger: false }))
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(Env)
+    .useValue(
+      parseEnv(Env, {
+        DATABASE_URL: inject('databaseUrl'),
+        REDIS_URL: redisUrl,
+        DATA_DIR: dataDir,
+        BUDGET: '2',
+        CHECKPOINT_MS: '200',
+        ...env,
+      }),
+    )
+    .compile()
+  const app = enableValidationAndShutdownHooks(
+    moduleRef.createNestApplication<NestExpressApplication>({ logger: false }),
+  )
   await app.init()
   const db = createPrisma(inject('databaseUrl'))
   return {
@@ -95,7 +103,7 @@ export async function start(dataDir: string, env: Record<string, string> = {}): 
   }
 }
 
-export async function until<T>(probe: () => Promise<T | null | undefined | false>, timeoutMs = 60_000): Promise<T> {
+export async function waitFor<T>(probe: () => Promise<T | null | undefined | false>, timeoutMs = 60_000): Promise<T> {
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
     const value = await probe()
@@ -103,4 +111,31 @@ export async function until<T>(probe: () => Promise<T | null | undefined | false
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
   throw new Error('timed out waiting')
+}
+
+export async function waitForTask(running: Running, id: string, ready: (task: Task) => boolean) {
+  return waitFor(async () => {
+    const task = await running.db.task.findUnique({ where: { id } })
+    return task && ready(task) ? task : null
+  })
+}
+
+export async function waitForExhibitEnd(running: Running, id: string) {
+  return waitFor(async () => {
+    const exhibit = await running.db.exhibit.findUnique({ where: { id } })
+    return exhibit && exhibit.status !== 'RUNNING' ? exhibit : null
+  })
+}
+
+export function taskId(body: unknown): string {
+  const submitted = parseSubmitResult(body)
+  if (!submitted?.id) throw new Error(`the supervisor answered a submission without a task id: ${JSON.stringify(body)}`)
+  return submitted.id
+}
+
+export function exhibitId(body: unknown): string {
+  if (!hasFields<{ id: string }>(body, { id: 'string' })) {
+    throw new Error(`the supervisor answered an exhibit start without an id: ${JSON.stringify(body)}`)
+  }
+  return body.id
 }

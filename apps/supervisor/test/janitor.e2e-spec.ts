@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { Janitor } from '../src/datasets/janitor.service.js'
-import { makeData, start, until, type Running } from './harness.js'
+import { makeData, start, taskId, waitForTask, type Running } from './harness.js'
 
 let dataDir: string
 let running: Running | null = null
@@ -30,8 +30,8 @@ describe('janitor', () => {
     const res = await request(running.app.getHttpServer())
       .post('/tasks')
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 600, count: 10 })
-    const done = res.body.id as string
-    await until(async () => (await running!.db.task.findUnique({ where: { id: done } }))?.status === 'DONE')
+    const done = taskId(res.body)
+    await waitForTask(running, done, (task) => task.status === 'DONE')
     const fresh = join(dataDir, 'tasks', randomUUID())
     const stale = join(dataDir, 'tasks', randomUUID())
     await mkdir(fresh, { recursive: true })

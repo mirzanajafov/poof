@@ -12,6 +12,7 @@ import {
   type LiveSocketEvents,
   type PoolSnapshot,
 } from '@poof/contracts'
+import type { PrismaClient } from '@poof/db'
 import { io, type Socket } from 'socket.io-client'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -39,14 +40,14 @@ afterEach(async () => {
   supervisor.reply = () => ({ status: 201, body: { accepted: true, id: 'x' } })
 })
 
-const http = () => request(running!.app.getHttpServer())
+const http = (running: Running) => request(running.app.getHttpServer())
 const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, paused: false, workers: [], tasks: [], breakers: {} })
 const admin = { Authorization: `Bearer ${adminToken}` }
 const midWindow = new Date('2026-10-26T12:30:30Z')
 
-async function seedTask() {
+async function seedTask(db: PrismaClient) {
   const id = randomUUID()
-  await running!.db.task.create({
+  await db.task.create({
     data: {
       id,
       dataset: 'synthetic',
@@ -74,18 +75,20 @@ async function seedTask() {
 describe('read model', () => {
   it('lists tasks and shows one with its leases, dead letters and decisions', async () => {
     running = await start(supervisor.url)
-    const id = await seedTask()
-    const list = await http().get('/api/tasks?limit=5')
+    const id = await seedTask(running.db)
+    const list = await http(running).get('/api/tasks?limit=5')
     expect(list.status).toBe(200)
-    expect(list.body.some((t: { id: string }) => t.id === id)).toBe(true)
-    const detail = await http().get(`/api/tasks/${id}`)
+    expect(list.body).toContainEqual(expect.objectContaining({ id }))
+    const detail = await http(running).get(`/api/tasks/${id}`)
     expect(detail.status).toBe(200)
-    expect(detail.body.leases).toHaveLength(2)
-    expect(detail.body.deadLetters[0].item).toBe(4)
-    expect(detail.body.decisions[0].kind).toBe('worker-exit')
-    expect((await http().get(`/api/tasks/${randomUUID()}`)).status).toBe(404)
-    expect((await http().get('/api/tasks/not-a-uuid')).status).toBe(400)
-    expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
+    expect(detail.body).toMatchObject({
+      leases: [{ lo: 0 }, { lo: 10 }],
+      deadLetters: [{ item: 4 }],
+      decisions: [{ kind: 'worker-exit' }],
+    })
+    expect((await http(running).get(`/api/tasks/${randomUUID()}`)).status).toBe(404)
+    expect((await http(running).get('/api/tasks/not-a-uuid')).status).toBe(400)
+    expect((await http(running).get('/api/tasks?limit=1000')).status).toBe(400)
   })
 
   it('serves images from a data directory with a dot in its path', async () => {
@@ -94,23 +97,23 @@ describe('read model', () => {
     const id = randomUUID()
     await mkdir(join(dataDir, 'tasks', id, 'out'), { recursive: true })
     await writeFile(join(dataDir, 'tasks', id, 'out', '0.webp'), Buffer.from('RIFF....WEBP'))
-    expect((await http().get(`/api/tasks/${id}/items/0`)).status).toBe(200)
+    expect((await http(running).get(`/api/tasks/${id}/items/0`)).status).toBe(200)
   })
 
   it('reports that Redis and Postgres answer', async () => {
     running = await start(supervisor.url)
-    expect((await http().get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
+    expect((await http(running).get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
   })
 
   it('answers 503, not 404 or 500, while Redis is down', async () => {
     running = await start(supervisor.url, { REDIS_URL: 'redis://127.0.0.1:9' })
-    const health = await http().get('/api/health')
+    const health = await http(running).get('/api/health')
     expect(health.status).toBe(503)
     expect(health.body).toEqual({ ok: false, redis: false, db: true })
-    expect((await http().get('/api/state')).status).toBe(503)
-    expect((await http().get('/api/exhibits/current')).status).toBe(503)
+    expect((await http(running).get('/api/state')).status).toBe(503)
+    expect((await http(running).get('/api/exhibits/current')).status).toBe(503)
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
-    expect((await http().post('/api/tasks').send(body)).status).toBe(503)
+    expect((await http(running).post('/api/tasks').send(body)).status).toBe(503)
     expect(supervisor.calls).toHaveLength(0)
   })
 
@@ -124,7 +127,7 @@ describe('read model', () => {
       await mkdir(join(running.dataDir, 'datasets', name), { recursive: true })
       await writeFile(join(running.dataDir, 'datasets', name, 'manifest.json'), JSON.stringify({ items }))
     }
-    const res = await http().get('/api/datasets')
+    const res = await http(running).get('/api/datasets')
     expect(res.body).toEqual([{ name: 'tiny', items: 2, meanMp: 6.5 }])
   })
 
@@ -133,22 +136,24 @@ describe('read model', () => {
     const id = randomUUID()
     await mkdir(join(running.dataDir, 'tasks', id, 'out'), { recursive: true })
     await writeFile(join(running.dataDir, 'tasks', id, 'out', '3.webp'), Buffer.from('RIFF....WEBP'))
-    const res = await http().get(`/api/tasks/${id}/items/3`)
+    const res = await http(running).get(`/api/tasks/${id}/items/3`)
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toBe('image/webp')
     expect(res.headers['cache-control']).toBe('public, max-age=86400, immutable')
-    const missing = await http().get(`/api/tasks/${id}/items/4`)
+    const missing = await http(running).get(`/api/tasks/${id}/items/4`)
     expect(missing.status).toBe(404)
     expect(missing.body).toEqual({ message: 'Not Found', statusCode: 404 })
-    const changed = await http().get(`/api/tasks/${id}/items/3`).set('If-Unmodified-Since', new Date(0).toUTCString())
+    const changed = await http(running)
+      .get(`/api/tasks/${id}/items/3`)
+      .set('If-Unmodified-Since', new Date(0).toUTCString())
     expect(changed.status).toBe(412)
     expect(changed.headers['cache-control']).toBeUndefined()
     expect(changed.headers['access-control-allow-origin']).toBe('http://localhost:3112')
     await writeFile(join(running.dataDir, 'tasks', id, 'out', '5.jpg'), Buffer.from('not really a jpeg'))
-    expect((await http().get(`/api/tasks/${id}/items/5`)).headers['content-type']).toBe('image/jpeg')
-    expect((await http().get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
-    expect((await http().get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
-    expect((await http().get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
+    expect((await http(running).get(`/api/tasks/${id}/items/5`)).headers['content-type']).toBe('image/jpeg')
+    expect((await http(running).get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
+    expect((await http(running).get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
+    expect((await http(running).get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
   })
 })
 
@@ -156,16 +161,16 @@ describe('submissions', () => {
   it('forwards a task to the supervisor and relays its answer', async () => {
     running = await start(supervisor.url)
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 120, count: 40 }
-    const ok = await http().post('/api/tasks').send(body)
+    const ok = await http(running).post('/api/tasks').send(body)
     expect(ok.status).toBe(201)
     expect(supervisor.calls[0]).toEqual({ method: 'POST', path: '/tasks', body })
     supervisor.reply = () => ({ status: 429, body: { accepted: false }, headers: { 'retry-after': '7' } })
-    const busy = await http().post('/api/tasks').send(body)
+    const busy = await http(running).post('/api/tasks').send(body)
     expect(busy.status).toBe(429)
     expect(busy.headers['retry-after']).toBe('7')
     expect(
       (
-        await http()
+        await http(running)
           .post('/api/tasks')
           .send({ ...body, extra: true })
       ).status,
@@ -174,25 +179,29 @@ describe('submissions', () => {
 
   it('refuses a preset or task status it does not know without asking the supervisor', async () => {
     running = await start(supervisor.url)
-    const submitted = await http()
+    const submitted = await http(running)
       .post('/api/tasks')
       .send({ dataset: 'synthetic', preset: 'png-9000', deadlineSeconds: 60 })
     expect(submitted.status).toBe(400)
-    expect(submitted.body.message).toEqual([expect.stringMatching(/^preset must be one of/)])
-    expect((await http().get('/api/tasks?status=LOST')).status).toBe(400)
+    expect(submitted.body).toHaveProperty('message', [expect.stringMatching(/^preset must be one of/)])
+    expect((await http(running).get('/api/tasks?status=LOST')).status).toBe(400)
     expect(supervisor.calls).toHaveLength(0)
   })
 
   it('answers 502 when the supervisor is down', async () => {
     running = await start('http://127.0.0.1:9')
-    const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
+    const res = await http(running)
+      .post('/api/tasks')
+      .send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
     expect(res.status).toBe(502)
   })
 
   it('answers 502 when the supervisor sends something that is not JSON', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 200, raw: '<html>bad gateway</html>' })
-    const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
+    const res = await http(running)
+      .post('/api/tasks')
+      .send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
     expect(res.status).toBe(502)
   })
 
@@ -200,7 +209,8 @@ describe('submissions', () => {
     vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { TRUST_PROXY: 'loopback, uniquelocal', TASKS_PER_MINUTE: '1' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
-    const from = (address: string) => http().post('/api/tasks').set('X-Forwarded-For', address).send(body)
+    const api = http(running)
+    const from = (address: string) => api.post('/api/tasks').set('X-Forwarded-For', address).send(body)
     expect((await from('203.0.113.1')).status).toBe(201)
     expect((await from('203.0.113.1')).status).toBe(429)
     expect((await from('203.0.113.2')).status).toBe(201)
@@ -210,50 +220,50 @@ describe('submissions', () => {
     vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { TASKS_PER_MINUTE: '3' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
-    for (let i = 0; i < 3; i++) expect((await http().post('/api/tasks').send(body)).status).toBe(201)
-    const limited = await http().post('/api/tasks').send(body)
+    for (let i = 0; i < 3; i++) expect((await http(running).post('/api/tasks').send(body)).status).toBe(201)
+    const limited = await http(running).post('/api/tasks').send(body)
     expect(limited.status).toBe(429)
     expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0)
     expect(supervisor.calls).toHaveLength(3)
-    expect((await http().post('/api/tasks').set(admin).send(body)).status).toBe(201)
+    expect((await http(running).post('/api/tasks').set(admin).send(body)).status).toBe(201)
   })
 })
 
 describe('exhibits', () => {
   it('limits public exhibits by length and cooldown, and gives the cooldown back when the supervisor refuses', async () => {
     running = await start(supervisor.url, { EXHIBITS_PER_HOUR: '10' })
-    expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 300 })).status).toBe(400)
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box', durationSeconds: 300 })).status).toBe(400)
     supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
-    expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(409)
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
-    expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
-    const cooling = await http().post('/api/exhibits').send({ policy: 'forecast+preempt', durationSeconds: 30 })
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
+    const cooling = await http(running).post('/api/exhibits').send({ policy: 'forecast+preempt', durationSeconds: 30 })
     expect(cooling.status).toBe(429)
-    expect(cooling.body.message).toMatch(/cooling down/)
+    expect(cooling.body).toHaveProperty('message', expect.stringMatching(/cooling down/))
     expect(Number(cooling.headers['retry-after'])).toBeGreaterThan(100)
     expect(Number(cooling.headers['retry-after'])).toBeLessThanOrEqual(150)
-    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(
-      201,
-    )
+    expect(
+      (await http(running).post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status,
+    ).toBe(201)
   })
 
   it('keeps the cooldown when the supervisor does not answer, since the exhibit may have started', async () => {
     running = await start('http://127.0.0.1:9')
-    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
-    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
+    const cooling = await http(running).post('/api/exhibits').send({ policy: 'box' })
     expect(cooling.status).toBe(429)
-    expect(cooling.body.message).toMatch(/cooling down/)
+    expect(cooling.body).toHaveProperty('message', expect.stringMatching(/cooling down/))
   })
 
   it('keeps the cooldown of a visitor when the supervisor refuses an exhibit the admin started', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
-    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
     supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
-    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box' })).status).toBe(409)
-    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect((await http(running).post('/api/exhibits').set(admin).send({ policy: 'box' })).status).toBe(409)
+    const cooling = await http(running).post('/api/exhibits').send({ policy: 'box' })
     expect(cooling.status).toBe(429)
-    expect(cooling.body.message).toMatch(/cooling down/)
+    expect(cooling.body).toHaveProperty('message', expect.stringMatching(/cooling down/))
   })
 
   it('refuses a null where an exhibit setting has a default, without asking the supervisor', async () => {
@@ -261,7 +271,7 @@ describe('exhibits', () => {
     for (const field of ['policy', 'durationSeconds', 'utilization', 'dataset', 'seed']) {
       expect(
         (
-          await http()
+          await http(running)
             .post('/api/exhibits')
             .set(admin)
             .send({ policy: 'box', [field]: null })
@@ -274,7 +284,7 @@ describe('exhibits', () => {
   it('fills in the public exhibit for a visitor who only picks a policy', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
-    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    expect((await http(running).post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
     expect(supervisor.calls[0]?.body).toEqual({
       policy: 'box',
       durationSeconds: exhibitDefaults.durationSeconds,
@@ -289,28 +299,30 @@ describe('exhibits', () => {
     running = await start(supervisor.url, { EXHIBIT_COOLDOWN_SECONDS: '0' })
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
     for (let i = 0; i < 3; i++)
-      expect((await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
-    const limited = await http().post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })
+      expect((await http(running).post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })).status).toBe(201)
+    const limited = await http(running).post('/api/exhibits').send({ policy: 'box', durationSeconds: 30 })
     expect(limited.status).toBe(429)
-    expect(limited.body.message).toMatch(/too many requests/)
+    expect(limited.body).toHaveProperty('message', expect.stringMatching(/too many requests/))
     expect(Number(limited.headers['retry-after'])).toBeGreaterThanOrEqual(1)
     expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(3600)
   })
 
   it('refuses an exhibit policy it does not know without asking the supervisor', async () => {
     running = await start(supervisor.url)
-    const res = await http().post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })
+    const res = await http(running).post('/api/exhibits').send({ policy: 'nope', durationSeconds: 30 })
     expect(res.status).toBe(400)
-    expect(res.body.message).toEqual([expect.stringMatching(/^policy must be one of/)])
+    expect(res.body).toHaveProperty('message', [expect.stringMatching(/^policy must be one of/)])
     expect(supervisor.calls).toHaveLength(0)
   })
 
   it('only lets the admin abort an exhibit', async () => {
     running = await start(supervisor.url)
     supervisor.reply = () => ({ status: 200, body: { submitted: 3 } })
-    expect((await http().delete('/api/exhibits/current')).status).toBe(401)
-    expect((await http().delete('/api/exhibits/current').set({ Authorization: 'Bearer wrong' })).status).toBe(401)
-    expect((await http().delete('/api/exhibits/current').set(admin)).status).toBe(200)
+    expect((await http(running).delete('/api/exhibits/current')).status).toBe(401)
+    expect((await http(running).delete('/api/exhibits/current').set({ Authorization: 'Bearer wrong' })).status).toBe(
+      401,
+    )
+    expect((await http(running).delete('/api/exhibits/current').set(admin)).status).toBe(200)
     expect(supervisor.calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/exhibits/current' })
   })
 })
@@ -334,14 +346,15 @@ describe('live view', () => {
 
   it('answers the live snapshot over HTTP too', async () => {
     running = await start(supervisor.url)
-    expect((await http().get('/api/state')).body).toEqual({ live: null, exhibit: null })
+    expect((await http(running).get('/api/state')).body).toEqual({ live: null, exhibit: null })
     await running.redis.set(poolSnapshotKey, JSON.stringify(poolSnapshot()))
-    expect((await http().get('/api/state')).body).toEqual({ live: poolSnapshot(), exhibit: null })
+    expect((await http(running).get('/api/state')).body).toEqual({ live: poolSnapshot(), exhibit: null })
   })
 
   it('lets only the configured web origin read the polling handshake', async () => {
     running = await start(supervisor.url, { WEB_ORIGIN: 'https://poof.example' })
-    const handshake = (origin: string) => http().get('/socket.io/?EIO=4&transport=polling').set('Origin', origin)
+    const api = http(running)
+    const handshake = (origin: string) => api.get('/socket.io/?EIO=4&transport=polling').set('Origin', origin)
     const allowed = await handshake('https://poof.example')
     expect(allowed.status).toBe(200)
     expect(allowed.headers['access-control-allow-origin']).toBe('https://poof.example')
