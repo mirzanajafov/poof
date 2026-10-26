@@ -14,7 +14,7 @@ export interface ExhibitParams {
   seed: number
 }
 
-export const exhibitDefaults: Omit<ExhibitParams, 'policy'> = {
+export const exhibitDefaults: Readonly<Omit<ExhibitParams, 'policy'>> = {
   durationSeconds: 60,
   utilization: 1.2,
   dataset: 'synthetic',
