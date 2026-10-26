@@ -57,6 +57,7 @@ describe('exhibits', () => {
     })
     expect(res.status).toBe(201)
     expect((await http().get('/health')).body.paused).toBe(true)
+    expect((await http().get('/state')).body.paused).toBe(true)
     const blocked = await http()
       .post('/tasks')
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 600, count: 10 })
@@ -149,6 +150,7 @@ describe('exhibits', () => {
     })
     expect(res.status).toBe(201)
     expect((await http().get('/health')).body.paused).toBe(false)
+    expect((await http().get('/state')).body.paused).toBe(false)
     const exhibit = await ended(res.body.id)
     await waitUntilOffTheLiveView()
     const stats = exhibit.stats as { submitted: number; done: number; peakProcesses: number }
