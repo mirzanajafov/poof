@@ -20,6 +20,10 @@ describe('Env', () => {
     })
   })
 
+  it('keeps only the settings it declares', () => {
+    expect(parseEnv(Env, { ...base, PATH: '/usr/bin' })).not.toHaveProperty('PATH')
+  })
+
   it('rejects missing or out-of-range values', () => {
     expect(() => parseEnv(Env, { DATABASE_URL: 'x' })).toThrow(/REDIS_URL/)
     expect(() => parseEnv(Env, { ...base, BUDGET: '0' })).toThrow(/BUDGET/)
