@@ -8,7 +8,7 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
-import { ConflictError, Database, Traces } from '@poof/nest'
+import { ConflictError, Database, FailureStreak, Traces } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
@@ -34,6 +34,7 @@ interface Current {
 @Injectable()
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
+  private readonly poolReads = new FailureStreak(this.logger, 'counting the pool exhibit tasks')
   private current: Current | null = null
   private starting: Promise<unknown> | null = null
 
@@ -243,7 +244,14 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   private async publishState(current: Current): Promise<void> {
-    if (!current.engine) current.pool.stats = await this.poolCounts(current).catch(() => current.pool.stats)
+    if (!current.engine) {
+      try {
+        current.pool.stats = await this.poolCounts(current)
+        this.poolReads.succeeded()
+      } catch (error) {
+        this.poolReads.failed(error)
+      }
+    }
     if (!current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
   }
 

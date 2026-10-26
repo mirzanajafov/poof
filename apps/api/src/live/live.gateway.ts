@@ -22,7 +22,6 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
 
   private readonly logger = new Logger(LiveGateway.name)
   private readonly snapshots = new FailureStreak(this.logger, 'reading the live snapshot')
-  private readonly messages = new FailureStreak(this.logger, 'reading live events')
   private buffer: LiveEvent[] = []
   private dropped = 0
   private timers: NodeJS.Timeout[] = []
@@ -33,10 +32,9 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
     this.cache.subscribe(liveEventsChannel, (message) => {
       const event = parseLiveEvent(message)
       if (!event) {
-        this.messages.failed(new Error(`not a live event: ${message.slice(0, 200)}`))
+        this.logger.warn(`dropped a message that is not a live event: ${message.slice(0, 200)}`)
         return
       }
-      this.messages.succeeded()
       if (this.buffer.length >= MAX_BUFFER) {
         this.dropped++
         return

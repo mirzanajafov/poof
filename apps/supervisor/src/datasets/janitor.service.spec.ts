@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common'
+import type { Task } from '@poof/db'
 import { Database, parseEnv } from '@poof/nest'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Env } from '../config/env.js'
@@ -28,7 +29,7 @@ function janitor(folders: string[]) {
   return { janitor: new Janitor(env, db, datasets), db, datasets, errors }
 }
 
-const finishedLongAgo = (id: string) => ({
+const finishedLongAgo = (id: string): Task => ({
   id,
   dataset: 'small',
   offset: 0,
@@ -36,7 +37,7 @@ const finishedLongAgo = (id: string) => ({
   items: 1,
   policy: 'pool',
   exhibitId: null,
-  status: 'DONE' as const,
+  status: 'DONE',
   predictedMs: 100,
   done: 1,
   deadLettered: 0,

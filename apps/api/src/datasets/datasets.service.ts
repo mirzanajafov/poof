@@ -8,13 +8,13 @@ import {
   parseManifest,
   type DatasetSummary,
 } from '@poof/contracts'
-import { isMissingFile, readDirIfPresent } from '@poof/nest'
+import { FailureStreak, isMissingFile, readDirIfPresent } from '@poof/nest'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class Datasets {
   private readonly logger = new Logger(Datasets.name)
-  private readonly skipped = new Set<string>()
+  private readonly manifests = new Map<string, FailureStreak>()
 
   constructor(private readonly env: Env) {}
 
@@ -27,16 +27,16 @@ export class Datasets {
 
   private async summary(name: string): Promise<DatasetSummary | null> {
     const path = manifestPath(datasetDir(this.env.DATA_DIR, name))
+    const streak = this.manifests.get(name) ?? new FailureStreak(this.logger, `reading the manifest of dataset ${name}`)
+    this.manifests.set(name, streak)
     const manifest = await readFile(path, 'utf8')
       .then((text) => parseManifest(text, path))
       .catch((error: unknown) => {
-        if (!isMissingFile(error) && !this.skipped.has(name)) {
-          this.skipped.add(name)
-          this.logger.warn(`skipping dataset ${name}`, error)
-        }
+        if (!isMissingFile(error)) streak.failed(error)
         return null
       })
     if (!manifest) return null
+    streak.succeeded()
     const mp = manifest.items.map((i) => (i.width * i.height) / 1e6)
     return {
       name,

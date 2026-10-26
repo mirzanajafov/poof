@@ -14,14 +14,16 @@ import { Env } from '../config/env.js'
 @Injectable()
 export class Events implements OnApplicationShutdown {
   private readonly redis: Redis
-  private readonly writes = new FailureStreak(new Logger(Events.name), 'writing the live view to Redis')
+  private readonly logger = new Logger(Events.name)
+  private readonly publishes = new FailureStreak(this.logger, 'publishing live events')
+  private readonly saves = new FailureStreak(this.logger, 'saving the live snapshots')
 
   constructor(env: Env) {
     this.redis = connectRedis(env.REDIS_URL, Events.name)
   }
 
   publish(event: LiveEventBody): void {
-    this.run(this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })))
+    this.run(this.publishes, this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })))
   }
 
   savePoolSnapshot(snapshot: PoolSnapshot): void {
@@ -33,20 +35,20 @@ export class Events implements OnApplicationShutdown {
   }
 
   clearExhibitSnapshot(): void {
-    this.run(this.redis.del(exhibitSnapshotKey))
+    this.run(this.saves, this.redis.del(exhibitSnapshotKey))
   }
 
   private save(key: string, value: PoolSnapshot | ExhibitSnapshot): void {
-    this.run(this.redis.set(key, JSON.stringify(value), 'EX', 30))
+    this.run(this.saves, this.redis.set(key, JSON.stringify(value), 'EX', 30))
   }
 
-  private run(command: Promise<unknown>): void {
+  private run(streak: FailureStreak, command: Promise<unknown>): void {
     command.then(
       () => {
-        this.writes.succeeded()
+        streak.succeeded()
       },
       (error: unknown) => {
-        this.writes.failed(error)
+        streak.failed(error)
       },
     )
   }

@@ -15,6 +15,11 @@ export function connectRedis(url: string, name: string, options: RedisOptions = 
 }
 
 export async function closeRedis(redis: Redis): Promise<void> {
-  if (redis.status === 'ready') await redis.quit()
-  else redis.disconnect()
+  if (redis.status !== 'ready') {
+    redis.disconnect()
+    return
+  }
+  await redis.quit().catch((error: unknown) => {
+    new Logger('Redis').warn('could not close a connection cleanly', error)
+  })
 }
