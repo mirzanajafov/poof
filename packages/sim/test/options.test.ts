@@ -21,4 +21,10 @@ describe('knownNames', () => {
   it('lists every unknown name at once', () => {
     expect(() => knownNames('cage,c8,c16', ['cage', 'c2', 'c4'], 'machine')).toThrow('unknown machine c8, c16')
   })
+
+  it('refuses a name given twice, which would run every job twice', () => {
+    expect(() => knownNames('forecast,box,forecast', ['forecast', 'box'], 'policy')).toThrow(
+      'policy forecast given more than once',
+    )
+  })
 })

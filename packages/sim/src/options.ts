@@ -8,5 +8,7 @@ export function knownNames(spec: string, known: readonly string[], kind: string)
   const names = spec.split(',')
   const unknown = names.filter((name) => !known.includes(name))
   if (unknown.length > 0) throw new Error(`unknown ${kind} ${unknown.join(', ')}`)
+  const repeated = names.filter((name, i) => names.indexOf(name) !== i)
+  if (repeated.length > 0) throw new Error(`${kind} ${repeated.join(', ')} given more than once`)
   return names
 }
