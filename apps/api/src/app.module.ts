@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import { applyDefaults, EnvModule } from '@poof/nest'
+import { enableValidationAndShutdownHooks, EnvModule } from '@poof/nest'
 import { Env } from './config/env.js'
 import { DatasetsModule } from './datasets/datasets.module.js'
 import { ExhibitsModule } from './exhibits/exhibits.module.js'
@@ -21,5 +21,5 @@ export function configureApp(app: NestExpressApplication): NestExpressApplicatio
   app.setGlobalPrefix('api')
   app.enableCors({ origin: env.WEB_ORIGIN })
   app.useWebSocketAdapter(new LiveAdapter(app, env.WEB_ORIGIN))
-  return applyDefaults(app)
+  return enableValidationAndShutdownHooks(app)
 }

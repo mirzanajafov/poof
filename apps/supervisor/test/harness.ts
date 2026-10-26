@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { createPrisma, type PrismaClient } from '@poof/db'
-import { applyDefaults } from '@poof/nest'
+import { enableValidationAndShutdownHooks } from '@poof/nest'
 import { Redis } from 'ioredis'
 import sharp from 'sharp'
 import { inject } from 'vitest'
@@ -80,7 +80,7 @@ export async function start(dataDir: string, env: Record<string, string> = {}): 
   const redis = new Redis(redisUrl)
   await redis.flushdb()
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
-  const app = applyDefaults(moduleRef.createNestApplication({ logger: false }))
+  const app = enableValidationAndShutdownHooks(moduleRef.createNestApplication({ logger: false }))
   await app.init()
   const db = createPrisma(inject('databaseUrl'))
   return {
