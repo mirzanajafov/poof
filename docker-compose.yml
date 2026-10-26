@@ -75,7 +75,7 @@ services:
       SUPERVISOR_URL: http://poof-supervisor:3110
       DATA_DIR: /data
       ADMIN_TOKEN: local-admin-token-not-for-production
-      WEB_ORIGIN: http://localhost:3112
+      WEB_ORIGIN: http://localhost:3113
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - ./data/poof:/data:ro
