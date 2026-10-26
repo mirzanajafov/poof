@@ -24,12 +24,6 @@ export default defineConfig(
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
     },
   },
-  {
-    rules: {
-      '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
-    },
-  },
   { files: ['**/*.{js,cjs,mjs}'], extends: [tseslint.configs.disableTypeChecked] },
   { files: ['**/*.cjs'], languageOptions: { sourceType: 'commonjs' } },
   {
@@ -41,6 +35,8 @@ export default defineConfig(
     files: ['**/test/**/*.ts', '**/*.{spec,test}.{ts,tsx}'],
     extends: [vitest.configs.recommended],
     rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
