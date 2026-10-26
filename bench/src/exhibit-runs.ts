@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { exhibitDefaults } from '@poof/contracts'
 import { isExhibitPolicyName } from '@poof/core'
 
 const { values } = parseArgs({
@@ -8,9 +9,9 @@ const { values } = parseArgs({
     api: { type: 'string', default: 'http://poof-api:3111' },
     policies: { type: 'string', default: 'pool,forecast+preempt,forecast+budget,forecast,box' },
     seeds: { type: 'string', default: '1,2,3' },
-    duration: { type: 'string', default: '60' },
-    utilization: { type: 'string', default: '1.2' },
-    dataset: { type: 'string', default: 'synthetic' },
+    duration: { type: 'string', default: String(exhibitDefaults.durationSeconds) },
+    utilization: { type: 'string', default: String(exhibitDefaults.utilization) },
+    dataset: { type: 'string', default: exhibitDefaults.dataset },
     gap: { type: 'string', default: '15' },
     out: { type: 'string', default: 'exhibit-runs.json' },
   },

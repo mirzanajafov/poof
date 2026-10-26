@@ -14,6 +14,18 @@ export interface ExhibitParams {
   seed: number
 }
 
+export const exhibitDefaults: Omit<ExhibitParams, 'policy'> = {
+  durationSeconds: 60,
+  utilization: 1.2,
+  dataset: 'synthetic',
+  preset: 'webp-1600',
+  minItems: 20,
+  maxItems: 120,
+  slackMin: 0.5,
+  slackMax: 3,
+  seed: 1,
+}
+
 export interface ExhibitStats {
   submitted: number
   rejected: number

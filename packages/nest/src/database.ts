@@ -8,6 +8,13 @@ export class Database implements OnApplicationShutdown {
     this.client = createPrisma(url)
   }
 
+  ping(): Promise<boolean> {
+    return this.client.$queryRaw`SELECT 1`.then(
+      () => true,
+      () => false,
+    )
+  }
+
   async onApplicationShutdown(): Promise<void> {
     await this.client.$disconnect()
   }

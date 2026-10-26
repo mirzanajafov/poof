@@ -1,6 +1,3 @@
-import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
-import { join } from 'node:path'
 import {
   Body,
   Controller,
@@ -15,96 +12,41 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { presetNames, type PresetName } from '@poof/core'
-import { TaskStatus } from '@poof/db'
-import { Database } from '@poof/nest'
-import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'
-import { Env } from '../config/env.js'
+import { respondWith } from '../supervisor/respond.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
-
-export class SubmitTask {
-  @IsString()
-  dataset: string
-
-  @IsIn(presetNames)
-  preset: PresetName
-
-  @IsNumber()
-  @Min(1)
-  @Max(3600)
-  deadlineSeconds: number
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  count?: number
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  offset?: number
-}
-
-export class ListTasks {
-  @IsOptional()
-  @IsIn(Object.values(TaskStatus))
-  status?: TaskStatus
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number
-}
-
-const contentTypes: Array<[string, string]> = [
-  ['webp', 'image/webp'],
-  ['jpg', 'image/jpeg'],
-  ['avif', 'image/avif'],
-]
+import { ListTasks } from './list-tasks.dto.js'
+import { OutputFiles } from './output-files.js'
+import { SubmitTask } from './submit-task.dto.js'
+import { TaskQueries } from './task-queries.js'
 
 @Controller('tasks')
 export class TasksController {
   constructor(
-    private readonly db: Database,
+    private readonly tasks: TaskQueries,
+    private readonly outputs: OutputFiles,
     private readonly supervisor: Supervisor,
-    private readonly env: Env,
   ) {}
 
   @Get()
   list(@Query() query: ListTasks) {
-    return this.db.client.task.findMany({
-      where: query.status ? { status: query.status } : {},
-      orderBy: { submittedAt: 'desc' },
-      take: query.limit ?? 50,
-    })
+    return this.tasks.list(query.status, query.limit)
   }
 
   @Get(':id')
   async detail(@Param('id', new ParseUUIDPipe()) id: string) {
-    const task = await this.db.client.task.findUnique({
-      where: { id },
-      include: {
-        leases: { orderBy: [{ depth: 'asc' }, { lo: 'asc' }] },
-        deadLetters: { orderBy: { item: 'asc' } },
-        decisions: { orderBy: { at: 'asc' }, take: 200 },
-      },
-    })
+    const task = await this.tasks.detail(id)
     if (!task) throw new NotFoundException()
-    return { ...task, decisions: task.decisions.map((d) => ({ ...d, id: d.id.toString() })) }
+    return task
   }
 
   @Post()
   @UseGuards(RateLimitGuard)
   @RateLimit({ name: 'tasks', setting: 'TASKS_PER_MINUTE', windowSeconds: 60 })
-  submit(@Body() body: SubmitTask, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    return this.supervisor.relay('POST', '/tasks', body, res, req.headers)
+  async submit(@Body() body: SubmitTask, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return respondWith(res, await this.supervisor.forward('POST', '/tasks', body, req.headers))
   }
 
   @Get(':id/items/:item')
@@ -113,16 +55,8 @@ export class TasksController {
     @Param('item', new ParseIntPipe()) item: number,
     @Res() res: Response,
   ) {
-    for (const [ext, type] of contentTypes) {
-      const path = join(this.env.DATA_DIR, 'tasks', id, 'out', `${item}.${ext}`)
-      const found = await stat(path).catch(() => null)
-      if (!found?.isFile()) continue
-      res.setHeader('Content-Type', type)
-      res.setHeader('Content-Length', String(found.size))
-      res.setHeader('Cache-Control', 'public, max-age=86400, immutable')
-      createReadStream(path).pipe(res)
-      return
-    }
-    throw new NotFoundException()
+    const path = await this.outputs.path(id, item)
+    if (!path) throw new NotFoundException()
+    res.sendFile(path, { maxAge: '1d', immutable: true })
   }
 }

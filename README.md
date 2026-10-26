@@ -159,15 +159,15 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 
 ## API
 
-|                                          |                                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------------------------------- |
-| `POST /api/tasks`                        | `{ dataset, preset, deadlineSeconds, count?, offset? }`: 201, or 429 with Retry-After |
-| `GET /api/tasks`, `GET /api/tasks/:id`   | the task list, or one task with its leases, dead letters, decisions and trace id      |
-| `GET /api/tasks/:id/items/:n`            | a finished image (kept for 24 hours)                                                  |
-| `POST /api/exhibits`                     | `{ policy, durationSeconds, utilization?, dataset?, seed? }`                          |
-| `GET /api/exhibits`, `/current`, `/:id`  | past runs, the one running now, one run                                               |
-| `GET /api/datasets`, `/state`, `/health` |                                                                                       |
-| `/socket.io`                             | `snapshot` every second and `events` in 150 ms batches                                |
+|                                          |                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/tasks`                        | `{ dataset, preset, deadlineSeconds, count?, offset? }`: 201, or 429 with Retry-After                               |
+| `GET /api/tasks`, `GET /api/tasks/:id`   | the task list, or one task with its leases, dead letters, decisions and trace id                                    |
+| `GET /api/tasks/:id/items/:n`            | a finished image (kept for 24 hours)                                                                                |
+| `POST /api/exhibits`                     | `{ policy, durationSeconds?, utilization?, dataset?, seed? }`: a minute at 1.2 times capacity unless told otherwise |
+| `GET /api/exhibits`, `/current`, `/:id`  | past runs, the one running now, one run                                                                             |
+| `GET /api/datasets`, `/state`, `/health` |                                                                                                                     |
+| `/socket.io`                             | `snapshot` every second and `events` in 150 ms batches                                                              |
 
 ## Where things are
 

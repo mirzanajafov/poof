@@ -1,59 +1,7 @@
 import { Body, Controller, Delete, Get, Headers, NotFoundException, Post } from '@nestjs/common'
-import type { ExhibitParams } from '@poof/contracts'
-import { exhibitPolicyNames, presetNames, type ExhibitPolicyName, type PresetName } from '@poof/core'
 import { extract } from '@poof/tracing'
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import { Exhibits } from './exhibits.service.js'
-
-export class StartExhibit {
-  @IsIn(exhibitPolicyNames)
-  policy: ExhibitPolicyName
-
-  @IsInt()
-  @Min(10)
-  @Max(900)
-  durationSeconds: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.1)
-  @Max(5)
-  utilization?: number
-
-  @IsOptional()
-  @IsString()
-  dataset?: string
-
-  @IsOptional()
-  @IsIn(presetNames)
-  preset?: PresetName
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  minItems?: number
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  maxItems?: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.05)
-  slackMin?: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.05)
-  slackMax?: number
-
-  @IsOptional()
-  @IsInt()
-  seed?: number
-}
+import { StartExhibit } from './start-exhibit.dto.js'
 
 @Controller('exhibits')
 export class ExhibitsController {
@@ -61,19 +9,7 @@ export class ExhibitsController {
 
   @Post()
   start(@Body() body: StartExhibit, @Headers() headers: Record<string, string>) {
-    const params: ExhibitParams = {
-      policy: body.policy,
-      durationSeconds: body.durationSeconds,
-      utilization: body.utilization ?? 1,
-      dataset: body.dataset ?? 'synthetic',
-      preset: body.preset ?? 'webp-1600',
-      minItems: body.minItems ?? 20,
-      maxItems: Math.max(body.maxItems ?? 120, body.minItems ?? 20),
-      slackMin: body.slackMin ?? 0.5,
-      slackMax: Math.max(body.slackMax ?? 3, body.slackMin ?? 0.5),
-      seed: body.seed ?? 1,
-    }
-    return this.exhibits.start(params, extract(headers))
+    return this.exhibits.start(body, extract(headers))
   }
 
   @Get('current')

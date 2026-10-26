@@ -1,31 +1,13 @@
-import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { Controller, Get } from '@nestjs/common'
-import { datasetNamePattern, parseManifest, type DatasetSummary } from '@poof/contracts'
-import { Env } from '../config/env.js'
+import type { DatasetSummary } from '@poof/contracts'
+import { Datasets } from './datasets.service.js'
 
 @Controller('datasets')
 export class DatasetsController {
-  constructor(private readonly env: Env) {}
+  constructor(private readonly datasets: Datasets) {}
 
   @Get()
-  async datasets(): Promise<DatasetSummary[]> {
-    const root = join(this.env.DATA_DIR, 'datasets')
-    const names = await readdir(root).catch(() => [] as string[])
-    const out: DatasetSummary[] = []
-    for (const name of names.filter((n) => datasetNamePattern.test(n)).sort()) {
-      const path = join(root, name, 'manifest.json')
-      const manifest = await readFile(path, 'utf8')
-        .then((text) => parseManifest(text, path))
-        .catch(() => null)
-      if (!manifest) continue
-      const mp = manifest.items.map((i) => (i.width * i.height) / 1e6)
-      out.push({
-        name,
-        items: manifest.items.length,
-        meanMp: Math.round((mp.reduce((s, v) => s + v, 0) / mp.length) * 10) / 10,
-      })
-    }
-    return out
+  list(): Promise<DatasetSummary[]> {
+    return this.datasets.list()
   }
 }

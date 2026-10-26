@@ -1,8 +1,13 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { Traces } from '@poof/nest'
 import { extract, inject, SpanKind, SpanStatusCode, within } from '@poof/tracing'
-import type { Response } from 'express'
 import { Env } from '../config/env.js'
+
+export interface SupervisorReply {
+  status: number
+  retryAfter: string | null
+  body: unknown
+}
 
 @Injectable()
 export class Supervisor {
@@ -15,19 +20,18 @@ export class Supervisor {
     this.base = env.SUPERVISOR_URL.replace(/\/$/, '')
   }
 
-  async relay(
+  async forward(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body: unknown,
-    res: Response,
     incoming: Record<string, unknown> = {},
-  ): Promise<unknown> {
+  ): Promise<SupervisorReply> {
     const span = this.traces.tracer.startSpan(
       `${method} /api${path}`,
       { kind: SpanKind.SERVER, attributes: { 'http.request.method': method, 'url.path': `/api${path}` } },
       extract(incoming),
     )
-    let upstream: globalThis.Response
+    let upstream: Response
     try {
       upstream = await fetch(`${this.base}${path}`, {
         method,
@@ -42,10 +46,11 @@ export class Supervisor {
     }
     span.setAttribute('http.response.status_code', upstream.status)
     span.end()
-    res.status(upstream.status)
-    const retryAfter = upstream.headers.get('retry-after')
-    if (retryAfter) res.setHeader('Retry-After', retryAfter)
     const text = await upstream.text()
-    return text ? JSON.parse(text) : undefined
+    return {
+      status: upstream.status,
+      retryAfter: upstream.headers.get('retry-after'),
+      body: text ? JSON.parse(text) : undefined,
+    }
   }
 }

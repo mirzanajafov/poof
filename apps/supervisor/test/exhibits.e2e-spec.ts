@@ -161,6 +161,18 @@ describe('exhibits', () => {
     expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
   })
 
+  it('refuses an exhibit whose largest task or loosest deadline is below its smallest', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    const items = await http().post('/exhibits').send({ policy: 'box', minItems: 50, maxItems: 30 })
+    expect(items.status).toBe(400)
+    expect(items.body.message).toEqual(['maxItems must not be below minItems'])
+    const slack = await http().post('/exhibits').send({ policy: 'box', slackMin: 2, slackMax: 1 })
+    expect(slack.status).toBe(400)
+    expect(slack.body.message).toEqual(['slackMax must not be below slackMin'])
+    expect(await running.db.exhibit.count()).toBe(before)
+  })
+
   it('refuses an exhibit policy or preset it does not know', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()

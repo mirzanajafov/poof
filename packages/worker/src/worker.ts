@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseTaskManifest, type TaskManifest } from '@poof/contracts'
+import { presetExtensions } from '@poof/core'
 import { configureSharp, presets, processItem } from '@poof/imaging'
 import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './protocol.ts'
 
@@ -57,7 +58,7 @@ async function processOne(assignment: Assignment, item: number, since: NodeJS.Cp
       const output = await processItem(input, preset)
       const wallMs = performance.now() - started
       const used = process.cpuUsage(cpu)
-      const target = join(assignment.taskDir, 'out', `${item}.${preset.ext}`)
+      const target = join(assignment.taskDir, 'out', `${item}.${presetExtensions[preset.name]}`)
       const temp = `${target}.${process.pid}.tmp`
       await writeFile(temp, output)
       await rename(temp, target)

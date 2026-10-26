@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
+  exhibitDefaults,
   liveEventsChannel,
   poolSnapshotKey,
   type LiveBatch,
@@ -105,15 +106,17 @@ describe('read model', () => {
     expect(res.body).toEqual([{ name: 'tiny', items: 2, meanMp: 6.5 }])
   })
 
-  it('serves a finished image and nothing outside the task folder', async () => {
+  it('serves a finished image in the format of its preset and nothing outside the task folder', async () => {
     running = await start(supervisor.url)
-    const id = randomUUID()
+    const id = await seedTask()
     await mkdir(join(running.dataDir, 'tasks', id, 'out'), { recursive: true })
     await writeFile(join(running.dataDir, 'tasks', id, 'out', '3.webp'), Buffer.from('RIFF....WEBP'))
     const res = await http().get(`/api/tasks/${id}/items/3`)
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toBe('image/webp')
+    expect(res.headers['cache-control']).toBe('public, max-age=86400, immutable')
     expect((await http().get(`/api/tasks/${id}/items/4`)).status).toBe(404)
+    expect((await http().get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
     expect((await http().get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
     expect((await http().get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
   })
@@ -195,6 +198,34 @@ describe('exhibits', () => {
     expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(
       201,
     )
+  })
+
+  it('gives the cooldown back when the supervisor does not answer', async () => {
+    running = await start('http://127.0.0.1:9')
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
+  })
+
+  it('keeps the cooldown of a visitor when the supervisor refuses an exhibit the admin started', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
+    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box' })).status).toBe(409)
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(429)
+  })
+
+  it('fills in the public exhibit for a visitor who only picks a policy', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    expect(supervisor.calls[0]?.body).toEqual({
+      policy: 'box',
+      durationSeconds: exhibitDefaults.durationSeconds,
+      utilization: exhibitDefaults.utilization,
+      dataset: exhibitDefaults.dataset,
+      seed: exhibitDefaults.seed,
+    })
   })
 
   it('lets one address start three public exhibits an hour', async () => {

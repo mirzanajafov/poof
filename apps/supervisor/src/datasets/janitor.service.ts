@@ -1,5 +1,4 @@
-import { readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { stat } from 'node:fs/promises'
 import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common'
 import { Database } from '@poof/nest'
 import { Env } from '../config/env.js'
@@ -11,7 +10,6 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(Janitor.name)
   private readonly ttlMs: number
-  private readonly root: string
   private timer: NodeJS.Timeout | null = null
 
   constructor(
@@ -20,7 +18,6 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
     private readonly datasets: Datasets,
   ) {
     this.ttlMs = env.OUTPUT_TTL_HOURS * 3_600_000
-    this.root = join(env.DATA_DIR, 'tasks')
   }
 
   onApplicationBootstrap(): void {
@@ -33,7 +30,7 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   }
 
   async sweep(now = Date.now()): Promise<number> {
-    const names = (await readdir(this.root).catch(() => [] as string[])).filter((name) => uuid.test(name))
+    const names = (await this.datasets.taskFolders()).filter((name) => uuid.test(name))
     if (names.length === 0) return 0
     const tasks = await this.db.client.task.findMany({
       where: { id: { in: names } },
@@ -54,7 +51,7 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   }
 
   private async createdAt(name: string): Promise<number | null> {
-    const info = await stat(join(this.root, name)).catch(() => null)
+    const info = await stat(this.datasets.taskDir(name)).catch(() => null)
     return info ? info.mtimeMs : null
   }
 }

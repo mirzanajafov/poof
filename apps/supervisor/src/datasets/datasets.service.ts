@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
@@ -43,6 +43,10 @@ export class Datasets {
 
   taskDir(taskId: string): string {
     return join(this.env.DATA_DIR, 'tasks', taskId)
+  }
+
+  taskFolders(): Promise<string[]> {
+    return readdir(join(this.env.DATA_DIR, 'tasks')).catch(() => [])
   }
 
   async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
