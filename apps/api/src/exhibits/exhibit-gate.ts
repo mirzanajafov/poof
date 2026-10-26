@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Env } from '../config/env.js'
-import { Cache } from '../infra/cache.js'
+import { RedisStore } from '../infra/redis-store.js'
 
 const cooldownKey = 'poof:exhibit-cooldown'
 
@@ -14,7 +14,7 @@ export class ExhibitGate {
   private readonly logger = new Logger(ExhibitGate.name)
 
   constructor(
-    private readonly cache: Cache,
+    private readonly store: RedisStore,
     private readonly env: Env,
   ) {}
 
@@ -23,13 +23,13 @@ export class ExhibitGate {
     if (durationSeconds > limitSeconds) return { kind: 'too-long', limitSeconds }
     const cooldownSeconds = this.env.EXHIBIT_COOLDOWN_SECONDS
     if (cooldownSeconds === 0) return { kind: 'admitted', giveBack: () => Promise.resolve() }
-    const claim = await this.cache.claim(cooldownKey, cooldownSeconds + durationSeconds)
+    const claim = await this.store.claim(cooldownKey, cooldownSeconds + durationSeconds)
     if (claim.claimed) return { kind: 'admitted', giveBack: () => this.giveBack() }
     return { kind: 'cooling-down', retryAfterSeconds: claim.ttlSeconds }
   }
 
   private async giveBack(): Promise<void> {
-    await this.cache.release(cooldownKey).catch((error: unknown) => {
+    await this.store.release(cooldownKey).catch((error: unknown) => {
       this.logger.warn('could not give the exhibit cooldown back', error)
     })
   }

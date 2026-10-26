@@ -4,7 +4,7 @@ import type { ExhibitLeaseView, ExhibitSnapshot } from '@poof/contracts'
 import type { ExhibitPolicyName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
-import { capitalized, exitCounts, short } from '@/lib/format'
+import { capitalized, exitCounts, shortId } from '@/lib/format'
 import { post, refusal } from '@/lib/post'
 import { layoutLeases } from '@/lib/tree'
 import { Remaining } from './Remaining'
@@ -142,7 +142,7 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
           {exhibit.tasks.map((task) => (
             <figure key={task.id} className="shrink-0 rounded-lg border border-line bg-raised p-2">
               <figcaption className="tabular text-xs text-muted">
-                {short(task.id)} · {task.done}/{task.items}
+                {shortId(task.id)} · {task.done}/{task.items}
               </figcaption>
               <LeaseTree leases={task.leases} />
             </figure>

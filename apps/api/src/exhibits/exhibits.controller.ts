@@ -15,11 +15,11 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { Admin } from '../access/admin.js'
+import { AdminToken } from '../access/admin-token.js'
 import { AdminGuard } from '../access/admin.guard.js'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'
-import { Cache } from '../infra/cache.js'
+import { RedisStore } from '../infra/redis-store.js'
 import { respondWith } from '../supervisor/respond.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 import { ExhibitGate } from './exhibit-gate.js'
@@ -31,9 +31,9 @@ export class ExhibitsController {
   constructor(
     private readonly exhibits: ExhibitQueries,
     private readonly gate: ExhibitGate,
-    private readonly cache: Cache,
+    private readonly store: RedisStore,
     private readonly supervisor: Supervisor,
-    private readonly admin: Admin,
+    private readonly adminToken: AdminToken,
   ) {}
 
   @Get()
@@ -43,7 +43,7 @@ export class ExhibitsController {
 
   @Get('current')
   async current() {
-    const state = await this.cache.exhibitSnapshot()
+    const state = await this.store.exhibitSnapshot()
     if (!state) throw new NotFoundException('no exhibit is running')
     return state
   }
@@ -59,7 +59,7 @@ export class ExhibitsController {
   @UseGuards(RateLimitGuard)
   @RateLimit({ name: 'exhibits', setting: 'EXHIBITS_PER_HOUR', windowSeconds: 3600 })
   async start(@Body() body: StartExhibit, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const admission = this.admin.is(req) ? null : await this.gate.enter(body.durationSeconds)
+    const admission = this.adminToken.matches(req) ? null : await this.gate.enter(body.durationSeconds)
     if (admission?.kind === 'too-long') {
       throw new BadRequestException(`exhibits are limited to ${admission.limitSeconds} s`)
     }

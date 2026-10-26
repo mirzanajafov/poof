@@ -1,13 +1,13 @@
 import { Controller, Get } from '@nestjs/common'
 import type { LiveSnapshot } from '@poof/contracts'
-import { Cache } from '../infra/cache.js'
+import { RedisStore } from '../infra/redis-store.js'
 
 @Controller('state')
 export class LiveController {
-  constructor(private readonly cache: Cache) {}
+  constructor(private readonly store: RedisStore) {}
 
   @Get()
   state(): Promise<LiveSnapshot> {
-    return this.cache.liveSnapshot()
+    return this.store.liveSnapshot()
   }
 }

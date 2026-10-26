@@ -4,20 +4,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Refresh } from '@/components/Refresh'
 import { Stats } from '@/components/Stats'
-import { api } from '@/lib/api'
-import { exitCounts, exitWords, seconds, short } from '@/lib/format'
+import { getJson } from '@/lib/api'
+import { exitCounts, exitWords, seconds, shortId } from '@/lib/format'
 import { isUuid } from '@/lib/ids'
 
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  return { title: `Exhibit ${short((await params).id)}` }
+  return { title: `Exhibit ${shortId((await params).id)}` }
 }
 
 export default async function ExhibitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!isUuid(id)) notFound()
-  const exhibit = await api<ExhibitDetail>(`/exhibits/${id}`)
+  const exhibit = await getJson<ExhibitDetail>(`/exhibits/${id}`)
   if (!exhibit) notFound()
   const s = exhibit.stats
   const exits = s ? exitCounts(s.exits) : []
@@ -71,7 +71,7 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
             return (
               <li key={task.id} className="tabular flex flex-wrap justify-between gap-2 px-3 py-2">
                 <Link href={`/tasks/${task.id}`} className="underline">
-                  {short(task.id)}
+                  {shortId(task.id)}
                 </Link>
                 <span className="text-muted">
                   {task.status === 'FAILED' ? 'stopped' : task.status.toLowerCase()} · {task.done}/{task.items} ·

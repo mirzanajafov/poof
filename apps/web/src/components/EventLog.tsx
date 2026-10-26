@@ -1,10 +1,10 @@
 'use client'
 
 import type { LiveEvent } from '@poof/contracts'
-import { describe } from '@/lib/format'
+import { eventSentence } from '@/lib/format'
 
 export function EventLog({ events }: { events: LiveEvent[] }) {
-  const lines = events.map((event) => ({ event, text: describe(event) })).filter((l) => l.text)
+  const lines = events.map((event) => ({ event, text: eventSentence(event) })).filter((l) => l.text)
   return (
     <section>
       <h2 className="text-sm font-semibold">What the box is doing</h2>

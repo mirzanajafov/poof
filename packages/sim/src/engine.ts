@@ -158,7 +158,7 @@ interface SimProcess {
   yielding: boolean
 }
 
-const TODO = 0
+const PENDING = 0
 const DONE = 1
 const DEAD = 2
 
@@ -373,7 +373,7 @@ export class Simulation {
       tasks.set(task.info.id, task.info)
       for (const lease of task.leases) {
         if (lease.state !== 'running') continue
-        const info: LeaseInfo = {
+        const leaseView: LeaseInfo = {
           id: String(lease.id),
           taskId: task.info.id,
           parentId: lease.parentId === null ? null : String(lease.parentId),
@@ -389,11 +389,11 @@ export class Simulation {
         }
         if (this.policy.trigger === 'oracle') {
           let remaining = 0
-          for (let i = info.next; i < lease.hi; i++)
-            if (task.state[i] === TODO) remaining += valueAt(task.plan.costs, i)
-          info.trueRemainingMs = remaining / speed
+          for (let i = leaseView.next; i < lease.hi; i++)
+            if (task.state[i] === PENDING) remaining += valueAt(task.plan.costs, i)
+          leaseView.trueRemainingMs = remaining / speed
         }
-        leases.push(info)
+        leases.push(leaseView)
       }
     }
     return { now: this.now, tasks, leases, breakers: this.breakers.states(this.now), spawnMs: this.spawnMs }
@@ -480,11 +480,11 @@ export class Simulation {
   }
 
   private consumers(): SimProcess[] {
-    const out: SimProcess[] = []
+    const consuming: SimProcess[] = []
     for (const process of this.processes) {
-      if (process.state === 'starting' || (process.state === 'busy' && process.lease?.inflight)) out.push(process)
+      if (process.state === 'starting' || (process.state === 'busy' && process.lease?.inflight)) consuming.push(process)
     }
-    return out
+    return consuming
   }
 
   private step(dt: number): void {
@@ -541,7 +541,7 @@ export class Simulation {
 
   private startItem(process: SimProcess, lease: SimLease): void {
     const task = lease.task
-    while (lease.cursor < lease.hi && task.state[lease.cursor] !== TODO) lease.cursor++
+    while (lease.cursor < lease.hi && task.state[lease.cursor] !== PENDING) lease.cursor++
     if (lease.cursor >= lease.hi || task.failed) {
       this.finishLease(lease)
       return
@@ -773,7 +773,7 @@ export class Simulation {
         }
       }
       for (let i = 0; i < task.info.items; i++) {
-        if (task.state[i] === TODO && owner[i] === 0) throw new Error(`item ${i} of ${task.info.id} has no lease`)
+        if (task.state[i] === PENDING && owner[i] === 0) throw new Error(`item ${i} of ${task.info.id} has no lease`)
       }
     }
     if (this.policy.budget && this.processes.size > this.options.budget) {

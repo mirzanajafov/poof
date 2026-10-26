@@ -35,15 +35,7 @@ export default defineConfig(
     files: ['**/test/**/*.ts', '**/*.{spec,test}.{ts,tsx}'],
     extends: [vitest.configs.recommended],
     rules: {
-      '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
-      '@typescript-eslint/no-unsafe-argument': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
       'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'expectTypeOf'] }],
-      'vitest/no-conditional-expect': 'off',
     },
   },
 )

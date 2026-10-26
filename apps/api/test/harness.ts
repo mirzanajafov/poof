@@ -5,10 +5,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Test } from '@nestjs/testing'
 import type { NestExpressApplication } from '@nestjs/platform-express'
+import { parseJson } from '@poof/contracts'
 import { createPrisma, type PrismaClient } from '@poof/db'
+import { parseEnv } from '@poof/nest'
 import { Redis } from 'ioredis'
 import { inject } from 'vitest'
 import { AppModule, configureApp } from '../src/app.module.js'
+import { Env } from '../src/config/env.js'
 
 export const adminToken = 'test-admin-token-0123456789abcdef'
 export const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387/5'
@@ -33,17 +36,22 @@ export class StubSupervisor {
   url = ''
 
   async start(): Promise<void> {
-    this.server = createServer((req, res) => {
+    const server = createServer((req, res) => {
       void read(req).then((body) => {
-        const call = { method: req.method ?? 'GET', path: req.url ?? '/', body: body ? JSON.parse(body) : undefined }
+        const call = {
+          method: req.method ?? 'GET',
+          path: req.url ?? '/',
+          body: body ? parseJson(body, 'the request to the stub supervisor') : undefined,
+        }
         this.calls.push(call)
         const reply = this.reply(call)
         res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
         res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
       })
     })
-    await new Promise<void>((resolve) => this.server!.listen(0, '127.0.0.1', resolve))
-    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`
+    this.server = server
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    this.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   }
 
   async stop(): Promise<void> {
@@ -68,9 +76,12 @@ export interface Running {
   close(): Promise<void>
 }
 
-export async function start(supervisorUrl: string, env: Record<string, string> = {}): Promise<Running> {
-  const dataDir = env.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
-  Object.assign(process.env, {
+export async function start(
+  supervisorUrl: string,
+  overrides: Partial<Record<keyof Env, string>> = {},
+): Promise<Running> {
+  const dataDir = overrides.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
+  const env = parseEnv(Env, {
     DATABASE_URL: inject('databaseUrl'),
     REDIS_URL: redisUrl,
     SUPERVISOR_URL: supervisorUrl,
@@ -82,11 +93,14 @@ export async function start(supervisorUrl: string, env: Record<string, string> =
     EXHIBITS_PER_HOUR: '3',
     EXHIBIT_COOLDOWN_SECONDS: '120',
     PUBLIC_EXHIBIT_SECONDS: '60',
-    ...env,
+    ...overrides,
   })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(Env)
+    .useValue(env)
+    .compile()
   const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>({ logger: false }))
   await app.listen(0, '127.0.0.1')
   const url = `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`

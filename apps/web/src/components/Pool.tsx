@@ -2,7 +2,7 @@
 
 import type { PoolSnapshot } from '@poof/contracts'
 import Link from 'next/link'
-import { short, until } from '@/lib/format'
+import { deadlineText, shortId } from '@/lib/format'
 import { useNow } from './useNow'
 
 export function Tiles({
@@ -60,7 +60,7 @@ export function Workers({ live }: { live: PoolSnapshot | null }) {
                   <>
                     Task{' '}
                     <Link className="underline" href={`/tasks/${worker.task}`}>
-                      {short(worker.task)}
+                      {shortId(worker.task)}
                     </Link>
                     , images {lease.lo}-{lease.hi - 1}
                   </>
@@ -99,10 +99,10 @@ export function Queue({ live }: { live: PoolSnapshot | null }) {
               <li key={task.id} className="rounded-lg border border-line bg-surface p-3">
                 <div className="flex items-baseline justify-between gap-2 text-sm">
                   <Link href={`/tasks/${task.id}`} className="font-medium underline-offset-2 hover:underline">
-                    Task {short(task.id)}
+                    Task {shortId(task.id)}
                   </Link>
                   <span className={`tabular text-xs ${late ? 'text-bad' : 'text-muted'}`}>
-                    {until(task.deadline, now)}
+                    {deadlineText(task.deadline, now)}
                   </span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">

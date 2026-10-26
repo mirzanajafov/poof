@@ -21,7 +21,7 @@ describe('exhibitSchedule', () => {
 
   it('starts at zero, stays inside the run and the parameter ranges', () => {
     const arrivals = exhibitSchedule(params, itemMs)
-    expect(arrivals[0]!.at).toBe(0)
+    expect(arrivals[0]?.at).toBe(0)
     for (const a of arrivals) {
       expect(a.at).toBeLessThan(params.durationMs)
       expect(a.count).toBeGreaterThanOrEqual(20)

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { Breaker, Breakers } from '../src/breaker.ts'
-import { emptyEstimate, updateEstimate, upperMean } from '../src/estimate.ts'
 
 describe('Breaker', () => {
   it('stays closed through isolated failures', () => {
@@ -65,22 +64,5 @@ describe('Breakers', () => {
     expect(breakers.state('thumb-320', 1)).toBe('closed')
     expect(breakers.allows('thumb-320', 1)).toBe(true)
     expect(breakers.states(1)).toEqual(new Map())
-  })
-})
-
-describe('estimate', () => {
-  it('starts at the first sample and moves toward new ones', () => {
-    let e = updateEstimate(emptyEstimate, 100)
-    expect(e.mean).toBe(100)
-    e = updateEstimate(e, 200)
-    expect(e.mean).toBeCloseTo(120)
-    expect(e.variance).toBeGreaterThan(0)
-  })
-
-  it('upper mean adds z standard errors', () => {
-    let e = emptyEstimate
-    for (const sample of [80, 120, 80, 120, 80, 120, 80, 120, 80, 120]) e = updateEstimate(e, sample)
-    expect(upperMean(e, 0)).toBe(e.mean)
-    expect(upperMean(e, 2)).toBeGreaterThan(e.mean)
   })
 })

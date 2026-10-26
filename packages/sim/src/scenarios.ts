@@ -6,7 +6,7 @@ const minute = 60_000
 const threadsPerWorker = 14
 const supervisorThreads = 24
 
-const base = {
+const common = {
   arrivalsMs: 60 * minute,
   drainMs: 30 * minute,
   utilization: 0.5,
@@ -18,12 +18,12 @@ const base = {
 const event = { from: 20 * minute, to: 25 * minute }
 
 export const scenarios: Record<string, Scenario> = {
-  calm: { ...base, name: 'calm' },
-  skew: { ...base, name: 'skew', skew: { share: 0.2, block: [0.1, 0.3], factor: [5, 10] } },
-  neighbour: { ...base, name: 'neighbour', neighbour: { ...event, capacity: 0.5 } },
-  burst: { ...base, name: 'burst', burst: { ...event, utilization: 1.5 } },
+  calm: { ...common, name: 'calm' },
+  skew: { ...common, name: 'skew', skew: { share: 0.2, block: [0.1, 0.3], factor: [5, 10] } },
+  neighbour: { ...common, name: 'neighbour', neighbour: { ...event, capacity: 0.5 } },
+  burst: { ...common, name: 'burst', burst: { ...event, utilization: 1.5 } },
   poison: {
-    ...base,
+    ...common,
     name: 'poison',
     types: [
       { weight: 70, value: 'webp-1600' },

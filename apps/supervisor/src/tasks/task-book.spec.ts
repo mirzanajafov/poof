@@ -38,17 +38,17 @@ function setup(rules: Partial<BookRules> = {}) {
     finished: vi.fn(),
     failed: vi.fn(),
   }
-  const events = { publish: vi.fn() }
+  const publisher = { publish: vi.fn() }
   const stop = vi.fn()
   const book = new TaskBook(
     store,
-    events,
+    publisher,
     tracer,
     new Breakers<PresetName>(),
     { maxAttempts: 3, deadLetterShare: 0.5, deadLetter: true, ...rules },
     stop,
   )
-  return { book, store, events, stop }
+  return { book, store, publisher, stop }
 }
 
 const done = (lease: TaskLease, item: number): ItemDone => ({
@@ -81,7 +81,7 @@ const crash = (lease: TaskLease, item: number): ExitReport => ({
 
 describe('TaskBook', () => {
   it('writes a finished task together with the leases that have not reported done yet', () => {
-    const { book, store, events } = setup()
+    const { book, store, publisher } = setup()
     const task = newTask()
     const first = addLease(task, 0, 5, 'done')
     const second = addLease(task, 5, 10)
@@ -92,7 +92,7 @@ describe('TaskBook', () => {
     expect(task.status).toBe('DONE')
     expect(store.finished).toHaveBeenCalledTimes(1)
     expect(store.finished).toHaveBeenCalledWith(task, [second], expect.any(Date))
-    expect(events.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.done', met: true, dead: 0 }))
+    expect(publisher.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.done', met: true, dead: 0 }))
   })
 
   it('retries the item a crashed worker held and dead-letters it on the last attempt', () => {
@@ -128,7 +128,7 @@ describe('TaskBook', () => {
   })
 
   it('fails a task past its dead letter share, closes its waiting leases and stops its running ones', () => {
-    const { book, store, events, stop } = setup({ deadLetterShare: 0.1 })
+    const { book, store, publisher, stop } = setup({ deadLetterShare: 0.1 })
     const task = newTask()
     const running = addLease(task, 0, 5)
     const waiting = addLease(task, 5, 10, 'pending')
@@ -140,7 +140,7 @@ describe('TaskBook', () => {
     expect(store.failed).toHaveBeenCalledWith(task, 'fail', 'too many dead letters', expect.any(Date))
     expect(stop).toHaveBeenCalledWith(running)
     expect(waiting.state).toBe('done')
-    expect(events.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.failed' }))
+    expect(publisher.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.failed' }))
   })
 
   it('puts a lease back as pending for an open task and as done for a closed one', () => {
@@ -160,12 +160,12 @@ describe('TaskBook', () => {
   })
 
   it('tells the store and the live view once when a preset breaker opens', () => {
-    const { book, store, events } = setup({ deadLetterShare: 1 })
+    const { book, store, publisher } = setup({ deadLetterShare: 1 })
     const task = newTask(20)
     const lease = addLease(task, 0, 20)
     for (let item = 0; item < 12; item++) book.failedItem(task, lease, dead(lease, item))
     expect(store.breakerChanged).toHaveBeenCalledTimes(1)
     expect(store.breakerChanged).toHaveBeenCalledWith('webp-1600', 'open')
-    expect(events.publish).toHaveBeenCalledWith({ kind: 'breaker', preset: 'webp-1600', state: 'open' })
+    expect(publisher.publish).toHaveBeenCalledWith({ kind: 'breaker', preset: 'webp-1600', state: 'open' })
   })
 })

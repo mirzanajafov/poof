@@ -43,7 +43,7 @@ const headers = { authorization: `Bearer ${token}`, 'content-type': 'application
 const patienceMs = (2 * durationSeconds + 60) * 1000
 if (existsSync(values.out)) throw new Error(`${values.out} already holds runs, so pick another --out`)
 
-async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
+async function request(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
   const res = await fetch(`${values.api}${path}`, { ...init, signal: AbortSignal.timeout(30_000) }).catch(
     (error: unknown) => {
       console.log(`no answer from ${values.api}${path}: ${error instanceof Error ? error.message : 'unknown error'}`)
@@ -66,7 +66,7 @@ function giveUpAfter(deadline: number, what: string): void {
 async function idle(): Promise<void> {
   const deadline = Date.now() + patienceMs
   while (true) {
-    const { status } = await call('/api/exhibits/current')
+    const { status } = await request('/api/exhibits/current')
     if (status === 404) return
     if (status !== 200 && !transient(status)) throw new Error(`the API answered ${status} for the current exhibit`)
     giveUpAfter(deadline, 'the box has not been free')
@@ -78,7 +78,7 @@ async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
   const deadline = Date.now() + patienceMs
   while (true) {
     await idle()
-    const { status, body } = await call('/api/exhibits', {
+    const { status, body } = await request('/api/exhibits', {
       method: 'POST',
       headers,
       body: JSON.stringify({ policy, seed, durationSeconds, utilization, dataset: values.dataset }),
@@ -98,7 +98,7 @@ async function ended(id: string): Promise<ExhibitDetail> {
   while (true) {
     await sleep(3000)
     giveUpAfter(deadline, `exhibit ${id} has not ended`)
-    const { status, body } = await call(`/api/exhibits/${id}`)
+    const { status, body } = await request(`/api/exhibits/${id}`)
     if (transient(status)) continue
     if (status !== 200 || !hasFields<Pick<ExhibitDetail, 'status'>>(body, { status: ['RUNNING', ...exhibitEnds] })) {
       throw new Error(`the API answered ${status} ${JSON.stringify(body)} for exhibit ${id}`)

@@ -42,7 +42,7 @@ describe('replay', () => {
   })
 
   it('uses the measured cost of each image and is deterministic', () => {
-    expect(items[3]!.costMs).toBe(230)
+    expect(items[3]?.costMs).toBe(230)
     expect(JSON.stringify(replay(exhibit('box'), items, calibration))).toBe(
       JSON.stringify(replay(exhibit('box'), items, calibration)),
     )

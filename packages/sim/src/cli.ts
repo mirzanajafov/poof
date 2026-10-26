@@ -129,12 +129,12 @@ console.log(
   `\nsimulated ${jobs.length} runs in ${((performance.now() - started) / 1000).toFixed(1)} s, ${(runMs / jobs.length).toFixed(0)} ms per run`,
 )
 
-const out = values.out ?? fileURLToPath(new URL(`../results/${values.calibration}/`, import.meta.url))
-await mkdir(join(out, 'raw'), { recursive: true })
-await writeFile(join(out, 'raw', 'metrics.json'), JSON.stringify(metrics))
-await writeFile(join(out, 'raw', 'series.json'), JSON.stringify(series))
+const outDir = values.out ?? fileURLToPath(new URL(`../results/${values.calibration}/`, import.meta.url))
+await mkdir(join(outDir, 'raw'), { recursive: true })
+await writeFile(join(outDir, 'raw', 'metrics.json'), JSON.stringify(metrics))
+await writeFile(join(outDir, 'raw', 'series.json'), JSON.stringify(series))
 await writeFile(
-  join(out, 'summary.json'),
+  join(outDir, 'summary.json'),
   `${JSON.stringify({ calibration, seeds, dtMs, cells, comparisons }, null, 2)}\n`,
 )
-console.log(`wrote ${out}`)
+console.log(`wrote ${outDir}`)

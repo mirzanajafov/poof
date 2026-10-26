@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Traces, UpstreamError } from '@poof/nest'
+import { Telemetry, UpstreamError } from '@poof/nest'
 import { extract, inject, SpanKind, SpanStatusCode, within } from '@poof/tracing'
 import { Env } from '../config/env.js'
 
@@ -11,13 +11,13 @@ export interface SupervisorReply {
 
 @Injectable()
 export class Supervisor {
-  private readonly base: string
+  private readonly supervisorUrl: string
 
   constructor(
     env: Env,
-    private readonly traces: Traces,
+    private readonly telemetry: Telemetry,
   ) {
-    this.base = env.SUPERVISOR_URL.replace(/\/$/, '')
+    this.supervisorUrl = env.SUPERVISOR_URL.replace(/\/$/, '')
   }
 
   async forward(
@@ -26,14 +26,14 @@ export class Supervisor {
     body: unknown,
     incoming: Record<string, unknown>,
   ): Promise<SupervisorReply> {
-    const span = this.traces.tracer.startSpan(
+    const span = this.telemetry.tracer.startSpan(
       `${method} /api${path}`,
       { kind: SpanKind.SERVER, attributes: { 'http.request.method': method, 'url.path': `/api${path}` } },
       extract(incoming),
     )
     let reply: SupervisorReply
     try {
-      const upstream = await fetch(`${this.base}${path}`, {
+      const upstream = await fetch(`${this.supervisorUrl}${path}`, {
         method,
         headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...inject(within(span)) },
         body: body === undefined ? undefined : JSON.stringify(body),

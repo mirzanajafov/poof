@@ -8,7 +8,7 @@ import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './pro
 configureSharp()
 if (process.platform === 'linux') await writeFile('/proc/self/oom_score_adj', '1000').catch(() => undefined)
 
-interface Current {
+interface ActiveLease {
   assignment: Assignment
   cursor: number
   hi: number
@@ -17,7 +17,7 @@ interface Current {
 const heartbeatMs = Number(process.env.POOF_HEARTBEAT_MS ?? 1000)
 const manifests = new Map<string, TaskManifest>()
 const queue: Assignment[] = []
-let current: Current | null = null
+let current: ActiveLease | null = null
 let running = false
 let stopping = false
 

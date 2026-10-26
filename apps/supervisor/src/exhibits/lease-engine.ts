@@ -22,7 +22,7 @@ import {
 import { SpanStatusCode, within, type Context, type Span, type Tracer } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
 import type { Dataset, Datasets } from '../datasets/datasets.service.js'
-import type { Events } from '../infra/events.js'
+import type { LivePublisher } from '../infra/live-publisher.js'
 import { Task, type TaskLease } from '../tasks/task.js'
 import { TaskBook } from '../tasks/task-book.js'
 import type { LeaseRow, TaskStore } from '../tasks/task-store.js'
@@ -75,12 +75,12 @@ export class LeaseEngine {
   constructor(
     private readonly options: EngineOptions,
     private readonly store: TaskStore,
-    private readonly events: Events,
+    private readonly publisher: LivePublisher,
     private readonly datasets: Datasets,
   ) {
     this.book = new TaskBook(
       store,
-      events,
+      publisher,
       options.tracer,
       new Breakers<PresetName>(options.policy.breaker),
       {
@@ -247,7 +247,7 @@ export class LeaseEngine {
   }
 
   private announce(lease: SplitLease): void {
-    this.events.publish({
+    this.publisher.publish({
       kind: 'lease.created',
       task: lease.task.id,
       lease: lease.id,
@@ -439,7 +439,7 @@ export class LeaseEngine {
         worker.handle.on('item', (message) => this.onItem(worker, message))
         worker.handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
         worker.handle.on('exit', (exit) => this.onExit(worker, exit))
-        this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: worker.handle.pid })
+        this.publisher.publish({ kind: 'worker.spawned', worker: worker.id, pid: worker.handle.pid })
         this.assign(worker, lease)
       },
       () => {
@@ -519,7 +519,7 @@ export class LeaseEngine {
     this.workers.delete(worker)
     this.counters.exits[exit.reason] = (this.counters.exits[exit.reason] ?? 0) + 1
     this.store.workerExited(worker.id, exit.reason, worker.items)
-    this.events.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
+    this.publisher.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
     const lease = worker.lease
     if (!lease) return
     lease.worker = null
