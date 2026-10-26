@@ -64,9 +64,7 @@ describe('decide', () => {
   })
 
   it('sizes the split to fit the time left', () => {
-    const [request] = decide(view([lease()], 10_000), policies.forecast)
-    expect(request!.k).toBe(2)
-    expect(request!.remaining).toBe(900)
+    expect(decide(view([lease()], 10_000), policies.forecast)).toMatchObject([{ k: 2, remaining: 900 }])
   })
 
   it('respects warm-up, cooldown, depth and breakers', () => {

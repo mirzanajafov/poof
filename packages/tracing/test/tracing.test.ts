@@ -24,10 +24,10 @@ describe('tracing', () => {
     const spans = exporter.getFinishedSpans()
     expect(new Set(spans.map((s) => s.spanContext().traceId)).size).toBe(1)
     const byId = new Map(spans.map((s) => [s.spanContext().spanId, s]))
-    const image = spans.find((s) => s.name === 'image')!
-    const parent = byId.get(image.parentSpanContext!.spanId)!
-    expect(parent.spanContext().spanId).toBe(helper.spanContext().spanId)
-    expect(byId.get(parent.parentSpanContext!.spanId)!.spanContext().spanId).toBe(lease.spanContext().spanId)
+    const parentOf = (span: (typeof spans)[number] | undefined) => byId.get(span?.parentSpanContext?.spanId ?? '')
+    const image = spans.find((s) => s.name === 'image')
+    expect(parentOf(image)?.spanContext().spanId).toBe(helper.spanContext().spanId)
+    expect(parentOf(parentOf(image))?.spanContext().spanId).toBe(lease.spanContext().spanId)
   })
 
   it('carries a trace over HTTP headers and resumes one from a stored id', async () => {
@@ -37,7 +37,9 @@ describe('tracing', () => {
     const headers = inject(within(request))
     expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
     const task = tracing.tracer.startSpan('task', {}, extract(headers))
-    const resumed = tracing.tracer.startSpan('task', {}, resume(traceIdOf(task)!))
+    const traceId = traceIdOf(task)
+    expect(traceId).toMatch(/^[0-9a-f]{32}$/)
+    const resumed = tracing.tracer.startSpan('task', {}, resume(traceId ?? ''))
     for (const span of [resumed, task, request]) span.end()
     await tracing.flush()
     const ids = exporter.getFinishedSpans().map((s) => s.spanContext().traceId)

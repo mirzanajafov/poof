@@ -14,10 +14,10 @@ describe('FailureStreak', () => {
     streak.succeeded()
     streak.succeeded()
     streak.failed(new Error('third'))
-    expect(warn.mock.calls.map(([message]) => message)).toEqual([
-      'reading the snapshot failed',
-      'reading the snapshot failed',
+    expect(warn.mock.calls).toEqual([
+      ['reading the snapshot failed', new Error('first')],
+      ['reading the snapshot failed', new Error('third')],
     ])
-    expect(log.mock.calls.map(([message]) => message)).toEqual(['reading the snapshot works again'])
+    expect(log.mock.calls).toEqual([['reading the snapshot works again']])
   })
 })

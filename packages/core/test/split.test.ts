@@ -25,23 +25,21 @@ describe('chooseK', () => {
 
 describe('planSplit', () => {
   it('gives the parent extra items to cover the spawn latency', () => {
-    const plan = planSplit(0, 100, 1, 50, 1000)!
-    expect(plan.cut).toBe(60)
-    expect(plan.children).toEqual([{ lo: 60, hi: 100 }])
+    expect(planSplit(0, 100, 1, 50, 1000)).toEqual({ cut: 60, children: [{ lo: 60, hi: 100 }] })
   })
 
   it('covers the remaining range exactly, without overlap', () => {
-    const plan = planSplit(17, 1000, 3, 40, 300)!
-    const ranges = [{ lo: 17, hi: plan.cut }, ...plan.children]
-    for (let i = 1; i < ranges.length; i++) expect(ranges[i]!.lo).toBe(ranges[i - 1]!.hi)
-    expect(ranges.at(-1)!.hi).toBe(1000)
+    const plan = planSplit(17, 1000, 3, 40, 300)
+    const ranges = [{ lo: 17, hi: plan?.cut ?? 17 }, ...(plan?.children ?? [])]
+    expect(ranges.slice(1).map((r) => r.lo)).toEqual(ranges.slice(0, -1).map((r) => r.hi))
+    expect(ranges.at(-1)?.hi).toBe(1000)
     for (const range of ranges) expect(range.hi).toBeGreaterThan(range.lo)
   })
 
   it('never hands out more children than items', () => {
-    const plan = planSplit(10, 13, 4, 50, 0)!
-    expect(plan.children.length).toBe(2)
-    expect(plan.cut).toBe(11)
+    const plan = planSplit(10, 13, 4, 50, 0)
+    expect(plan?.children.length).toBe(2)
+    expect(plan?.cut).toBe(11)
   })
 
   it('refuses a range with a single item left', () => {
