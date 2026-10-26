@@ -37,14 +37,19 @@ export class Datasets {
   }
 
   select(dataset: Dataset, offset: number, count: number): ManifestItem[] {
-    return Array.from({ length: count }, (_, i) => dataset.items[(offset + i) % dataset.items.length]!)
+    const { items } = dataset
+    return Array.from({ length: count }, (_, i) => {
+      const item = items[(offset + i) % items.length]
+      if (!item) throw new Error(`dataset ${dataset.name} has no items`)
+      return item
+    })
   }
 
   taskDir(taskId: string): string {
     return join(this.root, 'tasks', taskId)
   }
 
-  async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<string> {
+  async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
     const dir = this.taskDir(taskId)
     await mkdir(join(dir, 'input'), { recursive: true })
     await mkdir(join(dir, 'out'), { recursive: true })
@@ -55,7 +60,6 @@ export class Datasets {
       manifest.items.push({ file })
     }
     await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))
-    return dir
   }
 
   async removeTask(taskId: string): Promise<void> {

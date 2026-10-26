@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { WorkerHandle, type Limits, type ExitReport } from '../src/handle.ts'
+import { WorkerHandle, type Limits } from '../src/handle.ts'
 import type { ItemDead, ItemDone, LeaseDone } from '../src/protocol.ts'
 
 let root: string
@@ -38,7 +38,6 @@ function collect(handle: WorkerHandle) {
   const leases: LeaseDone[] = []
   handle.on('item', (item) => items.push(item))
   handle.on('leaseDone', (lease) => leases.push(lease))
-  const exited = new Promise<ExitReport>((resolve) => handle.once('exit', resolve))
   const leaseDone = (lease: string) =>
     new Promise<LeaseDone>((resolve) => {
       const found = leases.find((l) => l.lease === lease)
@@ -48,7 +47,7 @@ function collect(handle: WorkerHandle) {
           if (l.lease === lease) resolve(l)
         })
     })
-  return { items, leases, exited, leaseDone }
+  return { items, leases, exited: handle.exited, leaseDone }
 }
 
 const assignment = (taskDir: string, lease: string, lo: number, hi: number) => ({
@@ -100,6 +99,19 @@ describe('worker', () => {
     handle.kill()
   })
 
+  it('refuses a second shrink of a lease while the first is in flight and still answers the first', async () => {
+    const taskDir = await makeTask('overlap', 40)
+    const handle = await started()
+    const { leaseDone } = collect(handle)
+    handle.assign(assignment(taskDir, 'a', 0, 40), 10_000)
+    const first = handle.shrink('a', 20)
+    const second = handle.shrink('a', 10)
+    expect((await second).ok).toBe(false)
+    expect((await first).ok).toBe(true)
+    expect((await leaseDone('a')).hi).toBe(20)
+    handle.kill()
+  })
+
   it('refuses a cut at or behind the item in flight', async () => {
     const taskDir = await makeTask('refuse', 20)
     const handle = await started()
@@ -134,6 +146,14 @@ describe('worker', () => {
     expect(items.map((i) => `${i.lease}${i.item}`)).toEqual(['a0', 'a1', 'a2', 'b3', 'b4', 'b5'])
     expect(handle.idle).toBe(true)
     handle.kill()
+  })
+
+  it('reports the exit of a worker killed before it was ready', async () => {
+    const handle = new WorkerHandle()
+    const starting = handle.start()
+    handle.kill()
+    await expect(starting).rejects.toThrow(/before ready/)
+    expect((await handle.exited).reason).toBe('killed')
   })
 
   it('reports a crash with the item that was in flight', async () => {

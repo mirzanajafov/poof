@@ -14,6 +14,7 @@ import type { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
 import { Database, Events, Traces } from '../infra/infra.module.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
+import { TaskStore } from '../tasks/task-store.js'
 import { LeaseEngine } from './lease-engine.js'
 
 interface Current {
@@ -46,6 +47,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     private readonly events: Events,
     private readonly datasets: Datasets,
     private readonly scheduler: Scheduler,
+    private readonly store: TaskStore,
     private readonly traces: Traces,
   ) {
     this.settings = {
@@ -108,7 +110,7 @@ export class Exhibits implements BeforeApplicationShutdown {
           tracer: this.traces.tracer,
           trace: within(span),
         },
-        this.db,
+        this.store,
         this.events,
         this.datasets,
       )
@@ -143,9 +145,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       itemMs,
     )
     for (const arrival of arrivals) {
-      current.timers.push(
-        setTimeout(() => this.schedule(current, () => this.arrive(current, arrival, itemMs)), arrival.at),
-      )
+      current.timers.push(setTimeout(() => this.schedule(current, () => this.arrive(current, arrival)), arrival.at))
     }
     current.timers.push(
       setTimeout(
@@ -162,12 +162,11 @@ export class Exhibits implements BeforeApplicationShutdown {
     return { id, endsAt }
   }
 
-  private async arrive(current: Current, arrival: Arrival, itemMs: number[]): Promise<void> {
+  private async arrive(current: Current, arrival: Arrival): Promise<void> {
     if (current.finishing) return
     const { params, dataset } = current
     const items = this.datasets.select(dataset, arrival.offset, arrival.count)
-    let predictedMs = 0
-    for (let i = 0; i < arrival.count; i++) predictedMs += itemMs[(arrival.offset + i) % itemMs.length]!
+    const predictedMs = items.reduce((sum, item) => sum + predictedCostMs(params.preset, item), 0)
     const deadlineMs = arrival.slack * predictedMs
     if (current.engine) {
       await current.engine.submit(dataset, items, params.preset, Date.now() + deadlineMs, arrival.offset)
@@ -231,7 +230,7 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   private async finishPool(current: Current): Promise<ExhibitStats> {
     const cancelled = this.scheduler.cancel(current.pool.tasks, 'exhibit ended')
-    await this.scheduler.flush()
+    await this.store.flush()
     const stats = await this.poolCounts(current)
     stats.cancelled = cancelled
     return stats

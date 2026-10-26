@@ -59,6 +59,7 @@ function linuxRssMb(pid: number): number | null {
 
 export class WorkerHandle extends EventEmitter<HandleEvents> {
   readonly limits: Limits
+  readonly exited: Promise<ExitReport>
   private child: ChildProcess | null = null
   private readonly leases: Tracked[] = []
   private since = 0
@@ -66,6 +67,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   private reportedRssMb = 0
   private killReason: ExitReason | null = null
   private stopping = false
+  private ready = false
   private watchdog: NodeJS.Timeout | null = null
   private stderr = ''
   private readonly pendingShrinks = new Map<string, (result: Shrunk) => void>()
@@ -74,6 +76,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   constructor(options: { limits?: Partial<Limits> } = {}) {
     super()
     this.limits = { ...defaultLimits, ...options.limits }
+    this.exited = new Promise((resolve) => this.once('exit', resolve))
   }
 
   get inflight(): Inflight | null {
@@ -99,16 +102,18 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
       })
       this.child = child
       this.pid = child.pid ?? 0
-      child.stderr!.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         this.stderr = (this.stderr + chunk.toString()).slice(-4096)
       })
-      const onEarlyExit = (code: number | null) =>
-        reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
-      child.once('exit', onEarlyExit)
+      child.once('error', reject)
+      child.once('exit', (code, signal) => {
+        if (!this.ready) reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
+        this.onExit(code, signal)
+      })
       child.on('message', (message: FromWorker) => {
         if (message.type === 'ready') {
-          child.off('exit', onEarlyExit)
-          child.once('exit', (code, signal) => this.onExit(code, signal))
+          child.off('error', reject)
+          this.ready = true
           this.lastBeat = Date.now()
           this.reportedRssMb = message.rssMb
           this.watchdog = setInterval(() => this.watch(), this.limits.watchMs)
@@ -121,21 +126,25 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   }
 
   assign(assignment: Omit<Assignment, 'type'>, itemTimeoutMs: number): void {
+    if (!this.child?.connected) return
     if (this.leases.length === 0) this.since = Date.now()
     this.leases.push({ lease: assignment.lease, cursor: assignment.lo, hi: assignment.hi, itemTimeoutMs })
-    this.child!.send({ type: 'assign', ...assignment })
+    this.child.send({ type: 'assign', ...assignment })
   }
 
   shrink(lease: string, cut: number): Promise<Shrunk> {
+    const child = this.child
+    if (!child?.connected || this.pendingShrinks.has(lease))
+      return Promise.resolve({ type: 'shrunk', lease, ok: false })
     return new Promise((resolve) => {
       this.pendingShrinks.set(lease, resolve)
-      this.child!.send({ type: 'shrink', lease, cut })
+      child.send({ type: 'shrink', lease, cut })
     })
   }
 
   stop(): void {
     this.stopping = true
-    this.child?.send({ type: 'stop' })
+    if (this.child?.connected) this.child.send({ type: 'stop' })
   }
 
   kill(reason: ExitReason = 'killed'): void {
