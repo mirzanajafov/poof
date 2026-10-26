@@ -123,15 +123,16 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   }
 
   assign(assignment: Omit<Assignment, 'type'>, itemTimeoutMs: number): void {
+    if (!this.child?.connected) throw new Error(`worker ${this.pid} is not running`)
     if (this.leases.length === 0) this.since = Date.now()
-    if (!this.child) throw new Error(`worker ${this.pid} is not running`)
     this.leases.push({ lease: assignment.lease, cursor: assignment.lo, hi: assignment.hi, itemTimeoutMs })
     this.child.send({ type: 'assign', ...assignment })
   }
 
   shrink(lease: string, cut: number): Promise<Shrunk> {
     const child = this.child
-    if (!child) return Promise.resolve({ type: 'shrunk', lease, ok: false })
+    if (!child?.connected || this.pendingShrinks.has(lease))
+      return Promise.resolve({ type: 'shrunk', lease, ok: false })
     return new Promise((resolve) => {
       this.pendingShrinks.set(lease, resolve)
       child.send({ type: 'shrink', lease, cut })
@@ -140,7 +141,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
 
   stop(): void {
     this.stopping = true
-    this.child?.send({ type: 'stop' })
+    if (this.child?.connected) this.child.send({ type: 'stop' })
   }
 
   kill(reason: ExitReason = 'killed'): void {

@@ -27,8 +27,6 @@ export interface LeaseRow {
   depth: number
 }
 
-export type DecisionKind = 'reject' | 'worker-exit' | 'fail' | 'cancel' | 'split'
-
 interface Progress {
   id: string
   done: number
@@ -108,7 +106,7 @@ export class TaskStore {
     this.write(() => this.db.client.deadLetter.create({ data: { taskId, item, attempts, error: error.slice(0, 500) } }))
   }
 
-  decided(taskId: string, kind: DecisionKind, detail: Prisma.InputJsonObject): void {
+  decided(taskId: string, kind: 'worker-exit' | 'split', detail: Prisma.InputJsonObject): void {
     this.write(() => this.db.client.decision.create({ data: { kind, taskId, detail } }))
   }
 
@@ -116,32 +114,30 @@ export class TaskStore {
     this.write(() => this.db.client.breakerEvent.create({ data: { type, state } }))
   }
 
-  finished(task: Progress, leases: ReadonlyArray<{ id: string; hi: number }>, at: Date): void {
+  finished({ id, done, dead }: Progress, leases: ReadonlyArray<{ id: string; hi: number }>, at: Date): void {
+    const cursors = leases.map((lease) => ({ id: lease.id, cursor: lease.hi }))
     this.write(() =>
       this.db.client.$transaction([
         this.db.client.task.update({
-          where: { id: task.id },
-          data: { status: 'DONE', finishedAt: at, done: task.done, deadLettered: task.dead },
+          where: { id },
+          data: { status: 'DONE', finishedAt: at, done, deadLettered: dead },
         }),
-        ...leases.map((lease) =>
-          this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.hi } }),
+        ...cursors.map((lease) =>
+          this.db.client.lease.update({ where: { id: lease.id }, data: { state: 'DONE', cursor: lease.cursor } }),
         ),
       ]),
     )
   }
 
-  failed(task: Progress, kind: 'fail' | 'cancel', reason: string): void {
+  failed({ id, done, dead }: Progress, kind: 'fail' | 'cancel', reason: string, at: Date): void {
     this.write(() =>
       this.db.client.$transaction([
         this.db.client.task.update({
-          where: { id: task.id },
-          data: { status: 'FAILED', finishedAt: new Date(), done: task.done, deadLettered: task.dead },
+          where: { id },
+          data: { status: 'FAILED', finishedAt: at, done, deadLettered: dead },
         }),
-        this.db.client.lease.updateMany({
-          where: { taskId: task.id, state: { not: 'DONE' } },
-          data: { state: 'DONE' },
-        }),
-        this.db.client.decision.create({ data: { kind, taskId: task.id, detail: { reason, dead: task.dead } } }),
+        this.db.client.lease.updateMany({ where: { taskId: id, state: { not: 'DONE' } }, data: { state: 'DONE' } }),
+        this.db.client.decision.create({ data: { kind, taskId: id, detail: { reason, dead } } }),
       ]),
     )
   }
@@ -162,21 +158,16 @@ export class TaskStore {
     return this.writes
   }
 
-  async unfinished() {
+  async releaseAfterRestart(): Promise<void> {
     await this.db.client.worker.updateMany({ where: { endedAt: null }, data: { endedAt: new Date(), exit: 'KILLED' } })
     await this.db.client.lease.updateMany({ where: { state: 'RUNNING' }, data: { state: 'PENDING', workerId: null } })
+  }
+
+  unfinishedTasks() {
     return this.db.client.task.findMany({
       where: { status: { in: ['QUEUED', 'RUNNING'] } },
       include: { leases: { orderBy: { lo: 'asc' } }, deadLetters: { select: { item: true } } },
     })
-  }
-
-  async abandon(taskId: string, reason: string): Promise<void> {
-    await this.db.client.$transaction([
-      this.db.client.task.update({ where: { id: taskId }, data: { status: 'FAILED', finishedAt: new Date() } }),
-      this.db.client.lease.updateMany({ where: { taskId, state: { not: 'DONE' } }, data: { state: 'DONE' } }),
-      this.db.client.decision.create({ data: { kind: 'fail', taskId, detail: { reason } } }),
-    ])
   }
 
   private write(write: () => Promise<unknown>): void {

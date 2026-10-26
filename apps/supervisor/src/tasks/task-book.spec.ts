@@ -21,7 +21,7 @@ function newTask(items = 10): Task {
 }
 
 function addLease(task: Task, lo: number, hi: number, state: LeaseState = 'running'): TaskLease {
-  const lease: TaskLease = { id: `lease-${lo}`, lo, hi, cursor: lo, state, worker: null, span: null }
+  const lease: TaskLease = { id: `lease-${lo}`, lo, hi, cursor: lo, state, span: null }
   task.leases.push(lease)
   return lease
 }
@@ -39,13 +39,16 @@ function setup(rules: Partial<BookRules> = {}) {
     failed: vi.fn(),
   }
   const events = { publish: vi.fn() }
-  const book = new TaskBook(store, events, tracer, new Breakers<PresetName>(), {
-    maxAttempts: 3,
-    deadLetterShare: 0.5,
-    deadLetter: true,
-    ...rules,
-  })
-  return { book, store, events }
+  const stop = vi.fn()
+  const book = new TaskBook(
+    store,
+    events,
+    tracer,
+    new Breakers<PresetName>(),
+    { maxAttempts: 3, deadLetterShare: 0.5, deadLetter: true, ...rules },
+    stop,
+  )
+  return { book, store, events, stop }
 }
 
 const done = (lease: TaskLease, item: number): ItemDone => ({
@@ -108,7 +111,7 @@ describe('TaskBook', () => {
     }
     expect(store.deadLettered).toHaveBeenCalledTimes(1)
     expect(store.deadLettered).toHaveBeenCalledWith('task', 3, 3, 'worker crash')
-    expect(lease).toMatchObject({ cursor: 4, state: 'pending', worker: null })
+    expect(lease).toMatchObject({ cursor: 4, state: 'pending' })
     expect(task.dead).toBe(1)
   })
 
@@ -124,20 +127,18 @@ describe('TaskBook', () => {
     expect(lease).toMatchObject({ cursor: 0, state: 'pending' })
   })
 
-  it('fails a task past its dead letter share and stops its running leases at the next item', () => {
-    const { book, store, events } = setup({ deadLetterShare: 0.1 })
+  it('fails a task past its dead letter share, closes its waiting leases and stops its running ones', () => {
+    const { book, store, events, stop } = setup({ deadLetterShare: 0.1 })
     const task = newTask()
     const running = addLease(task, 0, 5)
     const waiting = addLease(task, 5, 10, 'pending')
-    const shrink = vi.fn(() => Promise.resolve({ type: 'shrunk' as const, lease: running.id, ok: false as const }))
-    running.worker = { handle: { shrink } }
     running.cursor = 2
     book.failedItem(task, running, dead(running, 0))
     expect(task.open).toBe(true)
     book.failedItem(task, running, dead(running, 1))
     expect(task.status).toBe('FAILED')
-    expect(store.failed).toHaveBeenCalledWith(task, 'fail', 'too many dead letters')
-    expect(shrink).toHaveBeenCalledWith(running.id, 3)
+    expect(store.failed).toHaveBeenCalledWith(task, 'fail', 'too many dead letters', expect.any(Date))
+    expect(stop).toHaveBeenCalledWith(running)
     expect(waiting.state).toBe('done')
     expect(events.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.failed' }))
   })

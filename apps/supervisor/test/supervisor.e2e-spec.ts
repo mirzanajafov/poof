@@ -143,7 +143,7 @@ describe('supervisor', () => {
       })
       expect(failed.status).toBe('FAILED')
       expect(failed.leases.every((l) => l.state === 'DONE')).toBe(true)
-      expect(failed.decisions.map((d) => d.detail)).toEqual([{ reason }])
+      expect(failed.decisions.map((d) => d.detail)).toEqual([{ reason, dead: 0 }])
     }
   })
 

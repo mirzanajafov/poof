@@ -38,17 +38,17 @@ export class Datasets {
 
   select(dataset: Dataset, offset: number, count: number): ManifestItem[] {
     const start = offset % dataset.items.length
-    const laps = Math.ceil((start + count) / dataset.items.length)
-    return Array.from({ length: laps }, () => dataset.items)
-      .flat()
-      .slice(start, start + count)
+    const rotated = [...dataset.items.slice(start), ...dataset.items.slice(0, start)]
+    const selected: ManifestItem[] = []
+    while (selected.length < count) selected.push(...rotated)
+    return selected.slice(0, count)
   }
 
   taskDir(taskId: string): string {
     return join(this.root, 'tasks', taskId)
   }
 
-  async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<string> {
+  async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
     const dir = this.taskDir(taskId)
     await mkdir(join(dir, 'input'), { recursive: true })
     await mkdir(join(dir, 'out'), { recursive: true })
@@ -59,7 +59,6 @@ export class Datasets {
       manifest.items.push({ file })
     }
     await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))
-    return dir
   }
 
   async removeTask(taskId: string): Promise<void> {

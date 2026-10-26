@@ -1,7 +1,6 @@
 import type { LeaseState, PresetName } from '@poof/core'
 import type { TaskStatus } from '@poof/db'
 import type { Span } from '@poof/tracing'
-import type { WorkerHandle } from '@poof/worker'
 
 export interface TaskSpec {
   id: string
@@ -20,7 +19,6 @@ export interface TaskLease {
   hi: number
   cursor: number
   state: LeaseState
-  worker: { readonly handle: Pick<WorkerHandle, 'shrink'> } | null
   span: Span | null
 }
 
@@ -69,6 +67,22 @@ export class Task<Lease extends TaskLease = TaskLease> {
 
   get met(): boolean {
     return this.status === 'DONE' && this.finishedAt !== null && this.finishedAt <= this.deadline
+  }
+
+  restore(status: 'QUEUED' | 'RUNNING', dead: number): void {
+    let processed = 0
+    this.remainingMs = 0
+    for (const lease of this.leases) {
+      if (lease.state === 'done') {
+        processed += lease.hi - lease.lo
+      } else {
+        processed += lease.cursor - lease.lo
+        this.remainingMs += this.predicted.subarray(lease.cursor, lease.hi).reduce((sum, ms) => sum + ms, 0)
+      }
+    }
+    this.status = status
+    this.dead = dead
+    this.done = processed - dead
   }
 
   attemptsAt(item: number): number {

@@ -96,16 +96,24 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       CHECKPOINT_MS: config.get('CHECKPOINT_MS', { infer: true }),
       MAX_TASK_ITEMS: config.get('MAX_TASK_ITEMS', { infer: true }),
     }
-    this.book = new TaskBook(store, events, traces.tracer, new Breakers<PresetName>(), {
-      maxAttempts: this.settings.MAX_ATTEMPTS,
-      deadLetterShare: this.settings.DEAD_LETTER_SHARE,
-      deadLetter: true,
-    })
+    this.book = new TaskBook(
+      store,
+      events,
+      traces.tracer,
+      new Breakers<PresetName>(),
+      { maxAttempts: this.settings.MAX_ATTEMPTS, deadLetterShare: this.settings.DEAD_LETTER_SHARE, deadLetter: true },
+      (chunk) => void chunk.worker?.handle.shrink(chunk.id, chunk.cursor + 1),
+    )
   }
 
   async onApplicationBootstrap(): Promise<void> {
     await this.recover()
-    this.timers.push(setInterval(() => this.checkpoint(), this.settings.CHECKPOINT_MS))
+    this.timers.push(
+      setInterval(() => {
+        this.checkpoint()
+        this.book.forget(Date.now() - forgetAfterMs)
+      }, this.settings.CHECKPOINT_MS),
+    )
     this.timers.push(setInterval(() => this.events.savePoolSnapshot(this.snapshot()), 1000))
     for (let i = 0; i < this.settings.BUDGET; i++) void this.spawn()
   }
@@ -214,10 +222,6 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       cancelled++
     }
     return cancelled
-  }
-
-  flush(): Promise<unknown> {
-    return this.store.flush()
   }
 
   health() {
@@ -403,7 +407,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         lease.span?.setStatus({ code: SpanStatusCode.ERROR, message: `worker ${exit.reason}` })
       lease.span?.end()
       lease.span = null
-      if (!this.stopping) {
+      lease.worker = null
+      if (this.stopping) {
+        this.store.leaseReleased(lease.id, 'pending', lease.cursor)
+      } else {
         this.book.released(lease.task, lease, exit)
         this.dispatch()
       }
@@ -412,27 +419,21 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private checkpoint(): void {
-    const now = Date.now()
     const leases = [...this.moved].filter((l) => l.state === 'running').map((l) => ({ id: l.id, cursor: l.cursor }))
     const tasks = [...this.changed].filter((t) => t.open).map((t) => ({ id: t.id, done: t.done, dead: t.dead }))
     this.moved.clear()
     this.changed.clear()
     this.store.checkpoint(leases, tasks)
-    for (const task of this.book.tasks.values()) {
-      const ended = task.finishedAt !== null && now - task.finishedAt > forgetAfterMs
-      if (ended && task.leases.every((l) => l.state === 'done')) this.book.tasks.delete(task.id)
-    }
   }
 
   private async recover(): Promise<void> {
-    const rows = await this.store.unfinished()
+    await this.store.releaseAfterRestart()
+    const rows = await this.store.unfinishedTasks()
     for (const row of rows) {
       const dataset = await this.datasets.get(row.dataset).catch(() => null)
       if (!dataset || !isPresetName(row.preset)) {
-        await this.store.abandon(
-          row.id,
-          dataset ? `no preset ${row.preset} after a restart` : 'dataset gone after a restart',
-        )
+        const reason = dataset ? `no preset ${row.preset} after a restart` : 'dataset gone after a restart'
+        this.store.failed({ id: row.id, done: row.done, dead: row.deadLettered }, 'fail', reason, new Date())
         continue
       }
       const preset = row.preset
@@ -453,21 +454,15 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
           row.traceId ? resume(row.traceId) : undefined,
         ),
       })
-      task.status = row.status === 'RUNNING' ? 'RUNNING' : 'QUEUED'
-      task.dead = row.deadLetters.length
-      task.remainingMs = 0
-      let processed = 0
       for (const l of row.leases) {
         const state = l.state === 'DONE' ? 'done' : 'pending'
         task.leases.push({ id: l.id, task, lo: l.lo, hi: l.hi, cursor: l.cursor, state, worker: null, span: null })
-        processed += (state === 'done' ? l.hi : l.cursor) - l.lo
-        if (state === 'pending') task.remainingMs += predicted.subarray(l.cursor, l.hi).reduce((sum, ms) => sum + ms, 0)
       }
-      task.done = processed - task.dead
-      this.book.tasks.set(task.id, task)
+      task.restore(row.status === 'RUNNING' ? 'RUNNING' : 'QUEUED', row.deadLetters.length)
       this.changed.add(task)
-      this.book.settle(task)
+      this.book.track(task)
     }
+    await this.store.flush()
     if (rows.length > 0) this.logger.log(`recovered ${rows.length} unfinished tasks`)
   }
 }

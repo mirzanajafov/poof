@@ -99,7 +99,6 @@ export class Exhibits implements BeforeApplicationShutdown {
       engine = new LeaseEngine(
         {
           exhibitId: id,
-          policyName: params.policy,
           policy,
           budget: this.settings.BUDGET,
           maxProcesses: this.settings.EXHIBIT_MAX_PROCESSES,
@@ -231,7 +230,7 @@ export class Exhibits implements BeforeApplicationShutdown {
 
   private async finishPool(current: Current): Promise<ExhibitStats> {
     const cancelled = this.scheduler.cancel(current.pool.tasks, 'exhibit ended')
-    await this.scheduler.flush()
+    await this.store.flush()
     const stats = await this.poolCounts(current)
     stats.cancelled = cancelled
     return stats

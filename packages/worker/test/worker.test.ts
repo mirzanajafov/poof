@@ -99,6 +99,19 @@ describe('worker', () => {
     handle.kill()
   })
 
+  it('refuses a second shrink of a lease while the first is in flight and still answers the first', async () => {
+    const taskDir = await makeTask('overlap', 40)
+    const handle = await started()
+    const { leaseDone } = collect(handle)
+    handle.assign(assignment(taskDir, 'a', 0, 40), 10_000)
+    const first = handle.shrink('a', 20)
+    const second = handle.shrink('a', 10)
+    expect((await second).ok).toBe(false)
+    expect((await first).ok).toBe(true)
+    expect((await leaseDone('a')).hi).toBe(20)
+    handle.kill()
+  })
+
   it('refuses a cut at or behind the item in flight', async () => {
     const taskDir = await makeTask('refuse', 20)
     const handle = await started()

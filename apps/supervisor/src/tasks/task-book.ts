@@ -42,6 +42,7 @@ export class TaskBook<Lease extends TaskLease> {
     private readonly tracer: Tracer,
     readonly breakers: Breakers<PresetName>,
     private readonly rules: BookRules,
+    private readonly stop: (lease: Lease) => void,
   ) {}
 
   active(): Array<Task<Lease>> {
@@ -83,10 +84,21 @@ export class TaskBook<Lease extends TaskLease> {
     this.settle(task)
   }
 
+  track(task: Task<Lease>): void {
+    this.tasks.set(task.id, task)
+    this.settle(task)
+  }
+
+  forget(endedBefore: number): void {
+    for (const task of this.tasks.values()) {
+      const ended = task.finishedAt !== null && task.finishedAt < endedBefore
+      if (ended && task.leases.every((lease) => lease.state === 'done')) this.tasks.delete(task.id)
+    }
+  }
+
   released(task: Task<Lease>, lease: TaskLease, exit: ExitReport): void {
-    lease.worker = null
     const inflight = exit.inflight
-    if (inflight?.lease === lease.id && exit.reason !== 'normal') {
+    if (task.open && inflight?.lease === lease.id && exit.reason !== 'normal') {
       const crash = task.crashed(inflight.item, this.rules.maxAttempts, this.rules.deadLetter)
       this.store.decided(task.id, 'worker-exit', { reason: exit.reason, item: crash.item, attempts: crash.attempts })
       if (crash.deadLettered) {
@@ -106,18 +118,17 @@ export class TaskBook<Lease extends TaskLease> {
     if (!task.open) return
     task.status = 'FAILED'
     task.finishedAt = Date.now()
-    const leases: readonly TaskLease[] = task.leases
-    for (const lease of leases) {
-      if (lease.state === 'pending') {
+    for (const lease of task.leases) {
+      if (lease.state === 'running') {
+        this.stop(lease)
+      } else if (lease.state !== 'done') {
         lease.state = 'done'
         lease.span?.end()
-      } else if (lease.state === 'running' && lease.worker) {
-        void lease.worker.handle.shrink(lease.id, lease.cursor + 1)
       }
     }
     if (kind === 'cancel') this.counts.cancelled++
     else this.counts.failed++
-    this.store.failed(task, kind, reason)
+    this.store.failed(task, kind, reason, new Date(task.finishedAt))
     this.events.publish({ kind: 'task.failed', task: task.id, reason })
     task.span.setAttributes({
       'poof.outcome': kind === 'cancel' ? 'cancelled' : 'failed',
@@ -129,7 +140,7 @@ export class TaskBook<Lease extends TaskLease> {
     task.span.end()
   }
 
-  settle(task: Task<Lease>): void {
+  private settle(task: Task<Lease>): void {
     if (!task.open || !task.complete) return
     task.status = 'DONE'
     task.finishedAt = Date.now()
@@ -138,6 +149,11 @@ export class TaskBook<Lease extends TaskLease> {
     if (met) this.counts.met++
     const unfinished = task.leases.filter((lease) => lease.state !== 'done')
     this.store.finished(task, unfinished, new Date(task.finishedAt))
+    for (const lease of unfinished) {
+      if (lease.state === 'running') continue
+      lease.state = 'done'
+      lease.span?.end()
+    }
     this.events.publish({ kind: 'task.done', task: task.id, met, dead: task.dead })
     task.span.setAttributes({ 'poof.outcome': met ? 'met' : 'late', 'poof.done': task.done, 'poof.dead': task.dead })
     task.span.end(task.finishedAt)

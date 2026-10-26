@@ -11,7 +11,6 @@ import {
   predictedCostMs,
   updateEstimate,
   type Estimate,
-  type ExhibitPolicyName,
   type LeaseInfo,
   type PolicyConfig,
   type Preemption,
@@ -30,7 +29,6 @@ import type { LeaseRow, TaskStore } from '../tasks/task-store.js'
 
 export interface EngineOptions {
   exhibitId: string
-  policyName: ExhibitPolicyName
   policy: PolicyConfig
   budget: number
   maxProcesses: number
@@ -93,11 +91,20 @@ export class LeaseEngine {
     private readonly events: Events,
     private readonly datasets: Datasets,
   ) {
-    this.book = new TaskBook(store, events, options.tracer, new Breakers<PresetName>(options.policy.breaker), {
-      maxAttempts: options.maxAttempts,
-      deadLetterShare: options.deadLetterShare,
-      deadLetter: options.policy.deadLetter,
-    })
+    this.book = new TaskBook(
+      store,
+      events,
+      options.tracer,
+      new Breakers<PresetName>(options.policy.breaker),
+      {
+        maxAttempts: options.maxAttempts,
+        deadLetterShare: options.deadLetterShare,
+        deadLetter: options.policy.deadLetter,
+      },
+      (lease) => {
+        if (!lease.busy) void lease.worker?.handle.shrink(lease.id, lease.cursor + 1)
+      },
+    )
   }
 
   start(): void {
@@ -147,7 +154,7 @@ export class LeaseEngine {
     const placement = {
       dataset: dataset.name,
       offset,
-      policy: this.options.policyName,
+      policy: this.options.policy.name,
       exhibitId: this.options.exhibitId,
     }
     if (this.options.policy.admission) {
@@ -167,10 +174,10 @@ export class LeaseEngine {
       await this.datasets.removeTask(id)
       return false
     }
-    this.counters.submitted++
     const size = Math.ceil(task.items / Math.max(1, this.options.policy.upfront))
     for (let lo = 0; lo < task.items; lo += size) this.newLease(task, lo, Math.min(task.items, lo + size), null, 0)
     await this.book.accept(task, placement, task.leases.map(leaseRow))
+    this.counters.submitted++
     for (const lease of task.leases) this.announce(lease)
     return true
   }
@@ -332,7 +339,7 @@ export class LeaseEngine {
     for (const worker of this.workers) {
       if (worker.yielding) yielding++
       const lease = worker.lease
-      if (worker.yielding || lease?.state !== 'running' || lease.busy) continue
+      if (worker.yielding || lease?.state !== 'running' || lease.busy || !lease.task.open) continue
       running.push({ leaseId: lease.id, deadline: lease.task.deadline, remaining: lease.hi - lease.cursor - 1 })
     }
     return { running, yielding, minRemaining: 2 }
@@ -348,7 +355,7 @@ export class LeaseEngine {
     const result = await lease.worker.handle.shrink(lease.id, plan.cut)
     this.reserved -= plan.children.length
     lease.busy = false
-    if (!result.ok || this.stopped) return
+    if (!result.ok || this.stopped || !lease.task.open) return
     lease.hi = plan.cut
     lease.lastSplitAt = Date.now()
     this.counters.splits++
@@ -384,6 +391,7 @@ export class LeaseEngine {
       worker.yielding = false
       return
     }
+    if (!lease.task.open) return
     const rest = lease.hi
     lease.hi = cut
     this.counters.preemptions++
@@ -419,7 +427,9 @@ export class LeaseEngine {
       () => {
         spawn.setAttribute('poof.worker.pid', worker.handle.pid)
         spawn.end()
-        if (this.stopped) {
+        if (this.stopped || lease.state !== 'starting') {
+          this.workers.delete(worker)
+          lease.worker = null
           worker.handle.kill('killed')
           return
         }
@@ -485,11 +495,12 @@ export class LeaseEngine {
     if (lease?.id !== message.lease) return
     const task = lease.task
     lease.state = 'done'
+    lease.cursor = Math.max(lease.cursor, message.hi)
     lease.worker = null
     worker.lease = null
-    lease.span.setAttribute('poof.hi', lease.hi)
+    lease.span.setAttribute('poof.hi', message.hi)
     lease.span.end()
-    this.store.leaseDone(lease.id, lease.hi)
+    this.store.leaseDone(lease.id, lease.cursor)
     const next = worker.yielding || this.stopped ? undefined : task.leases.find((l) => l.state === 'pending')
     if (next && task.status === 'RUNNING' && this.book.breakers.allows(task.preset, Date.now())) {
       this.counters.adoptions++
@@ -511,10 +522,8 @@ export class LeaseEngine {
     this.events.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
     const lease = worker.lease
     if (!lease) return
-    if (this.stopped) {
-      lease.worker = null
-      return
-    }
+    lease.worker = null
+    if (this.stopped) return
     if (exit.reason !== 'normal') {
       lease.span.addEvent('worker exit', { 'poof.reason': exit.reason, 'poof.item': exit.inflight?.item ?? -1 })
     }
