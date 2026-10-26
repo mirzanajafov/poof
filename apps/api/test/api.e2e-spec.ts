@@ -102,6 +102,18 @@ describe('read model', () => {
     expect((await http().get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
   })
 
+  it('answers 503, not 404 or 500, while Redis is down', async () => {
+    running = await start(supervisor.url, { REDIS_URL: 'redis://127.0.0.1:9' })
+    const health = await http().get('/api/health')
+    expect(health.status).toBe(503)
+    expect(health.body).toEqual({ ok: false, redis: false, db: true })
+    expect((await http().get('/api/state')).status).toBe(503)
+    expect((await http().get('/api/exhibits/current')).status).toBe(503)
+    const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
+    expect((await http().post('/api/tasks').send(body)).status).toBe(503)
+    expect(supervisor.calls).toHaveLength(0)
+  })
+
   it('lists the datasets on disk that the supervisor would serve', async () => {
     running = await start(supervisor.url)
     const items = [

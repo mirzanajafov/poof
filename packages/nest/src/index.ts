@@ -1,4 +1,6 @@
 export * from './app.ts'
 export * from './database.ts'
 export * from './env.ts'
+export * from './errors.ts'
+export * from './redis.ts'
 export * from './traces.ts'

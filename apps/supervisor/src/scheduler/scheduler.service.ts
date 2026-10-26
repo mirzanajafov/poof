@@ -13,11 +13,11 @@ import {
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
-import { Traces } from '@poof/nest'
+import { NotFoundError, Traces } from '@poof/nest'
 import { resume, SpanStatusCode, within, type Context } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
 import { Env } from '../config/env.js'
-import { Datasets } from '../datasets/datasets.service.js'
+import { Datasets, type Dataset } from '../datasets/datasets.service.js'
 import { Events } from '../infra/events.js'
 import { Task, type TaskLease } from '../tasks/task.js'
 import { TaskBook } from '../tasks/task-book.js'
@@ -33,7 +33,13 @@ export interface SubmitRequest {
 
 export type SubmitResult =
   | { accepted: true; id: string; items: number; predictedSeconds: number }
-  | { accepted: false; id: string | null; reason: string; retryAfterSeconds: number; code: 429 | 503 }
+  | {
+      accepted: false
+      id: string | null
+      refusal: 'paused' | 'over-capacity'
+      reason: string
+      retryAfterSeconds: number
+    }
 
 interface Chunk extends TaskLease {
   readonly task: Task<Chunk>
@@ -104,7 +110,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   async submit(request: SubmitRequest, options: { exhibitId?: string; trace?: Context } = {}): Promise<SubmitResult> {
     if (this.paused) {
       const retryAfterSeconds = Math.max(1, Math.ceil((this.pausedUntil - Date.now()) / 1000))
-      return { accepted: false, id: null, reason: 'an exhibit is running', retryAfterSeconds, code: 503 }
+      return { accepted: false, id: null, refusal: 'paused', reason: 'an exhibit is running', retryAfterSeconds }
     }
     const dataset = await this.datasets.get(request.dataset)
     const offset = request.offset ?? 0
@@ -148,9 +154,9 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       return {
         accepted: false,
         id,
+        refusal: 'over-capacity',
         reason: 'the box cannot finish this before its deadline',
         retryAfterSeconds,
-        code: 429,
       }
     }
     await this.datasets.createTask(id, dataset, items)
@@ -403,10 +409,18 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     await this.store.releaseAfterRestart()
     const rows = await this.store.unfinishedTasks()
     for (const row of rows) {
-      const dataset = await this.datasets.get(row.dataset).catch(() => null)
-      if (!dataset || !isPresetName(row.preset)) {
-        const reason = dataset ? `no preset ${row.preset} after a restart` : 'dataset gone after a restart'
-        this.store.failed({ id: row.id, done: row.done, dead: row.deadLettered }, 'fail', reason, new Date())
+      const progress = { id: row.id, done: row.done, dead: row.deadLettered }
+      let dataset: Dataset
+      try {
+        dataset = await this.datasets.get(row.dataset)
+      } catch (error) {
+        const reason =
+          error instanceof NotFoundError ? 'dataset gone' : `dataset ${row.dataset} unreadable (${String(error)})`
+        this.store.failed(progress, 'fail', `${reason} after a restart`, new Date())
+        continue
+      }
+      if (!isPresetName(row.preset)) {
+        this.store.failed(progress, 'fail', `no preset ${row.preset} after a restart`, new Date())
         continue
       }
       const preset = row.preset

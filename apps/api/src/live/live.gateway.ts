@@ -1,6 +1,6 @@
 import type { OnApplicationShutdown } from '@nestjs/common'
 import { type OnGatewayConnection, type OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
-import { liveEventsChannel, type LiveEvent, type LiveSocketEvents } from '@poof/contracts'
+import { liveEventsChannel, parseLiveEvent, type LiveEvent, type LiveSocketEvents } from '@poof/contracts'
 import type { Server, Socket } from 'socket.io'
 import { Cache } from '../infra/cache.js'
 
@@ -21,18 +21,20 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
 
   afterInit(): void {
     this.cache.subscribe(liveEventsChannel, (message) => {
-      if (this.buffer.length >= MAX_BUFFER) {
+      const event = parseLiveEvent(message)
+      if (!event || this.buffer.length >= MAX_BUFFER) {
         this.dropped++
         return
       }
-      this.buffer.push(JSON.parse(message) as LiveEvent)
+      this.buffer.push(event)
     })
     this.timers.push(setInterval(() => this.flush(), BATCH_MS))
     this.timers.push(setInterval(() => void this.broadcastSnapshot(), SNAPSHOT_MS))
   }
 
   async handleConnection(client: Socket<Record<string, never>, LiveSocketEvents>): Promise<void> {
-    client.emit('snapshot', await this.cache.liveSnapshot())
+    const snapshot = await this.cache.liveSnapshot().catch(() => null)
+    if (snapshot) client.emit('snapshot', snapshot)
   }
 
   private flush(): void {
@@ -43,7 +45,8 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
 
   private async broadcastSnapshot(): Promise<void> {
     if (this.server.engine.clientsCount === 0) return
-    this.server.emit('snapshot', await this.cache.liveSnapshot())
+    const snapshot = await this.cache.liveSnapshot().catch(() => null)
+    if (snapshot) this.server.emit('snapshot', snapshot)
   }
 
   onApplicationShutdown(): void {

@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
 import { Database } from '@poof/nest'
 import { Cache } from '../infra/cache.js'
 
@@ -12,6 +12,8 @@ export class HealthController {
   @Get()
   async health() {
     const [redis, db] = await Promise.all([this.cache.ping(), this.db.ping()])
-    return { ok: redis && db, redis, db }
+    const health = { ok: redis && db, redis, db }
+    if (!health.ok) throw new ServiceUnavailableException(health)
+    return health
   }
 }

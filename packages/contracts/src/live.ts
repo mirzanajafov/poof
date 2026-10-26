@@ -23,6 +23,44 @@ export type LiveEventBody =
 
 export type LiveEvent = LiveEventBody & { at: number }
 
+const liveEventKinds: Record<LiveEvent['kind'], true> = {
+  'task.accepted': true,
+  'task.rejected': true,
+  'task.done': true,
+  'task.failed': true,
+  'lease.claimed': true,
+  'lease.created': true,
+  item: true,
+  'item.dead': true,
+  'worker.spawned': true,
+  'worker.exit': true,
+  breaker: true,
+  'exhibit.started': true,
+  'exhibit.ended': true,
+}
+
+export function parseLiveEvent(text: string): LiveEvent | null {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  return isLiveEvent(value) ? value : null
+}
+
+function isLiveEvent(value: unknown): value is LiveEvent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    typeof value.kind === 'string' &&
+    Object.hasOwn(liveEventKinds, value.kind) &&
+    'at' in value &&
+    typeof value.at === 'number'
+  )
+}
+
 export interface PoolWorkerView {
   id: string
   pid: number

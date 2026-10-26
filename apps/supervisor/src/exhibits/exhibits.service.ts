@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { ConflictException, Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
 import {
   emptyExhibitStats,
   type ExhibitEnd,
@@ -8,7 +8,7 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
-import { Database, Traces } from '@poof/nest'
+import { ConflictError, Database, Traces } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
@@ -48,7 +48,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   ) {}
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
-    if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
+    if (this.current || this.starting) throw new ConflictError('an exhibit is already running')
     const starting = this.begin(params, trace)
     this.starting = starting
     try {

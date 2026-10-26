@@ -7,7 +7,8 @@ import {
   type LiveEventBody,
   type PoolSnapshot,
 } from '@poof/contracts'
-import { Redis } from 'ioredis'
+import { closeRedis, connectRedis } from '@poof/nest'
+import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
@@ -15,8 +16,7 @@ export class Events implements OnApplicationShutdown {
   private readonly redis: Redis
 
   constructor(env: Env) {
-    this.redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })
-    this.redis.on('error', () => undefined)
+    this.redis = connectRedis(env.REDIS_URL, Events.name)
   }
 
   publish(event: LiveEventBody): void {
@@ -40,6 +40,6 @@ export class Events implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit().catch(() => undefined)
+    await closeRedis(this.redis).catch(() => undefined)
   }
 }

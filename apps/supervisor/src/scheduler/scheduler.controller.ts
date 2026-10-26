@@ -17,7 +17,7 @@ export class SchedulerController {
   ): Promise<SubmitResult> {
     const result = await this.scheduler.submit(body, { trace: extract(headers) })
     if (!result.accepted) {
-      res.status(result.code)
+      res.status(result.refusal === 'paused' ? 503 : 429)
       res.setHeader('Retry-After', String(result.retryAfterSeconds))
     }
     return result

@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import {
   datasetDir,
   datasetNamePattern,
@@ -13,6 +13,7 @@ import {
   type ManifestItem,
   type TaskManifest,
 } from '@poof/contracts'
+import { isMissingFile, NotFoundError } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { linkOrCopy } from './files.js'
 
@@ -28,16 +29,13 @@ export class Datasets {
   constructor(private readonly env: Env) {}
 
   async get(name: string): Promise<Dataset> {
-    if (!datasetNamePattern.test(name)) throw new NotFoundException(`no dataset ${name}`)
+    if (!datasetNamePattern.test(name)) throw new NotFoundError(`no dataset ${name}`)
     const cached = this.cache.get(name)
     if (cached) return cached
     const path = manifestPath(datasetDir(this.env.DATA_DIR, name))
-    let text: string
-    try {
-      text = await readFile(path, 'utf8')
-    } catch {
-      throw new NotFoundException(`no dataset ${name}`)
-    }
+    const text = await readFile(path, 'utf8').catch((error: unknown) => {
+      throw isMissingFile(error) ? new NotFoundError(`no dataset ${name}`) : error
+    })
     const dataset: Dataset = { name, items: parseManifest(text, path).items }
     this.cache.set(name, dataset)
     return dataset
@@ -57,7 +55,10 @@ export class Datasets {
   }
 
   taskFolders(): Promise<string[]> {
-    return readdir(tasksDir(this.env.DATA_DIR)).catch(() => [])
+    return readdir(tasksDir(this.env.DATA_DIR)).catch((error: unknown) => {
+      if (isMissingFile(error)) return []
+      throw error
+    })
   }
 
   async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
