@@ -131,6 +131,9 @@ describe('read model', () => {
     const changed = await http().get(`/api/tasks/${id}/items/3`).set('If-Unmodified-Since', new Date(0).toUTCString())
     expect(changed.status).toBe(412)
     expect(changed.headers['cache-control']).toBeUndefined()
+    expect(changed.headers['access-control-allow-origin']).toBe('http://localhost:3112')
+    await writeFile(join(running.dataDir, 'tasks', id, 'out', '5.jpg'), Buffer.from('not really a jpeg'))
+    expect((await http().get(`/api/tasks/${id}/items/5`)).headers['content-type']).toBe('image/jpeg')
     expect((await http().get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
     expect((await http().get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
     expect((await http().get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
@@ -170,6 +173,13 @@ describe('submissions', () => {
 
   it('answers 502 when the supervisor is down', async () => {
     running = await start('http://127.0.0.1:9')
+    const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
+    expect(res.status).toBe(502)
+  })
+
+  it('answers 502 when the supervisor sends something that is not JSON', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 200, raw: '<html>bad gateway</html>' })
     const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
     expect(res.status).toBe(502)
   })

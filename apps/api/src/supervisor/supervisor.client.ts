@@ -24,7 +24,7 @@ export class Supervisor {
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body: unknown,
-    incoming: Record<string, unknown> = {},
+    incoming: Record<string, unknown>,
   ): Promise<SupervisorReply> {
     const span = this.traces.tracer.startSpan(
       `${method} /api${path}`,
