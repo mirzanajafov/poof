@@ -16,12 +16,12 @@ export function until(deadline: number, now: number): string {
   return left >= 0 ? `due in ${seconds(left)}` : `${seconds(left)} late`
 }
 
-const exitWords: Record<ExitReason, string> = {
+export const exitWords: Record<ExitReason, string> = {
   crash: 'crashed',
-  memory: 'was killed for using too much memory',
-  timeout: 'was killed: an item took too long',
-  heartbeat: 'went silent and was killed',
-  killed: 'was stopped',
+  memory: 'killed for using too much memory',
+  timeout: 'killed because an item took too long',
+  heartbeat: 'killed for going silent',
+  killed: 'stopped',
   normal: 'retired',
 }
 
@@ -51,7 +51,7 @@ export function describe(event: LiveEvent): string | null {
     case 'worker.spawned':
       return `Worker ${event.pid} started`
     case 'worker.exit':
-      return event.reason === 'normal' ? null : `A worker ${exitWords[event.reason]}`
+      return event.reason === 'normal' ? null : `A worker exited: ${exitWords[event.reason]}`
     case 'breaker':
       return `Breaker for ${event.preset} is now ${event.state}`
     case 'exhibit.started':

@@ -5,7 +5,9 @@ import type { ExhibitPolicyName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
 import { seconds, short } from '@/lib/format'
+import { post, refusal } from '@/lib/post'
 import { layoutLeases } from '@/lib/tree'
+import { useNow } from './useNow'
 
 const choices: Array<{ policy: ExhibitPolicyName; title: string; text: string }> = [
   {
@@ -39,15 +41,10 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
     setBusy(true)
     setMessage(null)
     try {
-      const res = await fetch('/api/exhibits', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ policy }),
-      })
-      if (res.status !== 201) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string }
-        const retry = res.headers.get('retry-after')
-        setMessage(`${body.message ?? `Refused (${res.status})`}${retry ? `. Try again in ${retry} s.` : '.'}`)
+      const answer = await post('/api/exhibits', { policy })
+      if (answer.status !== 201) {
+        const retry = answer.retryAfter ? `. Try again in ${answer.retryAfter} s.` : '.'
+        setMessage(`${refusal(answer)}${retry}`)
       }
     } catch {
       setMessage('The box did not answer.')
@@ -89,7 +86,7 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
           </div>
           <button
             type="button"
-            onClick={start}
+            onClick={() => void start()}
             disabled={busy}
             className="mt-4 rounded-lg bg-storm px-4 py-2 font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
           >
@@ -103,7 +100,7 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
 }
 
 function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; processes: number[] }) {
-  const left = Math.max(0, exhibit.endsAt - Date.now())
+  const left = Math.max(0, exhibit.endsAt - useNow(1000))
   const s = exhibit.stats
   const kills = Object.entries(s.exits)
     .filter(([reason]) => reason !== 'normal')
@@ -160,37 +157,32 @@ function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; process
   )
 }
 
-const stateClass: Record<ExhibitLeaseView['state'], string> = {
-  running: 'fill-accent',
-  starting: 'fill-faint',
-  pending: 'fill-raised stroke-faint',
-  done: 'fill-good',
+const states: Record<ExhibitLeaseView['state'], { className: string; label: string }> = {
+  running: { className: 'fill-accent', label: 'working' },
+  starting: { className: 'fill-faint', label: 'starting' },
+  pending: { className: 'fill-raised stroke-faint', label: 'waiting for a process' },
+  done: { className: 'fill-good', label: 'done' },
 }
 
 function LeaseTree({ leases }: { leases: ExhibitLeaseView[] }) {
   const layout = layoutLeases(leases, 22, 30)
   const pad = 10
-  const at = new Map(layout.nodes.map((n) => [n.lease.id, n]))
   return (
     <svg width={layout.width + pad * 2} height={layout.height + pad} role="img" aria-label={`${leases.length} leases`}>
       <g transform={`translate(${pad + 11},${pad})`}>
-        {layout.edges.map((edge) => {
-          const a = at.get(edge.from)!
-          const b = at.get(edge.to)!
-          return (
-            <line
-              key={`${edge.from}-${edge.to}`}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              className="stroke-line"
-              strokeWidth={1.5}
-            />
-          )
-        })}
+        {layout.edges.map((edge) => (
+          <line
+            key={`${edge.from.lease.id}-${edge.to.lease.id}`}
+            x1={edge.from.x}
+            y1={edge.from.y}
+            x2={edge.to.x}
+            y2={edge.to.y}
+            className="stroke-line"
+            strokeWidth={1.5}
+          />
+        ))}
         {layout.nodes.map(({ lease, x, y }) => (
-          <circle key={lease.id} cx={x} cy={y} r={6} strokeWidth={1.5} className={stateClass[lease.state]}>
+          <circle key={lease.id} cx={x} cy={y} r={6} strokeWidth={1.5} className={states[lease.state].className}>
             <title>
               {`images ${lease.lo}-${lease.hi - 1}, ${lease.state}${lease.pid ? `, pid ${lease.pid}` : ''}`}
             </title>
@@ -202,18 +194,12 @@ function LeaseTree({ leases }: { leases: ExhibitLeaseView[] }) {
 }
 
 function Legend() {
-  const items: Array<[string, string]> = [
-    ['fill-accent', 'working'],
-    ['fill-faint', 'starting'],
-    ['fill-raised stroke-faint', 'waiting for a process'],
-    ['fill-good', 'done'],
-  ]
   return (
     <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted">
-      {items.map(([cls, label]) => (
+      {Object.values(states).map(({ className, label }) => (
         <span key={label} className="flex items-center gap-1">
           <svg width={12} height={12} aria-hidden>
-            <circle cx={6} cy={6} r={5} strokeWidth={1.5} className={cls} />
+            <circle cx={6} cy={6} r={5} strokeWidth={1.5} className={className} />
           </svg>
           {label}
         </span>

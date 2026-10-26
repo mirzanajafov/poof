@@ -1,27 +1,13 @@
+import type { TaskDetail, TaskStatus } from '@poof/contracts'
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
+import { Elapsed } from '@/components/Elapsed'
 import { Refresh } from '@/components/Refresh'
+import { Stats } from '@/components/Stats'
 import { api } from '@/lib/api'
 import { seconds, short } from '@/lib/format'
-
-interface TaskDetail {
-  id: string
-  dataset: string
-  preset: string
-  items: number
-  policy: string
-  status: string
-  done: number
-  deadLettered: number
-  predictedMs: number
-  submittedAt: string
-  deadline: string
-  startedAt: string | null
-  finishedAt: string | null
-  leases: Array<{ id: string; lo: number; hi: number; cursor: number; state: string; depth: number }>
-  deadLetters: Array<{ item: number; attempts: number; error: string }>
-  decisions: Array<{ id: string; at: string; kind: string; detail: Record<string, unknown> }>
-}
+import { isUuid } from '@/lib/ids'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `Task ${short((await params).id)}` }
 }
 
-const statusTone: Record<string, string> = {
+const statusTone: Record<TaskStatus, string> = {
   DONE: 'bg-good-soft',
   RUNNING: 'bg-accent-soft',
   QUEUED: 'bg-accent-soft',
@@ -39,7 +25,7 @@ const statusTone: Record<string, string> = {
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!/^[0-9a-f-]{36}$/.test(id)) notFound()
+  if (!isUuid(id)) notFound()
   const task = await api<TaskDetail>(`/tasks/${id}`)
   if (!task) notFound()
   const submitted = new Date(task.submittedAt).getTime()
@@ -57,29 +43,21 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </p>
         <h1 className="mt-1 flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
           Task {short(task.id)}
-          <span className={`rounded-full px-2.5 py-0.5 text-sm font-medium ${statusTone[task.status] ?? ''}`}>
+          <span className={`rounded-full px-2.5 py-0.5 text-sm font-medium ${statusTone[task.status]}`}>
             {task.status.toLowerCase()}
           </span>
         </h1>
       </header>
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
+      <Stats
+        items={[
           ['Images', `${task.done} / ${task.items}`],
           ['Predicted work', seconds(task.predictedMs)],
           ['Allowed', seconds(deadline - submitted)],
-          [
-            finished ? 'Took' : 'Running for',
-            finished
-              ? `${seconds(finished - submitted)}${finished <= deadline ? ', on time' : ', late'}`
-              : seconds(Date.now() - submitted),
-          ],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-line bg-surface px-3 py-3">
-            <dt className="text-xs text-muted">{label}</dt>
-            <dd className="tabular mt-1 text-lg font-semibold">{value}</dd>
-          </div>
-        ))}
-      </dl>
+          finished
+            ? ['Took', `${seconds(finished - submitted)}${finished <= deadline ? ', on time' : ', late'}`]
+            : ['Running for', <Elapsed key="elapsed" since={submitted} />],
+        ]}
+      />
       {task.status !== 'REJECTED' && (
         <section>
           <h2 className="text-sm font-semibold">Results</h2>
@@ -92,10 +70,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               const ready = task.leases.some((l) => i >= l.lo && i < l.cursor) && !dead.has(i)
               return ready ? (
                 <a key={i} href={`/api/tasks/${task.id}/items/${i}`} target="_blank" rel="noreferrer" className="block">
-                  <img
+                  <Image
                     src={`/api/tasks/${task.id}/items/${i}`}
                     alt={`Result ${i}`}
-                    loading="lazy"
+                    width={160}
+                    height={160}
+                    unoptimized
                     className="aspect-square w-full rounded-md border border-line object-cover"
                   />
                 </a>

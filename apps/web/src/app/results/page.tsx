@@ -1,20 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import summary from '@poof/sim/results/server/summary.json'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Results' }
 export const dynamic = 'force-static'
 
-interface Cell {
-  machine: string
-  scenario: string
-  policy: string
-  budget: number
-  hitRate: { mean: number; lo: number; hi: number }
-  spawnsPerTask: number
-}
-
-const results = join(process.cwd(), '..', '..', 'packages', 'sim', 'results', 'server')
+const results = join(process.cwd(), 'node_modules', '@poof', 'sim', 'results', 'server')
 const policies = [
   'never',
   'static-4',
@@ -36,7 +28,6 @@ function pct(value: number): string {
 }
 
 export default async function Results() {
-  const summary = JSON.parse(await readFile(join(results, 'summary.json'), 'utf8')) as { cells: Cell[] }
   const charts = await Promise.all(['hit-rate-cage.svg', 'burst-processes-cage.svg', 'burst-goodput-cage.svg'].map(svg))
   const cell = (machine: string, scenario: string, policy: string) =>
     summary.cells.find((c) => c.machine === machine && c.scenario === scenario && c.policy === policy)

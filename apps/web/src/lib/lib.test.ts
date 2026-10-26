@@ -20,7 +20,7 @@ group('format', () => {
       'Image 4 of task abcdef dead-lettered after 3 tries',
     )
     expect(describe({ kind: 'worker.exit', at: 0, worker: 'w', reason: 'timeout' })).toBe(
-      'A worker was killed: an item took too long',
+      'A worker exited: killed because an item took too long',
     )
     expect(describe({ kind: 'worker.exit', at: 0, worker: 'w', reason: 'normal' })).toBeNull()
     expect(describe({ kind: 'item', at: 0, task: 't', lease: 'l', item: 1, ok: true })).toBeNull()
@@ -51,9 +51,9 @@ group('layoutLeases', () => {
     expect(at('a')).toMatchObject({ x: 0, y: 50 })
     expect(at('b')).toMatchObject({ x: 100, y: 50 })
     expect(at('r')).toMatchObject({ x: 50, y: 0 })
-    expect(layout.edges).toEqual([
-      { from: 'r', to: 'a' },
-      { from: 'r', to: 'b' },
+    expect(layout.edges.map((edge) => [edge.from.lease.id, edge.to.lease.id])).toEqual([
+      ['r', 'a'],
+      ['r', 'b'],
     ])
     expect(layout.height).toBe(100)
   })

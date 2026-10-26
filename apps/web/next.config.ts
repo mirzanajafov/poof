@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 
 const api = process.env.API_URL ?? 'http://localhost:3111'
@@ -5,7 +6,7 @@ const api = process.env.API_URL ?? 'http://localhost:3111'
 const config: NextConfig = {
   poweredByHeader: false,
   output: 'standalone',
-  outputFileTracingRoot: new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${api}/api/:path*` }]
   },

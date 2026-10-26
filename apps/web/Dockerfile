@@ -4,12 +4,13 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/core/package.json packages/core/
+COPY packages/sim/package.json packages/sim/
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter "@poof/web..."
 COPY packages/contracts packages/contracts
 COPY packages/core packages/core
+COPY packages/sim packages/sim
 COPY apps/web apps/web
-COPY packages/sim/results/server packages/sim/results/server
 ARG NEXT_PUBLIC_LIVE_URL=
 ENV API_URL=http://poof-api:3111 NEXT_PUBLIC_LIVE_URL=${NEXT_PUBLIC_LIVE_URL}
 RUN pnpm --filter "@poof/web..." build
