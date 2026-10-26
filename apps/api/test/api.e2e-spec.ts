@@ -37,6 +37,7 @@ afterEach(async () => {
 })
 
 const http = () => request(running!.app.getHttpServer())
+const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, workers: [], tasks: [], breakers: {} })
 const admin = { Authorization: `Bearer ${adminToken}` }
 
 async function seedTask() {
@@ -225,8 +226,7 @@ describe('exhibits', () => {
 describe('live view', () => {
   it('sends a snapshot on connect and relays supervisor events in batches', async () => {
     running = await start(supervisor.url)
-    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
-    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
+    await running.redis.set(poolSnapshotKey, JSON.stringify(poolSnapshot()))
     const socket: Socket<LiveSocketEvents> = io(running.url, { transports: ['websocket'] })
     const snapshot = await new Promise<LiveSnapshot>((resolve) => socket.once('snapshot', resolve))
     expect(snapshot.live?.budget).toBe(2)
@@ -243,9 +243,8 @@ describe('live view', () => {
   it('answers the live snapshot over HTTP too', async () => {
     running = await start(supervisor.url)
     expect((await http().get('/api/state')).body).toEqual({ live: null, exhibit: null })
-    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
-    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
-    expect((await http().get('/api/state')).body).toEqual({ live: pool, exhibit: null })
+    await running.redis.set(poolSnapshotKey, JSON.stringify(poolSnapshot()))
+    expect((await http().get('/api/state')).body).toEqual({ live: poolSnapshot(), exhibit: null })
   })
 
   it('lets only the configured web origin read the polling handshake', async () => {
