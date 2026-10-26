@@ -26,7 +26,8 @@ if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const res = await fetch(`${values.api}${path}`, init)
+  const res = await fetch(`${values.api}${path}`, init).catch(() => null)
+  if (!res) return { status: 0, body: null }
   const body: unknown = await res.json().catch(() => null)
   return { status: res.status, body }
 }
@@ -35,10 +36,9 @@ async function ended(id: string): Promise<ExhibitDetail> {
   while (true) {
     await sleep(3000)
     const { status, body } = await call(`/api/exhibits/${id}`)
-    if (status >= 400 && status < 500) throw new Error(`the API answered ${status} for exhibit ${id}`)
-    if (status !== 200) continue
-    const detail = body as ExhibitDetail
-    if (detail.status !== 'RUNNING') return detail
+    if ([401, 403, 404].includes(status)) throw new Error(`the API answered ${status} for exhibit ${id}`)
+    const detail = status === 200 ? (body as ExhibitDetail | null) : null
+    if (detail && detail.status !== 'RUNNING') return detail
   }
 }
 
