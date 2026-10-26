@@ -15,6 +15,7 @@ export interface LinearFit {
 }
 
 export function quantile(values: readonly number[], q: number): number {
+  if (!(q >= 0 && q <= 1)) throw new RangeError(`quantile ${q} is outside 0 to 1`)
   if (values.length === 0) return Number.NaN
   const sorted = [...values].sort((a, b) => a - b)
   const pos = (sorted.length - 1) * q

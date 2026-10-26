@@ -12,7 +12,8 @@ describe('quantile', () => {
   })
 
   it('refuses a quantile outside zero to one', () => {
-    expect(() => quantile([1, 2], 1.5)).toThrow(RangeError)
+    expect(() => quantile([5], 1.5)).toThrow('quantile 1.5 is outside 0 to 1')
+    expect(() => quantile([5], Number.NaN)).toThrow('quantile NaN is outside 0 to 1')
   })
 })
 
