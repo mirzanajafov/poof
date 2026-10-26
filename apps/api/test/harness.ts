@@ -67,7 +67,7 @@ export interface Running {
 }
 
 export async function start(supervisorUrl: string, env: Record<string, string> = {}): Promise<Running> {
-  const dataDir = await mkdtemp(join(tmpdir(), 'poof-api-'))
+  const dataDir = env.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
   Object.assign(process.env, {
     DATABASE_URL: inject('databaseUrl'),
     REDIS_URL: redisUrl,

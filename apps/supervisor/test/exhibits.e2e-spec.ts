@@ -161,6 +161,21 @@ describe('exhibits', () => {
     expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
   })
 
+  it('refuses a null where an exhibit setting has a default', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    for (const field of ['durationSeconds', 'utilization', 'dataset', 'preset', 'minItems', 'maxItems', 'slackMax']) {
+      expect(
+        (
+          await http()
+            .post('/exhibits')
+            .send({ policy: 'box', [field]: null })
+        ).status,
+      ).toBe(400)
+    }
+    expect(await running.db.exhibit.count()).toBe(before)
+  })
+
   it('refuses an exhibit whose largest task or loosest deadline is below its smallest', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()

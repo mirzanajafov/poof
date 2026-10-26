@@ -7,7 +7,6 @@ export class ListTasks {
   @IsIn(Object.values(TaskStatus))
   status?: TaskStatus
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

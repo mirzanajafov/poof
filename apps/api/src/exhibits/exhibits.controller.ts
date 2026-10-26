@@ -67,12 +67,7 @@ export class ExhibitsController {
       res.setHeader('Retry-After', String(admission.retryAfterSeconds))
       throw new HttpException('the box is cooling down after the last exhibit', HttpStatus.TOO_MANY_REQUESTS)
     }
-    const reply = await this.supervisor
-      .forward('POST', '/exhibits', body, req.headers)
-      .catch(async (error: unknown) => {
-        await admission?.giveBack()
-        throw error
-      })
+    const reply = await this.supervisor.forward('POST', '/exhibits', body, req.headers)
     if (reply.status >= 400) await admission?.giveBack()
     return respondWith(res, reply)
   }

@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  InternalServerErrorException,
+  Logger,
+  Next,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -12,7 +15,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import type { Request, Response } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'
 import { respondWith } from '../supervisor/respond.js'
@@ -24,6 +27,8 @@ import { TaskQueries } from './task-queries.js'
 
 @Controller('tasks')
 export class TasksController {
+  private readonly logger = new Logger(TasksController.name)
+
   constructor(
     private readonly tasks: TaskQueries,
     private readonly outputs: OutputFiles,
@@ -54,9 +59,22 @@ export class TasksController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('item', new ParseIntPipe()) item: number,
     @Res() res: Response,
+    @Next() next: NextFunction,
   ) {
     const path = await this.outputs.path(id, item)
     if (!path) throw new NotFoundException()
-    res.sendFile(path, { maxAge: '1d', immutable: true })
+    res.sendFile(
+      path,
+      { maxAge: '1d', immutable: true, lastModified: false, acceptRanges: false, dotfiles: 'allow' },
+      (error) => {
+        if (!error || ('code' in error && error.code === 'ECONNABORTED')) return
+        if ('status' in error && error.status === 404) {
+          next(new NotFoundException())
+          return
+        }
+        this.logger.error(error)
+        next(new InternalServerErrorException())
+      },
+    )
   }
 }

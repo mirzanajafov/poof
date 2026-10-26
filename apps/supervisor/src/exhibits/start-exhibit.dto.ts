@@ -4,7 +4,6 @@ import {
   IsIn,
   IsInt,
   IsNumber,
-  IsOptional,
   IsString,
   Max,
   Min,
@@ -32,49 +31,40 @@ export class StartExhibit implements ExhibitParams {
   @IsIn(exhibitPolicyNames)
   policy: ExhibitPolicyName
 
-  @IsOptional()
   @IsInt()
   @Min(10)
   @Max(900)
   durationSeconds: number = exhibitDefaults.durationSeconds
 
-  @IsOptional()
   @IsNumber()
   @Min(0.1)
   @Max(5)
   utilization: number = exhibitDefaults.utilization
 
-  @IsOptional()
   @IsString()
   dataset: string = exhibitDefaults.dataset
 
-  @IsOptional()
   @IsIn(presetNames)
   preset: PresetName = exhibitDefaults.preset
 
-  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(1000)
   minItems: number = exhibitDefaults.minItems
 
-  @IsOptional()
   @IsInt()
   @Max(1000)
   @Validate(NotBelow, ['minItems'])
   maxItems: number = exhibitDefaults.maxItems
 
-  @IsOptional()
   @IsNumber()
   @Min(0.05)
   slackMin: number = exhibitDefaults.slackMin
 
-  @IsOptional()
   @IsNumber()
   @Validate(NotBelow, ['slackMin'])
   slackMax: number = exhibitDefaults.slackMax
 
-  @IsOptional()
   @IsInt()
   seed: number = exhibitDefaults.seed
 }
