@@ -1,27 +1,25 @@
 import type { PresetName } from '@poof/core'
+import { isRecord } from './records.ts'
 
-export type SubmitRefusal = 'paused' | 'over-capacity'
+export const submitRefusals = ['paused', 'over-capacity'] as const
+
+export type SubmitRefusal = (typeof submitRefusals)[number]
 
 export type SubmitResult =
   | { accepted: true; id: string; items: number; predictedSeconds: number }
   | { accepted: false; id: string | null; refusal: SubmitRefusal; reason: string; retryAfterSeconds: number }
 
 export function parseSubmitResult(value: unknown): SubmitResult | null {
-  if (typeof value !== 'object' || value === null || !('accepted' in value)) return null
-  const fields = new Map<string, unknown>(Object.entries(value))
-  const id = fields.get('id')
-  if (value.accepted === true) {
-    const items = fields.get('items')
-    const predictedSeconds = fields.get('predictedSeconds')
+  if (!isRecord(value)) return null
+  const { accepted, id, items, predictedSeconds, refusal, reason, retryAfterSeconds } = value
+  if (accepted === true) {
     if (typeof id !== 'string' || typeof items !== 'number' || typeof predictedSeconds !== 'number') return null
-    return { accepted: true, id, items, predictedSeconds }
+    return { accepted, id, items, predictedSeconds }
   }
-  const refusal = fields.get('refusal')
-  const reason = fields.get('reason')
-  const retryAfterSeconds = fields.get('retryAfterSeconds')
-  if (value.accepted !== false || (id !== null && typeof id !== 'string') || typeof reason !== 'string') return null
-  if ((refusal !== 'paused' && refusal !== 'over-capacity') || typeof retryAfterSeconds !== 'number') return null
-  return { accepted: false, id, refusal, reason, retryAfterSeconds }
+  if (accepted !== false || (id !== null && typeof id !== 'string')) return null
+  if (typeof reason !== 'string' || typeof retryAfterSeconds !== 'number') return null
+  const kind = submitRefusals.find((known) => known === refusal)
+  return kind ? { accepted, id, refusal: kind, reason, retryAfterSeconds } : null
 }
 
 export type TaskStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED' | 'REJECTED'

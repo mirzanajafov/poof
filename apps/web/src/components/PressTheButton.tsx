@@ -1,13 +1,13 @@
 'use client'
 
-import { parseSubmitResult, type DatasetSummary } from '@poof/contracts'
+import { parseSubmitResult, type DatasetSummary, type SubmitResult } from '@poof/contracts'
 import { isPresetName, type PresetName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
 import { post, refusal } from '@/lib/post'
 
 type Outcome =
-  | { kind: 'accepted'; id: string; items: number; predictedSeconds: number }
+  | { kind: 'accepted'; task: Extract<SubmitResult, { accepted: true }> }
   | { kind: 'refused'; message: string; retryAfter: number | null }
 
 const presets = [
@@ -28,11 +28,9 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
     try {
       const answer = await post('/api/tasks', { dataset, preset, count, deadlineSeconds: deadline })
       const result = parseSubmitResult(answer.body)
-      setOutcome(
-        result?.accepted
-          ? { kind: 'accepted', id: result.id, items: result.items, predictedSeconds: result.predictedSeconds }
-          : { kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter },
-      )
+      if (result?.accepted) setOutcome({ kind: 'accepted', task: result })
+      else if (result) setOutcome({ kind: 'refused', message: result.reason, retryAfter: result.retryAfterSeconds })
+      else setOutcome({ kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter })
     } catch {
       setOutcome({ kind: 'refused', message: 'the box did not answer', retryAfter: null })
     } finally {
@@ -123,8 +121,8 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
       </button>
       {outcome?.kind === 'accepted' && (
         <p className="mt-3 rounded-md bg-good-soft px-3 py-2 text-sm">
-          Taken: {outcome.items} images, about {outcome.predictedSeconds} s of work.{' '}
-          <Link href={`/tasks/${outcome.id}`} className="font-medium text-accent-ink underline">
+          Taken: {outcome.task.items} images, about {outcome.task.predictedSeconds} s of work.{' '}
+          <Link href={`/tasks/${outcome.task.id}`} className="font-medium text-accent-ink underline">
             Watch it
           </Link>
         </p>
