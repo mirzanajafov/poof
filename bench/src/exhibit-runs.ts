@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util'
 import { exhibitDefaults, isRecord, type ExhibitDetail } from '@poof/contracts'
 import type { ExhibitRun } from '@poof/contracts/bench'
 import { isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
+import { finishedRun } from './exhibit-run.ts'
 
 const { values } = parseArgs({
   options: {
@@ -35,22 +36,32 @@ async function call(path: string, init?: RequestInit): Promise<{ status: number;
   return { status: res.status, body }
 }
 
-async function ended(id: string): Promise<ExhibitDetail> {
+async function get(path: string): Promise<{ status: number; body: unknown }> {
   while (true) {
+    const answer = await call(path).catch(() => null)
+    if (answer) return answer
+    console.log(`GET ${path} got no answer, trying again`)
+    await sleep(5000)
+  }
+}
+
+async function ended(id: string, deadline: number): Promise<ExhibitDetail> {
+  while (Date.now() < deadline) {
     await sleep(3000)
-    const answer = await call(`/api/exhibits/${id}`).catch(() => null)
-    if (!answer) continue
-    const { status, body } = answer
-    if ([401, 403, 404].includes(status)) throw new Error(`the API answered ${status} for exhibit ${id}`)
+    const { status, body } = await get(`/api/exhibits/${id}`)
+    if (status >= 400 && status < 500 && status !== 429) throw new Error(`the API answered ${status} for exhibit ${id}`)
     const detail = status === 200 ? (body as ExhibitDetail | null) : null
     if (detail && detail.status !== 'RUNNING') return detail
   }
+  throw new Error(`exhibit ${id} did not end by ${new Date(deadline).toISOString()}`)
 }
+
+const patienceMs = (2 * Number(values.duration) + 60) * 1000
 
 const runs: ExhibitRun[] = []
 for (const seed of values.seeds.split(',').map(Number)) {
   for (const policy of policies) {
-    while ((await call('/api/exhibits/current')).status === 200) await sleep(5000)
+    while ((await get('/api/exhibits/current')).status === 200) await sleep(5000)
     const started = await call('/api/exhibits', {
       method: 'POST',
       headers,
@@ -67,13 +78,14 @@ for (const seed of values.seeds.split(',').map(Number)) {
       console.log(`${policy} seed ${seed}: could not start (${started.status} ${JSON.stringify(started.body)})`)
       continue
     }
-    const { status, params, stats, tasks } = await ended(id)
-    if (status === 'DONE' && stats) {
-      runs.push({ id, policy, params, stats, tasks })
+    const detail = await ended(id, Date.now() + patienceMs)
+    const run = finishedRun(detail)
+    if (run) {
+      runs.push(run)
       await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
-      console.log(`${policy} seed ${seed}: ${JSON.stringify(stats)}`)
+      console.log(`${policy} seed ${seed}: ${JSON.stringify(run.stats)}`)
     } else {
-      console.log(`${policy} seed ${seed}: ended ${status}, not recorded`)
+      console.log(`${policy} seed ${seed}: ended ${detail.status}, not recorded`)
     }
     await sleep(Number(values.gap) * 1000)
   }
