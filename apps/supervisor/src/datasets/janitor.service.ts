@@ -68,10 +68,10 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   }
 
   private async createdAt(name: string): Promise<number | null> {
-    const folder = await stat(this.datasets.taskDir(name)).catch((error: unknown) => {
+    const stats = await stat(this.datasets.taskDir(name)).catch((error: unknown) => {
       if (isMissingFile(error)) return null
       throw error
     })
-    return folder ? folder.mtimeMs : null
+    return stats ? stats.mtimeMs : null
   }
 }

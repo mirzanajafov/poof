@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common'
-import { Database, TracingService } from '@poof/nest'
+import { Database, Telemetry } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { RedisStore } from './redis-store.js'
 
@@ -8,12 +8,12 @@ import { RedisStore } from './redis-store.js'
   providers: [
     { provide: Database, useFactory: (env: Env) => new Database(env.DATABASE_URL), inject: [Env] },
     {
-      provide: TracingService,
-      useFactory: (env: Env) => new TracingService('poof-api', env.OTEL_EXPORTER_OTLP_ENDPOINT),
+      provide: Telemetry,
+      useFactory: (env: Env) => new Telemetry('poof-api', env.OTEL_EXPORTER_OTLP_ENDPOINT),
       inject: [Env],
     },
     RedisStore,
   ],
-  exports: [Database, TracingService, RedisStore],
+  exports: [Database, Telemetry, RedisStore],
 })
 export class InfraModule {}

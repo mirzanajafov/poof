@@ -1,7 +1,7 @@
 import { Logger, type OnApplicationShutdown } from '@nestjs/common'
 import { startTracing, type Tracer, type Tracing } from '@poof/tracing'
 
-export class TracingService implements OnApplicationShutdown {
+export class Telemetry implements OnApplicationShutdown {
   private readonly tracing: Tracing
 
   constructor(service: string, endpoint: string | undefined) {
@@ -14,7 +14,7 @@ export class TracingService implements OnApplicationShutdown {
 
   async onApplicationShutdown(): Promise<void> {
     await this.tracing.shutdown().catch((error: unknown) => {
-      new Logger(TracingService.name).warn('could not flush the last traces', error)
+      new Logger(Telemetry.name).warn('could not flush the last traces', error)
     })
   }
 }

@@ -373,7 +373,7 @@ export class Simulation {
       tasks.set(task.info.id, task.info)
       for (const lease of task.leases) {
         if (lease.state !== 'running') continue
-        const info: LeaseInfo = {
+        const leaseView: LeaseInfo = {
           id: String(lease.id),
           taskId: task.info.id,
           parentId: lease.parentId === null ? null : String(lease.parentId),
@@ -389,11 +389,11 @@ export class Simulation {
         }
         if (this.policy.trigger === 'oracle') {
           let remaining = 0
-          for (let i = info.next; i < lease.hi; i++)
+          for (let i = leaseView.next; i < lease.hi; i++)
             if (task.state[i] === PENDING) remaining += valueAt(task.plan.costs, i)
-          info.trueRemainingMs = remaining / speed
+          leaseView.trueRemainingMs = remaining / speed
         }
-        leases.push(info)
+        leases.push(leaseView)
       }
     }
     return { now: this.now, tasks, leases, breakers: this.breakers.states(this.now), spawnMs: this.spawnMs }
@@ -480,11 +480,11 @@ export class Simulation {
   }
 
   private consumers(): SimProcess[] {
-    const out: SimProcess[] = []
+    const consuming: SimProcess[] = []
     for (const process of this.processes) {
-      if (process.state === 'starting' || (process.state === 'busy' && process.lease?.inflight)) out.push(process)
+      if (process.state === 'starting' || (process.state === 'busy' && process.lease?.inflight)) consuming.push(process)
     }
-    return out
+    return consuming
   }
 
   private step(dt: number): void {

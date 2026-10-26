@@ -2,7 +2,7 @@
 
 import type { PoolSnapshot } from '@poof/contracts'
 import Link from 'next/link'
-import { shortId, deadlineText } from '@/lib/format'
+import { deadlineText, shortId } from '@/lib/format'
 import { useNow } from './useNow'
 
 export function Tiles({

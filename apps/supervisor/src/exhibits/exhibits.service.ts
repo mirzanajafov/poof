@@ -8,7 +8,7 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
-import { ConflictError, Database, FailureStreak, TracingService } from '@poof/nest'
+import { ConflictError, Database, FailureStreak, Telemetry } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
@@ -45,7 +45,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     private readonly datasets: Datasets,
     private readonly scheduler: Scheduler,
     private readonly store: TaskStore,
-    private readonly tracing: TracingService,
+    private readonly telemetry: Telemetry,
   ) {}
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
@@ -65,7 +65,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     const startedAt = Date.now()
     const endsAt = startedAt + params.durationSeconds * 1000
     await this.db.client.exhibit.create({ data: { id, policy: params.policy, params: { ...params } } })
-    const span = this.tracing.tracer.startSpan(
+    const span = this.telemetry.tracer.startSpan(
       'exhibit',
       {
         startTime: startedAt,
@@ -95,7 +95,7 @@ export class Exhibits implements BeforeApplicationShutdown {
           deadLetterShare: this.env.DEAD_LETTER_SHARE,
           rssMb: this.env.WORKER_RSS_MB,
           tickMs: 250,
-          tracer: this.tracing.tracer,
+          tracer: this.telemetry.tracer,
           trace: within(span),
         },
         this.store,

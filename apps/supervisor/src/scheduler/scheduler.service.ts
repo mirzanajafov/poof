@@ -13,7 +13,7 @@ import {
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
-import { NotFoundError, TracingService } from '@poof/nest'
+import { NotFoundError, Telemetry } from '@poof/nest'
 import { resume, SpanStatusCode, within, type Context } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
 import { Env } from '../config/env.js'
@@ -63,12 +63,12 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     private readonly store: TaskStore,
     private readonly publisher: LivePublisher,
     private readonly datasets: Datasets,
-    private readonly tracing: TracingService,
+    private readonly telemetry: Telemetry,
   ) {
     this.book = new TaskBook(
       store,
       publisher,
-      tracing.tracer,
+      telemetry.tracer,
       new Breakers<PresetName>(),
       { maxAttempts: this.env.MAX_ATTEMPTS, deadLetterShare: this.env.DEAD_LETTER_SHARE, deadLetter: true },
       (chunk) => void chunk.worker?.handle.shrink(chunk.id, chunk.cursor + 1),
@@ -117,7 +117,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       deadline: now + request.deadlineSeconds * 1000,
       dir: this.datasets.taskDir(id),
       predicted,
-      span: this.tracing.tracer.startSpan(
+      span: this.telemetry.tracer.startSpan(
         'task',
         {
           startTime: now,
@@ -296,7 +296,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, this.ratio(task.preset), (i) =>
       task.attemptsAt(i),
     )
-    lease.span = this.tracing.tracer.startSpan(
+    lease.span = this.telemetry.tracer.startSpan(
       'chunk',
       {
         attributes: {
@@ -427,7 +427,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         deadline: row.deadline.getTime(),
         dir: this.datasets.taskDir(row.id),
         predicted,
-        span: this.tracing.tracer.startSpan(
+        span: this.telemetry.tracer.startSpan(
           'task',
           { attributes: { 'poof.task': row.id, 'poof.items': row.items, 'poof.resumed': true } },
           row.traceId ? resume(row.traceId) : undefined,

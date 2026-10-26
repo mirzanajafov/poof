@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common'
-import { Database, TracingService } from '@poof/nest'
+import { Database, Telemetry } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { LivePublisher } from './live-publisher.js'
 
@@ -8,12 +8,12 @@ import { LivePublisher } from './live-publisher.js'
   providers: [
     { provide: Database, useFactory: (env: Env) => new Database(env.DATABASE_URL), inject: [Env] },
     {
-      provide: TracingService,
-      useFactory: (env: Env) => new TracingService('poof-supervisor', env.OTEL_EXPORTER_OTLP_ENDPOINT),
+      provide: Telemetry,
+      useFactory: (env: Env) => new Telemetry('poof-supervisor', env.OTEL_EXPORTER_OTLP_ENDPOINT),
       inject: [Env],
     },
     LivePublisher,
   ],
-  exports: [Database, TracingService, LivePublisher],
+  exports: [Database, Telemetry, LivePublisher],
 })
 export class InfraModule {}
