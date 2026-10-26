@@ -7,6 +7,7 @@ import { Worker } from 'node:worker_threads'
 import { loadCalibration } from './calibration.ts'
 import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
+import { count, knownNames } from './options.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
 import { allPolicies, machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
@@ -34,19 +35,6 @@ function policyNames(spec: string): string[] {
     allPolicies.map((p) => p.name),
     'policy',
   )
-}
-
-function count(option: string, text: string): number {
-  const value = Number(text)
-  if (!Number.isInteger(value) || value < 1) throw new Error(`--${option} needs a whole number above zero, not ${text}`)
-  return value
-}
-
-function knownNames(spec: string, known: readonly string[], kind: string): string[] {
-  const names = spec.split(',')
-  const unknown = names.filter((name) => !known.includes(name))
-  if (unknown.length > 0) throw new Error(`unknown ${kind} ${unknown.join(', ')}`)
-  return names
 }
 
 const machineNames = knownNames(values.machines, Object.keys(machines), 'machine')
