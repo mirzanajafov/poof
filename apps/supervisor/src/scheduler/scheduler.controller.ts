@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common'
 import { extract } from '@poof/tracing'
 import type { Response } from 'express'
-import { Scheduler, type SubmitResult } from './scheduler.service.js'
+import { Scheduler, type SubmitRefusal, type SubmitResult } from './scheduler.service.js'
 import { SubmitTask } from './submit-task.dto.js'
+
+const refusalStatus: Record<SubmitRefusal, number> = { paused: 503, 'over-capacity': 429 }
 
 @Controller()
 export class SchedulerController {
@@ -17,7 +19,7 @@ export class SchedulerController {
   ): Promise<SubmitResult> {
     const result = await this.scheduler.submit(body, { trace: extract(headers) })
     if (!result.accepted) {
-      res.status(result.refusal === 'paused' ? 503 : 429)
+      res.status(refusalStatus[result.refusal])
       res.setHeader('Retry-After', String(result.retryAfterSeconds))
     }
     return result

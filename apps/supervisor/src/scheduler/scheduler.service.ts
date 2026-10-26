@@ -31,12 +31,14 @@ export interface SubmitRequest {
   offset?: number
 }
 
+export type SubmitRefusal = 'paused' | 'over-capacity'
+
 export type SubmitResult =
   | { accepted: true; id: string; items: number; predictedSeconds: number }
   | {
       accepted: false
       id: string | null
-      refusal: 'paused' | 'over-capacity'
+      refusal: SubmitRefusal
       reason: string
       retryAfterSeconds: number
     }
@@ -254,7 +256,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     try {
       await handle.start()
     } catch (error) {
-      this.logger.error(`worker failed to start: ${String(error)}`)
+      this.logger.error('a worker failed to start', error)
       setTimeout(() => void this.spawn(), 1000).unref()
       return
     }
@@ -414,8 +416,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       try {
         dataset = await this.datasets.get(row.dataset)
       } catch (error) {
-        const reason =
-          error instanceof NotFoundError ? 'dataset gone' : `dataset ${row.dataset} unreadable (${String(error)})`
+        if (!(error instanceof NotFoundError)) this.logger.error(`could not read dataset ${row.dataset}`, error)
+        const reason = error instanceof NotFoundError ? 'dataset gone' : `dataset ${row.dataset} unreadable`
         this.store.failed(progress, 'fail', `${reason} after a restart`, new Date())
         continue
       }

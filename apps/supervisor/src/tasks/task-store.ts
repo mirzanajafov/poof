@@ -182,7 +182,7 @@ export class TaskStore {
 
   private write(what: string, write: () => Promise<unknown>): void {
     this.writes = this.writes.then(write).catch((error: unknown) => {
-      this.logger.error(`could not write ${what}: ${String(error)}`)
+      this.logger.error(`could not write ${what}`, error)
     })
   }
 }

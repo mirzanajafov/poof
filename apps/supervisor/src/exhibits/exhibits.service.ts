@@ -138,7 +138,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       setTimeout(
         () =>
           void this.finish('DONE').catch((error: unknown) =>
-            this.logger.error(`exhibit ${id} did not finish cleanly: ${String(error)}`),
+            this.logger.error(`exhibit ${id} did not finish cleanly`, error),
           ),
         params.durationSeconds * 1000,
       ),
@@ -177,7 +177,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   private schedule(current: Current, arrive: () => Promise<void>): void {
     current.arriving = current.arriving
       .then(arrive)
-      .catch((error: unknown) => this.logger.error(`exhibit arrival failed: ${String(error)}`))
+      .catch((error: unknown) => this.logger.error('an exhibit arrival failed', error))
   }
 
   finish(status: ExhibitEnd): Promise<ExhibitStats | null> {

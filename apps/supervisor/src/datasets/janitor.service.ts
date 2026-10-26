@@ -24,7 +24,7 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
     this.timer = setInterval(
       () => {
         this.sweep().catch((error: unknown) => {
-          this.logger.error(error)
+          this.logger.error('the output sweep failed', error)
         })
       },
       Math.min(10 * 60_000, this.ttlMs / 4),
@@ -50,8 +50,12 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
       const open = task && (task.status === 'QUEUED' || task.status === 'RUNNING')
       const ended = task ? (task.finishedAt ?? task.submittedAt).getTime() : await this.createdAt(name)
       if (open || ended === null || now - ended < this.ttlMs) continue
-      await this.datasets.removeTask(name)
-      removed++
+      try {
+        await this.datasets.removeTask(name)
+        removed++
+      } catch (error) {
+        this.logger.error(`could not remove the outputs of task ${name}`, error)
+      }
     }
     if (removed > 0) this.logger.log(`removed the outputs of ${removed} tasks`)
     return removed

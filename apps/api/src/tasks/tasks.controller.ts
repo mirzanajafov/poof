@@ -75,7 +75,7 @@ export class TasksController {
   private sendFailed(error: Error, res: Response, next: NextFunction, before: ReadonlySet<string>): void {
     if (('code' in error && error.code === 'ECONNABORTED') || ('syscall' in error && error.syscall === 'write')) return
     const status = 'status' in error && typeof error.status === 'number' ? error.status : 500
-    if (status >= 500) this.logger.error(error)
+    if (status >= 500) this.logger.error('could not send an image', error)
     if (res.headersSent) {
       res.destroy()
       return
