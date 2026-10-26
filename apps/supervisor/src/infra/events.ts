@@ -1,4 +1,4 @@
-import { Injectable, type OnApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common'
 import {
   exhibitSnapshotKey,
   liveEventsChannel,
@@ -7,20 +7,23 @@ import {
   type LiveEventBody,
   type PoolSnapshot,
 } from '@poof/contracts'
-import { Redis } from 'ioredis'
+import { closeRedis, connectRedis, FailureStreak } from '@poof/nest'
+import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class Events implements OnApplicationShutdown {
   private readonly redis: Redis
+  private readonly logger = new Logger(Events.name)
+  private readonly publishes = new FailureStreak(this.logger, 'publishing live events')
+  private readonly saves = new FailureStreak(this.logger, 'saving the live snapshots')
 
   constructor(env: Env) {
-    this.redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })
-    this.redis.on('error', () => undefined)
+    this.redis = connectRedis(env.REDIS_URL, Events.name)
   }
 
   publish(event: LiveEventBody): void {
-    void this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })).catch(() => undefined)
+    this.run(this.publishes, this.redis.publish(liveEventsChannel, JSON.stringify({ ...event, at: Date.now() })))
   }
 
   savePoolSnapshot(snapshot: PoolSnapshot): void {
@@ -32,14 +35,25 @@ export class Events implements OnApplicationShutdown {
   }
 
   clearExhibitSnapshot(): void {
-    void this.redis.del(exhibitSnapshotKey).catch(() => undefined)
+    this.run(this.saves, this.redis.del(exhibitSnapshotKey))
   }
 
   private save(key: string, value: PoolSnapshot | ExhibitSnapshot): void {
-    void this.redis.set(key, JSON.stringify(value), 'EX', 30).catch(() => undefined)
+    this.run(this.saves, this.redis.set(key, JSON.stringify(value), 'EX', 30))
+  }
+
+  private run(streak: FailureStreak, command: Promise<unknown>): void {
+    command.then(
+      () => {
+        streak.succeeded()
+      },
+      (error: unknown) => {
+        streak.failed(error)
+      },
+    )
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit().catch(() => undefined)
+    await closeRedis(this.redis)
   }
 }

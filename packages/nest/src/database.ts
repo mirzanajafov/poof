@@ -1,4 +1,4 @@
-import type { OnApplicationShutdown } from '@nestjs/common'
+import { Logger, type OnApplicationShutdown } from '@nestjs/common'
 import { createPrisma, type PrismaClient } from '@poof/db'
 
 export class Database implements OnApplicationShutdown {
@@ -16,6 +16,8 @@ export class Database implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.client.$disconnect()
+    await this.client.$disconnect().catch((error: unknown) => {
+      new Logger(Database.name).warn('could not disconnect from Postgres cleanly', error)
+    })
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, type OnApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common'
 import {
   exhibitSnapshotKey,
   poolSnapshotKey,
@@ -6,17 +6,18 @@ import {
   type LiveSnapshot,
   type PoolSnapshot,
 } from '@poof/contracts'
-import { Redis } from 'ioredis'
+import { closeRedis, connectRedis, UnavailableError } from '@poof/nest'
+import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class Cache implements OnApplicationShutdown {
+  private readonly logger = new Logger(Cache.name)
   private readonly redis: Redis
   private subscriber: Redis | null = null
 
-  constructor(env: Env) {
-    this.redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })
-    this.redis.on('error', () => undefined)
+  constructor(private readonly env: Env) {
+    this.redis = connectRedis(env.REDIS_URL, Cache.name)
   }
 
   exhibitSnapshot(): Promise<ExhibitSnapshot | null> {
@@ -36,36 +37,43 @@ export class Cache implements OnApplicationShutdown {
   }
 
   async increment(key: string, windowMs: number): Promise<number> {
-    const results = await this.redis.multi().incr(key).pexpire(key, windowMs).exec()
-    return Number(results?.[0]?.[1] ?? 0)
+    const results = await unavailableOnFailure(this.redis.multi().incr(key).pexpire(key, windowMs).exec())
+    const incr = results?.[0]
+    if (!incr || incr[0]) throw new UnavailableError('the rate limiter is unavailable', { cause: incr?.[0] })
+    return Number(incr[1])
   }
 
   async claim(key: string, seconds: number): Promise<{ claimed: true } | { claimed: false; ttlSeconds: number }> {
-    if ((await this.redis.set(key, '1', 'EX', seconds, 'NX')) === 'OK') return { claimed: true }
-    return { claimed: false, ttlSeconds: Math.max(1, await this.redis.ttl(key)) }
+    if ((await unavailableOnFailure(this.redis.set(key, '1', 'EX', seconds, 'NX'))) === 'OK') return { claimed: true }
+    return { claimed: false, ttlSeconds: Math.max(1, await unavailableOnFailure(this.redis.ttl(key))) }
   }
 
   async release(key: string): Promise<void> {
-    await this.redis.del(key)
+    await unavailableOnFailure(this.redis.del(key))
   }
 
   subscribe(channel: string, onMessage: (message: string) => void): void {
-    if (!this.subscriber) {
-      this.subscriber = this.redis.duplicate({ maxRetriesPerRequest: null })
-      this.subscriber.on('error', () => undefined)
-    }
+    this.subscriber ??= connectRedis(this.env.REDIS_URL, `${Cache.name} subscriber`, { maxRetriesPerRequest: null })
     this.subscriber.on('message', (received: string, message: string) => {
       if (received === channel) onMessage(message)
     })
-    void this.subscriber.subscribe(channel).catch(() => undefined)
+    this.subscriber.subscribe(channel).catch((error: unknown) => {
+      this.logger.error(`could not subscribe to ${channel}`, error)
+    })
   }
 
   private async json<T>(key: string): Promise<T | null> {
-    const raw = await this.redis.get(key).catch(() => null)
+    const raw = await unavailableOnFailure(this.redis.get(key))
     return raw ? (JSON.parse(raw) as T) : null
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await Promise.allSettled([this.redis.quit(), this.subscriber?.quit()])
+    await Promise.allSettled([closeRedis(this.redis), this.subscriber && closeRedis(this.subscriber)])
   }
+}
+
+function unavailableOnFailure<T>(command: Promise<T>): Promise<T> {
+  return command.catch((error: unknown) => {
+    throw new UnavailableError('the live store is unavailable', { cause: error })
+  })
 }

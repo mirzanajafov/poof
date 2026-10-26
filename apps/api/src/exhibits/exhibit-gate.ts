@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { Env } from '../config/env.js'
 import { Cache } from '../infra/cache.js'
 
@@ -11,6 +11,8 @@ export type Admission =
 
 @Injectable()
 export class ExhibitGate {
+  private readonly logger = new Logger(ExhibitGate.name)
+
   constructor(
     private readonly cache: Cache,
     private readonly env: Env,
@@ -22,7 +24,13 @@ export class ExhibitGate {
     const cooldownSeconds = this.env.EXHIBIT_COOLDOWN_SECONDS
     if (cooldownSeconds === 0) return { kind: 'admitted', giveBack: () => Promise.resolve() }
     const claim = await this.cache.claim(cooldownKey, cooldownSeconds + durationSeconds)
-    if (claim.claimed) return { kind: 'admitted', giveBack: () => this.cache.release(cooldownKey) }
+    if (claim.claimed) return { kind: 'admitted', giveBack: () => this.giveBack() }
     return { kind: 'cooling-down', retryAfterSeconds: claim.ttlSeconds }
+  }
+
+  private async giveBack(): Promise<void> {
+    await this.cache.release(cooldownKey).catch((error: unknown) => {
+      this.logger.warn('could not give the exhibit cooldown back', error)
+    })
   }
 }

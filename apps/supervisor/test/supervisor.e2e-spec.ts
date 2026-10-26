@@ -1,8 +1,8 @@
-import { readdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createPrisma } from '@poof/db'
 import request from 'supertest'
-import { afterAll, afterEach, beforeAll, describe, expect, inject, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, inject, it, onTestFinished } from 'vitest'
 import { makeData, start, until, type Running } from './harness.js'
 
 let dataDir: string
@@ -129,13 +129,18 @@ describe('supervisor', () => {
           leases: { create: [{ lo: 0, hi: 10, cursor: 0 }] },
         },
       })
+    onTestFinished(() => rm(join(dataDir, 'datasets', 'garbled'), { recursive: true, force: true }))
+    await mkdir(join(dataDir, 'datasets', 'garbled'), { recursive: true })
+    await writeFile(join(dataDir, 'datasets', 'garbled', 'manifest.json'), 'not json')
     const unknownPreset = await unfinished('small', 'png-9000')
     const missingDataset = await unfinished('gone', 'webp-1600')
+    const unreadableDataset = await unfinished('garbled', 'webp-1600')
     await db.$disconnect()
     running = await start(dataDir)
     for (const [task, reason] of [
       [unknownPreset, 'no preset png-9000 after a restart'],
       [missingDataset, 'dataset gone after a restart'],
+      [unreadableDataset, 'dataset garbled unreadable after a restart'],
     ] as const) {
       const failed = await running.db.task.findUniqueOrThrow({
         where: { id: task.id },

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { ConflictException, Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
+import { Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
 import {
   emptyExhibitStats,
   type ExhibitEnd,
@@ -8,7 +8,7 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
-import { Database, Traces } from '@poof/nest'
+import { ConflictError, Database, FailureStreak, Traces } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
@@ -34,6 +34,7 @@ interface Current {
 @Injectable()
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
+  private readonly poolReads = new FailureStreak(this.logger, 'counting the pool exhibit tasks')
   private current: Current | null = null
   private starting: Promise<unknown> | null = null
 
@@ -48,7 +49,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   ) {}
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
-    if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
+    if (this.current || this.starting) throw new ConflictError('an exhibit is already running')
     const starting = this.begin(params, trace)
     this.starting = starting
     try {
@@ -138,7 +139,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       setTimeout(
         () =>
           void this.finish('DONE').catch((error: unknown) =>
-            this.logger.error(`exhibit ${id} did not finish cleanly: ${String(error)}`),
+            this.logger.error(`exhibit ${id} did not finish cleanly`, error),
           ),
         params.durationSeconds * 1000,
       ),
@@ -177,7 +178,7 @@ export class Exhibits implements BeforeApplicationShutdown {
   private schedule(current: Current, arrive: () => Promise<void>): void {
     current.arriving = current.arriving
       .then(arrive)
-      .catch((error: unknown) => this.logger.error(`exhibit arrival failed: ${String(error)}`))
+      .catch((error: unknown) => this.logger.error('an exhibit arrival failed', error))
   }
 
   finish(status: ExhibitEnd): Promise<ExhibitStats | null> {
@@ -243,7 +244,14 @@ export class Exhibits implements BeforeApplicationShutdown {
   }
 
   private async publishState(current: Current): Promise<void> {
-    if (!current.engine) current.pool.stats = await this.poolCounts(current).catch(() => current.pool.stats)
+    if (!current.engine) {
+      try {
+        current.pool.stats = await this.poolCounts(current)
+        this.poolReads.succeeded()
+      } catch (error) {
+        this.poolReads.failed(error)
+      }
+    }
     if (!current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
   }
 

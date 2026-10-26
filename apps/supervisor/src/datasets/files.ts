@@ -1,4 +1,5 @@
 import { copyFile, link, rename, rm, stat } from 'node:fs/promises'
+import { isMissingFile } from '@poof/nest'
 
 export async function linkOrCopy(source: string, target: string): Promise<void> {
   await link(source, target).catch(() => copyFile(source, target))
@@ -17,7 +18,13 @@ export async function replaceFile(target: string, write: (temp: string) => Promi
 }
 
 async function sameFile(a: string, b: string): Promise<boolean> {
-  const [first, second] = await Promise.all([stat(a, { bigint: true }), stat(b, { bigint: true }).catch(() => null)])
+  const [first, second] = await Promise.all([
+    stat(a, { bigint: true }),
+    stat(b, { bigint: true }).catch((error: unknown) => {
+      if (isMissingFile(error)) return null
+      throw error
+    }),
+  ])
   return second !== null && first.ino !== 0n && first.dev === second.dev && first.ino === second.ino
 }
 
