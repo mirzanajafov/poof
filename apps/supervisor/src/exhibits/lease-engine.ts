@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { ExhibitSnapshot, ExhibitStats, ManifestItem } from '@poof/contracts'
+import { emptyExhibitStats, type ExhibitSnapshot, type ExhibitStats, type ManifestItem } from '@poof/contracts'
 import {
   admits,
   Breakers,
@@ -62,24 +62,11 @@ interface ExhibitWorker {
   items: number
 }
 
-type ProcessStats = Omit<ExhibitStats, keyof TaskBook<SplitLease>['counts']>
-
 export class LeaseEngine {
   private readonly book: TaskBook<SplitLease>
   private readonly leases = new Map<string, SplitLease>()
   private readonly workers = new Set<ExhibitWorker>()
-  private readonly counters: ProcessStats = {
-    submitted: 0,
-    rejected: 0,
-    spawns: 0,
-    spawnFailures: 0,
-    splits: 0,
-    preemptions: 0,
-    adoptions: 0,
-    exits: {},
-    peakProcesses: 0,
-    maxDepth: 0,
-  }
+  private readonly counters = emptyExhibitStats()
   private spawnEstimate: Estimate = emptyEstimate
   private reserved = 0
   private timer: NodeJS.Timeout | null = null
@@ -101,9 +88,7 @@ export class LeaseEngine {
         deadLetterShare: options.deadLetterShare,
         deadLetter: options.policy.deadLetter,
       },
-      (lease) => {
-        if (!lease.busy) void lease.worker?.handle.shrink(lease.id, lease.cursor + 1)
-      },
+      (lease) => this.stopLease(lease),
     )
   }
 
@@ -178,7 +163,10 @@ export class LeaseEngine {
     for (let lo = 0; lo < task.items; lo += size) this.newLease(task, lo, Math.min(task.items, lo + size), null, 0)
     await this.book.accept(task, placement, task.leases.map(leaseRow))
     this.counters.submitted++
-    for (const lease of task.leases) this.announce(lease)
+    for (const lease of task.leases) {
+      this.leases.set(lease.id, lease)
+      this.announce(lease)
+    }
     return true
   }
 
@@ -246,13 +234,13 @@ export class LeaseEngine {
       ),
     }
     task.leases.push(lease)
-    this.leases.set(lease.id, lease)
     this.counters.maxDepth = Math.max(this.counters.maxDepth, depth)
     return lease
   }
 
   private createLease(task: Task<SplitLease>, lo: number, hi: number, parent: SplitLease, depth: number) {
     const lease = this.newLease(task, lo, hi, parent, depth)
+    this.leases.set(lease.id, lease)
     this.store.leaseCreated(task.id, leaseRow(lease))
     this.announce(lease)
     return lease
@@ -326,6 +314,10 @@ export class LeaseEngine {
     }
   }
 
+  private stopLease(lease: SplitLease): void {
+    void lease.worker?.handle.shrink(lease.id, lease.cursor + 1)
+  }
+
   private lease(id: string): SplitLease {
     const lease = this.leases.get(id)
     if (!lease) throw new Error(`no lease ${id}`)
@@ -355,7 +347,11 @@ export class LeaseEngine {
     const result = await lease.worker.handle.shrink(lease.id, plan.cut)
     this.reserved -= plan.children.length
     lease.busy = false
-    if (!result.ok || this.stopped || !lease.task.open) return
+    if (!result.ok || this.stopped) return
+    if (!lease.task.open) {
+      this.stopLease(lease)
+      return
+    }
     lease.hi = plan.cut
     lease.lastSplitAt = Date.now()
     this.counters.splits++
@@ -391,7 +387,10 @@ export class LeaseEngine {
       worker.yielding = false
       return
     }
-    if (!lease.task.open) return
+    if (!lease.task.open) {
+      this.stopLease(lease)
+      return
+    }
     const rest = lease.hi
     lease.hi = cut
     this.counters.preemptions++

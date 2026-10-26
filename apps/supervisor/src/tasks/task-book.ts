@@ -109,9 +109,13 @@ export class TaskBook<Lease extends TaskLease> {
         lease.cursor = crash.item
       }
     }
+    this.putBack(task, lease)
+    this.settle(task)
+  }
+
+  putBack(task: Task<Lease>, lease: TaskLease): void {
     lease.state = task.open && lease.cursor < lease.hi ? 'pending' : 'done'
     this.store.leaseReleased(lease.id, lease.state, lease.cursor)
-    this.settle(task)
   }
 
   fail(task: Task<Lease>, reason: string, kind: 'fail' | 'cancel' = 'fail'): void {

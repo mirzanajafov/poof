@@ -67,6 +67,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   private reportedRssMb = 0
   private killReason: ExitReason | null = null
   private stopping = false
+  private ready = false
   private watchdog: NodeJS.Timeout | null = null
   private stderr = ''
   private readonly pendingShrinks = new Map<string, (result: Shrunk) => void>()
@@ -104,13 +105,13 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
       child.stderr?.on('data', (chunk: Buffer) => {
         this.stderr = (this.stderr + chunk.toString()).slice(-4096)
       })
-      const onEarlyExit = (code: number | null) =>
-        reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
-      child.once('exit', onEarlyExit)
+      child.once('exit', (code, signal) => {
+        if (!this.ready) reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
+        this.onExit(code, signal)
+      })
       child.on('message', (message: FromWorker) => {
         if (message.type === 'ready') {
-          child.off('exit', onEarlyExit)
-          child.once('exit', (code, signal) => this.onExit(code, signal))
+          this.ready = true
           this.lastBeat = Date.now()
           this.reportedRssMb = message.rssMb
           this.watchdog = setInterval(() => this.watch(), this.limits.watchMs)
@@ -123,7 +124,7 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
   }
 
   assign(assignment: Omit<Assignment, 'type'>, itemTimeoutMs: number): void {
-    if (!this.child?.connected) throw new Error(`worker ${this.pid} is not running`)
+    if (!this.child?.connected) return
     if (this.leases.length === 0) this.since = Date.now()
     this.leases.push({ lease: assignment.lease, cursor: assignment.lo, hi: assignment.hi, itemTimeoutMs })
     this.child.send({ type: 'assign', ...assignment })

@@ -37,11 +37,12 @@ export class Datasets {
   }
 
   select(dataset: Dataset, offset: number, count: number): ManifestItem[] {
-    const start = offset % dataset.items.length
-    const rotated = [...dataset.items.slice(start), ...dataset.items.slice(0, start)]
-    const selected: ManifestItem[] = []
-    while (selected.length < count) selected.push(...rotated)
-    return selected.slice(0, count)
+    const { items } = dataset
+    return Array.from({ length: count }, (_, i) => {
+      const item = items[(offset + i) % items.length]
+      if (!item) throw new Error(`dataset ${dataset.name} has no items`)
+      return item
+    })
   }
 
   taskDir(taskId: string): string {

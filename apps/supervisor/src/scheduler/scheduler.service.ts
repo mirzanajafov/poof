@@ -409,7 +409,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       lease.span = null
       lease.worker = null
       if (this.stopping) {
-        this.store.leaseReleased(lease.id, 'pending', lease.cursor)
+        this.book.putBack(lease.task, lease)
       } else {
         this.book.released(lease.task, lease, exit)
         this.dispatch()

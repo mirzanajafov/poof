@@ -148,6 +148,14 @@ describe('worker', () => {
     handle.kill()
   })
 
+  it('reports the exit of a worker killed before it was ready', async () => {
+    const handle = new WorkerHandle()
+    const starting = handle.start()
+    handle.kill()
+    await expect(starting).rejects.toThrow(/before ready/)
+    expect((await handle.exited).reason).toBe('killed')
+  })
+
   it('reports a crash with the item that was in flight', async () => {
     const taskDir = await makeTask('crash', 30)
     const handle = await started()

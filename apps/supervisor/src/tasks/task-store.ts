@@ -57,9 +57,8 @@ export class TaskStore {
   }
 
   started(taskId: string): void {
-    this.write(() =>
-      this.db.client.task.update({ where: { id: taskId }, data: { status: 'RUNNING', startedAt: new Date() } }),
-    )
+    const startedAt = new Date()
+    this.write(() => this.db.client.task.update({ where: { id: taskId }, data: { status: 'RUNNING', startedAt } }))
   }
 
   leaseCreated(taskId: string, lease: LeaseRow): void {
@@ -94,11 +93,9 @@ export class TaskStore {
   }
 
   workerExited(workerId: string, reason: ExitReason, items: number): void {
+    const endedAt = new Date()
     this.write(() =>
-      this.db.client.worker.update({
-        where: { id: workerId },
-        data: { endedAt: new Date(), exit: exitColumn[reason], items },
-      }),
+      this.db.client.worker.update({ where: { id: workerId }, data: { endedAt, exit: exitColumn[reason], items } }),
     )
   }
 
