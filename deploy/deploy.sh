@@ -12,10 +12,8 @@ say() { printf '\n== %s\n' "$1"; }
 healthy() {
   for _ in $(seq 1 60); do
     api=$(docker inspect -f '{{.State.Health.Status}}' poof-api 2>/dev/null || true)
-    if [ "$api" = healthy ] && "${compose[@]}" exec -T poof-web node -e \
-      "fetch('http://localhost:3112/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null && \
-      "${compose[@]}" exec -T supervisor node -e \
-      "fetch('http://localhost:3110/health').then((r) => r.json()).then((h) => process.exit(h.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
+    if [ "$api" = healthy ] && docker exec poof-api node -e \
+      "Promise.all([fetch('http://poof-web:3112/'), fetch('http://poof-supervisor:3110/health').then((r) => r.json())]).then(([web, supervisor]) => process.exit(web.ok && supervisor.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
       return 0
     fi
     sleep 3
@@ -58,6 +56,6 @@ if healthy; then
   echo "Rolled back. Database migrations from the failed release stay applied;"
   echo "the dump taken above is in backups/db if the schema change has to be undone."
 else
-  echo "Rollback is not healthy either. Check: ${compose[*]} logs supervisor poof-api poof-web" >&2
+  echo "Rollback is not healthy either. Check: ${compose[*]} logs" >&2
 fi
 exit 1
