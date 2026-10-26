@@ -72,8 +72,10 @@ export const sweepPolicies: PolicyConfig[] = [
   ...[1, 2].map((z) => variant(policies.forecastManaged, { name: `forecast+budget z=${z}`, z })),
 ]
 
+export const allPolicies: PolicyConfig[] = [...mainPolicies, ...sweepPolicies]
+
 export function policyByName(name: string): PolicyConfig {
-  const policy = [...mainPolicies, ...sweepPolicies].find((p) => p.name === name)
+  const policy = allPolicies.find((p) => p.name === name)
   if (!policy) throw new Error(`unknown policy ${name}`)
   return policy
 }

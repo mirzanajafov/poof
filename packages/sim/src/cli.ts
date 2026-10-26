@@ -9,7 +9,7 @@ import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
-import { machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
+import { allPolicies, machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
 
 const { values } = parseArgs({
   options: {
@@ -28,12 +28,18 @@ const { values } = parseArgs({
 function policyNames(spec: string): string[] {
   if (spec === 'main') return mainPolicies.map((p) => p.name)
   if (spec === 'sweep') return sweepPolicies.map((p) => p.name)
-  if (spec === 'all') return [...mainPolicies, ...sweepPolicies].map((p) => p.name)
+  if (spec === 'all') return allPolicies.map((p) => p.name)
   return knownNames(
     spec,
-    [...mainPolicies, ...sweepPolicies].map((p) => p.name),
+    allPolicies.map((p) => p.name),
     'policy',
   )
+}
+
+function count(option: string, text: string): number {
+  const value = Number(text)
+  if (!Number.isInteger(value) || value < 1) throw new Error(`--${option} needs a whole number above zero, not ${text}`)
+  return value
 }
 
 function knownNames(spec: string, known: readonly string[], kind: string): string[] {
@@ -46,9 +52,9 @@ function knownNames(spec: string, known: readonly string[], kind: string): strin
 const machineNames = knownNames(values.machines, Object.keys(machines), 'machine')
 const scenarioNames = knownNames(values.scenarios, Object.keys(scenarios), 'scenario')
 const policies = policyNames(values.policies)
-const seeds = Number(values.seeds)
-if (!Number.isInteger(seeds) || seeds < 1)
-  throw new Error(`--seeds needs a whole number above zero, not ${values.seeds}`)
+const seeds = count('seeds', values.seeds)
+const threads = count('threads', values.threads)
+const dtMs = count('dt', values.dt)
 const calibration = loadCalibration(values.calibration)
 const jobs: Job[] = []
 for (const machine of machineNames) {
@@ -60,7 +66,7 @@ for (const machine of machineNames) {
           scenario,
           policy,
           seed,
-          dtMs: Number(values.dt),
+          dtMs,
           keepSeries: seed === 1,
           checkInvariants: values.invariants,
         })
@@ -78,16 +84,16 @@ const workerPath = fileURLToPath(new URL('./run-worker.js', import.meta.url))
 
 await new Promise<void>((resolve, reject) => {
   const queue = [...jobs]
-  const threads = Math.min(Number(values.threads), jobs.length)
+  const workers = Math.min(threads, jobs.length)
   let idle = 0
-  for (let i = 0; i < threads; i++) {
+  for (let i = 0; i < workers; i++) {
     const worker = new Worker(workerPath, { workerData: { calibration } })
     const next = () => {
       const job = queue.shift()
       if (job) worker.postMessage(job)
       else {
         void worker.terminate()
-        if (++idle === threads) resolve()
+        if (++idle === workers) resolve()
       }
     }
     worker.on('message', (message: { metrics: RunMetrics; series: Sample[] | null; runMs: number }) => {
@@ -141,6 +147,6 @@ await writeFile(join(out, 'raw', 'metrics.json'), JSON.stringify(metrics))
 await writeFile(join(out, 'raw', 'series.json'), JSON.stringify(series))
 await writeFile(
   join(out, 'summary.json'),
-  `${JSON.stringify({ calibration, seeds, dtMs: Number(values.dt), cells, comparisons }, null, 2)}\n`,
+  `${JSON.stringify({ calibration, seeds, dtMs, cells, comparisons }, null, 2)}\n`,
 )
 console.log(`wrote ${out}`)
