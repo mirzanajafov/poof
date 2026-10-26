@@ -10,7 +10,7 @@ export function parseJson(text: string, origin: string): unknown {
   }
 }
 
-export type Check<T> = [T] extends [boolean]
+type Check<T> = [T] extends [boolean]
   ? 'boolean'
   : [T] extends [number]
     ? 'number'
@@ -28,8 +28,7 @@ export type Check<T> = [T] extends [boolean]
 
 export type Checks<T> = { [F in keyof T]-?: Check<T[F]> }
 
-export type FieldCheck =
-  'boolean' | 'number' | 'string' | 'number or null' | 'string or null' | 'object' | readonly unknown[]
+type FieldCheck = 'boolean' | 'number' | 'string' | 'number or null' | 'string or null' | 'object' | readonly unknown[]
 
 function passes(value: unknown, check: FieldCheck): boolean {
   if (typeof check !== 'string') return check.some((allowed) => allowed === value)
