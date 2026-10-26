@@ -9,12 +9,13 @@ describe('parseLiveEvent', () => {
     expect(parseLiveEvent(JSON.stringify(rejected))).toEqual(rejected)
   })
 
-  it('drops text that is not JSON, an unknown kind and an event with missing or mistyped fields', () => {
+  it('drops text that is not JSON, an unknown kind and an event with a missing, mistyped or unknown value', () => {
     expect(parseLiveEvent('{"kind":')).toBeNull()
     expect(parseLiveEvent(JSON.stringify({ kind: 'toString', at: 5 }))).toBeNull()
     expect(parseLiveEvent(JSON.stringify({ kind: 'item' }))).toBeNull()
     expect(parseLiveEvent(JSON.stringify({ kind: 'task.accepted', at: 1 }))).toBeNull()
     expect(parseLiveEvent(JSON.stringify({ kind: 'task.rejected', at: 1, task: 't', exhibit: 3 }))).toBeNull()
+    expect(parseLiveEvent(JSON.stringify({ kind: 'worker.exit', at: 1, worker: 'w', reason: 'bored' }))).toBeNull()
     expect(parseLiveEvent('null')).toBeNull()
   })
 })

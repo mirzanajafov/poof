@@ -30,7 +30,9 @@ export interface LeaseInfo {
   trueRemainingMs?: number
 }
 
-export type BreakerState = 'closed' | 'open' | 'half-open'
+export const breakerStates = ['closed', 'open', 'half-open'] as const
+
+export type BreakerState = (typeof breakerStates)[number]
 
 export interface View {
   now: number

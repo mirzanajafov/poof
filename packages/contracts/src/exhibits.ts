@@ -66,7 +66,9 @@ export function emptyExhibitStats(): ExhibitStats {
   }
 }
 
-export type ExhibitEnd = 'DONE' | 'ABORTED'
+export const exhibitEnds = ['DONE', 'ABORTED'] as const
+
+export type ExhibitEnd = (typeof exhibitEnds)[number]
 
 export interface ExhibitLeaseView {
   id: string
