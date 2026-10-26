@@ -9,11 +9,20 @@ force=false
 
 say() { printf '\n== %s\n' "$1"; }
 
+web_up() {
+  docker exec poof-api node -e \
+    "fetch('http://poof-web:3112/', { signal: AbortSignal.timeout(5000) }).then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null
+}
+
+supervisor_up() {
+  docker exec poof-api node -e \
+    "fetch('http://poof-supervisor:3110/health', { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).then((h) => process.exit(h.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null
+}
+
 healthy() {
   for _ in $(seq 1 60); do
     api=$(docker inspect -f '{{.State.Health.Status}}' poof-api 2>/dev/null || true)
-    if [ "$api" = healthy ] && docker exec poof-api node -e \
-      "Promise.all([fetch('http://poof-web:3112/'), fetch('http://poof-supervisor:3110/health').then((r) => r.json())]).then(([web, supervisor]) => process.exit(web.ok && supervisor.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
+    if [ "$api" = healthy ] && web_up && supervisor_up; then
       return 0
     fi
     sleep 3
@@ -22,28 +31,31 @@ healthy() {
 }
 
 release() {
-  "${compose[@]}" build
-  "${compose[@]}" up -d --remove-orphans
+  "${compose[@]}" build && "${compose[@]}" up -d --remove-orphans
 }
 
-previous=$(git rev-parse HEAD)
-git fetch --quiet origin "$branch"
-target=$(git rev-parse "origin/$branch")
+if [ -z "${POOF_DEPLOY_FROM:-}" ]; then
+  previous=$(git rev-parse HEAD)
+  git fetch --quiet origin "$branch"
+  target=$(git rev-parse "origin/$branch")
 
-if [ "$previous" = "$target" ] && [ "$force" = false ]; then
-  echo "Already at $(git log --oneline -1). Use --force to rebuild anyway."
-  exit 0
+  if [ "$previous" = "$target" ] && [ "$force" = false ]; then
+    echo "Already at $(git log --oneline -1). Use --force to rebuild anyway."
+    exit 0
+  fi
+
+  say "Backing up before the deploy"
+  "${compose[@]}" run --rm backup once
+
+  say "Deploying $(git log --oneline -1 "$target")"
+  git merge --ff-only --quiet "$target"
+  POOF_DEPLOY_FROM="$previous" exec bash deploy/deploy.sh
 fi
 
-say "Backing up before the deploy"
-"${compose[@]}" run --rm backup once
+previous="$POOF_DEPLOY_FROM"
 
-say "Deploying $(git log --oneline -1 "$target")"
-git merge --ff-only --quiet "$target"
-release
-
-say "Waiting for the supervisor, the API and the web app"
-if healthy; then
+say "Building, starting and waiting for the supervisor, the API and the web app"
+if release && healthy; then
   docker image prune -f --filter "label=com.docker.compose.project=poof" > /dev/null
   say "Live: $(git log --oneline -1)"
   exit 0
@@ -51,10 +63,9 @@ fi
 
 say "Not healthy, rolling back to $(git log --oneline -1 "$previous")"
 git reset --hard --quiet "$previous"
-release
-if healthy; then
-  echo "Rolled back. Database migrations from the failed release stay applied;"
-  echo "the dump taken above is in backups/db if the schema change has to be undone."
+if release && healthy; then
+  echo "Rolled back. Database migrations from the failed release stay applied."
+  echo "The dump taken above is in backups/db if the schema change has to be undone."
 else
   echo "Rollback is not healthy either. Check: ${compose[*]} logs" >&2
 fi
