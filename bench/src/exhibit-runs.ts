@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { exhibitDefaults, isRecord, type ExhibitDetail } from '@poof/contracts'
+import { exhibitDefaults, exhibitEnds, hasFields, isRecord, type ExhibitDetail } from '@poof/contracts'
 import type { ExhibitRun } from '@poof/contracts/bench'
 import { isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
 import { recordedRun } from './recorded-run.ts'
@@ -29,6 +29,7 @@ if (unknown.length > 0) throw new Error(`no exhibit policy ${unknown.join(', ')}
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+const patienceMs = (2 * Number(values.duration) + 60) * 1000
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
   const res = await fetch(`${values.api}${path}`, init)
@@ -36,21 +37,19 @@ async function call(path: string, init?: RequestInit): Promise<{ status: number;
   return { status: res.status, body }
 }
 
-async function answer(path: string): Promise<{ status: number; body: unknown } | null> {
-  return call(path).catch(() => {
-    console.log(`GET ${path} got no answer`)
-    return null
-  })
-}
-
 async function idle(): Promise<void> {
-  while ((await answer('/api/exhibits/current'))?.status !== 404) await sleep(5000)
+  while (true) {
+    const { status } = await call('/api/exhibits/current')
+    if (status === 404) return
+    if (status !== 200) throw new Error(`the API answered ${status} for the current exhibit`)
+    await sleep(5000)
+  }
 }
 
-async function start(policy: ExhibitPolicyName, seed: number): Promise<string | null> {
+async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
   while (true) {
     await idle()
-    const started = await call('/api/exhibits', {
+    const { status, body } = await call('/api/exhibits', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -61,48 +60,37 @@ async function start(policy: ExhibitPolicyName, seed: number): Promise<string | 
         dataset: values.dataset,
       }),
     })
-    if (started.status === 409) continue
-    const id = isRecord(started.body) && typeof started.body.id === 'string' ? started.body.id : null
-    if (started.status === 201 && id !== null) return id
-    console.log(`${policy} seed ${seed}: could not start (${started.status} ${JSON.stringify(started.body)})`)
-    return null
+    if (status === 201 && isRecord(body) && typeof body.id === 'string') return body.id
+    if (status !== 409) throw new Error(`could not start ${policy} seed ${seed}: ${status} ${JSON.stringify(body)}`)
+    console.log(`${policy} seed ${seed}: the box is busy, waiting`)
+    await sleep(5000)
   }
 }
 
-async function ended(id: string, deadline: number): Promise<ExhibitDetail | null> {
-  while (Date.now() < deadline) {
+async function ended(id: string): Promise<ExhibitDetail> {
+  const deadline = Date.now() + patienceMs
+  while (true) {
     await sleep(3000)
-    const polled = await answer(`/api/exhibits/${id}`)
-    if (!polled) continue
-    if (polled.status >= 400 && polled.status < 500 && polled.status !== 429) {
-      console.log(`the API answered ${polled.status} for exhibit ${id}`)
-      return null
+    const { status, body } = await call(`/api/exhibits/${id}`)
+    if (status !== 200 || !hasFields<Pick<ExhibitDetail, 'status'>>(body, { status: ['RUNNING', ...exhibitEnds] })) {
+      throw new Error(`the API answered ${status} ${JSON.stringify(body)} for exhibit ${id}`)
     }
-    const detail = polled.status === 200 ? (polled.body as ExhibitDetail | null) : null
-    if (detail && detail.status !== 'RUNNING') return detail
+    if (body.status !== 'RUNNING') return body as ExhibitDetail
+    if (Date.now() > deadline) throw new Error(`exhibit ${id} is still running ${patienceMs / 1000} s after it started`)
   }
-  return null
 }
-
-const patienceMs = (2 * Number(values.duration) + 60) * 1000
 
 const runs: ExhibitRun[] = []
 for (const seed of values.seeds.split(',').map(Number)) {
   for (const policy of policies) {
-    const id = await start(policy, seed)
-    if (id === null) continue
-    const detail = await ended(id, Date.now() + patienceMs)
-    const run = detail && recordedRun(detail)
+    const detail = await ended(await start(policy, seed))
+    const run = recordedRun(detail)
     if (run) {
       runs.push(run)
-      await writeFile(
-        values.out,
-        `${JSON.stringify(runs, null, 2)}
-`,
-      )
+      await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
       console.log(`${policy} seed ${seed}: ${JSON.stringify(run.stats)}`)
     } else {
-      console.log(`${policy} seed ${seed}: ${detail ? `ended ${detail.status}` : 'gave no result'}, not recorded`)
+      console.log(`${policy} seed ${seed}: ended ${detail.status}, not recorded`)
     }
     await sleep(Number(values.gap) * 1000)
   }
