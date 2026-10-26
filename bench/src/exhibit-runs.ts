@@ -3,7 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { exhibitDefaults, isRecord, type ExhibitDetail } from '@poof/contracts'
 import type { ExhibitRun } from '@poof/contracts/bench'
-import { isExhibitPolicyName } from '@poof/core'
+import { isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
 
 const { values } = parseArgs({
   options: {
@@ -18,17 +18,19 @@ const { values } = parseArgs({
   },
 })
 
-const names = values.policies.split(',')
-const unknown = names.filter((name) => !isExhibitPolicyName(name))
+const policies: ExhibitPolicyName[] = []
+const unknown: string[] = []
+for (const name of values.policies.split(',')) {
+  if (isExhibitPolicyName(name)) policies.push(name)
+  else unknown.push(name)
+}
 if (unknown.length > 0) throw new Error(`no exhibit policy ${unknown.join(', ')}`)
-const policies = names.filter(isExhibitPolicyName)
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const res = await fetch(`${values.api}${path}`, init).catch(() => null)
-  if (!res) return { status: 0, body: null }
+  const res = await fetch(`${values.api}${path}`, init)
   const body: unknown = await res.json().catch(() => null)
   return { status: res.status, body }
 }
@@ -36,7 +38,9 @@ async function call(path: string, init?: RequestInit): Promise<{ status: number;
 async function ended(id: string): Promise<ExhibitDetail> {
   while (true) {
     await sleep(3000)
-    const { status, body } = await call(`/api/exhibits/${id}`)
+    const answer = await call(`/api/exhibits/${id}`).catch(() => null)
+    if (!answer) continue
+    const { status, body } = answer
     if ([401, 403, 404].includes(status)) throw new Error(`the API answered ${status} for exhibit ${id}`)
     const detail = status === 200 ? (body as ExhibitDetail | null) : null
     if (detail && detail.status !== 'RUNNING') return detail
