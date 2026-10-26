@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common'
+import type { SubmitRefusal, SubmitResult } from '@poof/contracts'
 import { extract } from '@poof/tracing'
 import type { Response } from 'express'
-import { Scheduler, type SubmitRefusal, type SubmitResult } from './scheduler.service.js'
+import { Scheduler } from './scheduler.service.js'
 import { SubmitTask } from './submit-task.dto.js'
 
 const refusalStatus: Record<SubmitRefusal, number> = { paused: 503, 'over-capacity': 429 }

@@ -120,6 +120,7 @@ export interface PoolTaskView {
 export interface PoolSnapshot {
   at: number
   budget: number
+  paused: boolean
   workers: PoolWorkerView[]
   tasks: PoolTaskView[]
   breakers: Partial<Record<PresetName, BreakerState>>

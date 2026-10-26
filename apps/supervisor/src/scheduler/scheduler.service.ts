@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable, Logger, type BeforeApplicationShutdown, type OnApplicationBootstrap } from '@nestjs/common'
-import type { PoolSnapshot } from '@poof/contracts'
+import type { PoolSnapshot, SubmitResult } from '@poof/contracts'
 import {
   admits,
   Breakers,
@@ -30,18 +30,6 @@ export interface SubmitRequest {
   count?: number
   offset?: number
 }
-
-export type SubmitRefusal = 'paused' | 'over-capacity'
-
-export type SubmitResult =
-  | { accepted: true; id: string; items: number; predictedSeconds: number }
-  | {
-      accepted: false
-      id: string | null
-      refusal: SubmitRefusal
-      reason: string
-      retryAfterSeconds: number
-    }
 
 interface Chunk extends TaskLease {
   readonly task: Task<Chunk>
@@ -219,6 +207,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     return {
       at: Date.now(),
       budget: this.env.BUDGET,
+      paused: this.paused,
       workers: [...this.workers].map((w) => ({
         id: w.id,
         pid: w.handle.pid,

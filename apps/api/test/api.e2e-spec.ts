@@ -40,7 +40,7 @@ afterEach(async () => {
 })
 
 const http = () => request(running!.app.getHttpServer())
-const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, workers: [], tasks: [], breakers: {} })
+const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, paused: false, workers: [], tasks: [], breakers: {} })
 const admin = { Authorization: `Bearer ${adminToken}` }
 const midWindow = new Date('2026-10-26T12:30:30Z')
 
