@@ -1,5 +1,7 @@
 import type { ExhibitParams, ManifestItem } from '@poof/contracts'
 import {
+  exhibitCapacityCores,
+  exhibitMaxProcesses,
   exhibitPolicies,
   exhibitSchedule,
   predictedCostMs,
@@ -9,6 +11,7 @@ import {
 } from '@poof/core'
 import type { Calibration } from './calibration.ts'
 import { Simulation, type MachineSpec, type RunResult } from './engine.ts'
+import { cage } from './scenarios.ts'
 import type { Arrivals, Scenario, TaskPlan } from './workload.ts'
 
 export interface ReplayItem {
@@ -18,15 +21,7 @@ export interface ReplayItem {
   predictedMs: number
 }
 
-export const replayMachine: MachineSpec = {
-  name: 'cage',
-  cores: 1.5,
-  memoryMb: 1536,
-  supervisorMb: 200,
-  maxProcesses: 35,
-}
-
-export const capacityCores = 1.32
+export const replayMachine: MachineSpec = { ...cage, maxProcesses: exhibitMaxProcesses }
 
 export function replayItems(
   manifest: readonly ManifestItem[],
@@ -62,7 +57,7 @@ export class ReplayArrivals implements Arrivals {
       {
         durationMs: params.durationSeconds * 1000,
         utilization: params.utilization,
-        capacityCores,
+        capacityCores: exhibitCapacityCores,
         minItems: params.minItems,
         maxItems: params.maxItems,
         slackMin: params.slackMin,
@@ -111,9 +106,10 @@ export function replay(
   calibration: Calibration,
   timeoutRule?: TimeoutRule,
 ): RunResult {
+  const arrivals = new ReplayArrivals(params, items)
   return new Simulation({
-    scenario: new ReplayArrivals(params, items).scenario,
-    arrivals: new ReplayArrivals(params, items),
+    scenario: arrivals.scenario,
+    arrivals,
     machine: replayMachine,
     policy: exhibitPolicies[params.policy],
     calibration,

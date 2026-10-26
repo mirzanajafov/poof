@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
+import type { ItemCostSample } from '@poof/contracts'
+import { linearFit, median, round, summary } from '@poof/core/stats'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled, type DatasetItem } from './dataset.ts'
 import { cpuMsSince, peakRssMb, resetPeakRss, rssMb } from './memory.ts'
 import { environment, writeResult } from './results.ts'
-import { linearFit, median, round, summary } from './stats.ts'
 
 const { values } = parseArgs({
   options: {
@@ -17,24 +18,10 @@ const { values } = parseArgs({
   },
 })
 
-interface Sample {
-  source: string
-  file: string
-  mp: number
-  bytes: number
-  preset: string
-  pass: number
-  readMs: number
-  wallMs: number
-  cpuMs: number
-  peakRssMb: number
-  outBytes: number
-}
-
 configureSharp()
 const baseRssMb = rssMb()
 const datasets = await Promise.all(values.data!.map((dir) => loadDataset(dir)))
-const samples: Sample[] = []
+const samples: ItemCostSample[] = []
 
 for (const name of values.presets!.split(',')) {
   const preset = presetByName(name)

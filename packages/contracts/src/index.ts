@@ -1,3 +1,4 @@
+export * from './bench.ts'
 export * from './workers.ts'
 export * from './datasets.ts'
 export * from './exhibits.ts'

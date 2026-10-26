@@ -2,8 +2,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { manifestPath } from '@poof/contracts/layout'
+import { Rng } from '@poof/core'
 import sharp from 'sharp'
-import { mulberry32, type DatasetItem } from './dataset.ts'
+import type { DatasetItem } from './dataset.ts'
 
 const { values } = parseArgs({
   options: {
@@ -94,7 +95,8 @@ const quality = Number(values.quality)
 await mkdir(out, { recursive: true })
 const items: Array<DatasetItem & { bytes: number }> = []
 for (let i = 0; i < count; i++) {
-  const rand = mulberry32(seed * 1000 + i)
+  const rng = new Rng(seed * 1000 + i)
+  const rand = () => rng.next()
   const mp = Math.exp(Math.log(minMp) + rand() * (Math.log(maxMp) - Math.log(minMp)))
   const aspect = aspects[Math.floor(rand() * aspects.length)]!
   const width = Math.round(Math.sqrt(mp * 1e6 * aspect) / 2) * 2

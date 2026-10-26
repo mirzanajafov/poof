@@ -1,7 +1,7 @@
 import type { ExhibitParams } from '@poof/contracts'
-import { exhibitSchedule, type ExhibitPolicyName } from '@poof/core'
+import { exhibitCapacityCores, exhibitSchedule, type ExhibitPolicyName } from '@poof/core'
 import { describe, expect, it } from 'vitest'
-import { capacityCores, replay, replayItems } from '../src/replay.ts'
+import { replay, replayItems } from '../src/replay.ts'
 import { calibration } from './fixture.ts'
 
 const manifest = Array.from({ length: 30 }, (_, i) => ({ file: `${i}.jpg`, width: 2000 + i * 100, height: 1500 }))
@@ -27,7 +27,7 @@ describe('replay', () => {
       {
         durationMs: 60_000,
         utilization: 1.2,
-        capacityCores,
+        capacityCores: exhibitCapacityCores,
         minItems: 20,
         maxItems: 60,
         slackMin: 0.5,

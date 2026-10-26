@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { exhibitDefaults } from '@poof/contracts'
+import { exhibitDefaults, isRecord, type ExhibitDetail, type ExhibitRun } from '@poof/contracts'
 import { isExhibitPolicyName } from '@poof/core'
 
 const { values } = parseArgs({
@@ -17,23 +17,31 @@ const { values } = parseArgs({
   },
 })
 
-const policies = values.policies!.split(',')
-const invalid = policies.filter((policy) => !isExhibitPolicyName(policy))
-if (invalid.length > 0) throw new Error(`no exhibit policy ${invalid.join(', ')}`)
+const names = values.policies.split(',')
+const policies = names.filter(isExhibitPolicyName)
+if (policies.length !== names.length) {
+  throw new Error(`no exhibit policy ${names.filter((name) => !isExhibitPolicyName(name)).join(', ')}`)
+}
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
-async function call(
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: Record<string, unknown> | null }> {
+async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
   const res = await fetch(`${values.api}${path}`, init)
-  return { status: res.status, body: (await res.json().catch(() => null)) as Record<string, unknown> | null }
+  const body: unknown = await res.json().catch(() => null)
+  return { status: res.status, body }
 }
 
-const runs: unknown[] = []
-for (const seed of values.seeds!.split(',').map(Number)) {
+async function ended(id: string): Promise<ExhibitDetail> {
+  while (true) {
+    await sleep(3000)
+    const detail = (await call(`/api/exhibits/${id}`)).body as ExhibitDetail | null
+    if (detail && detail.status !== 'RUNNING') return detail
+  }
+}
+
+const runs: ExhibitRun[] = []
+for (const seed of values.seeds.split(',').map(Number)) {
   for (const policy of policies) {
     while ((await call('/api/exhibits/current')).status === 200) await sleep(5000)
     const started = await call('/api/exhibits', {
@@ -47,19 +55,19 @@ for (const seed of values.seeds!.split(',').map(Number)) {
         dataset: values.dataset,
       }),
     })
-    if (started.status !== 201) {
+    const id = isRecord(started.body) && typeof started.body.id === 'string' ? started.body.id : null
+    if (started.status !== 201 || id === null) {
       console.log(`${policy} seed ${seed}: could not start (${started.status} ${JSON.stringify(started.body)})`)
       continue
     }
-    const id = String(started.body!.id)
-    let detail: Record<string, unknown> | null = null
-    do {
-      await sleep(3000)
-      detail = (await call(`/api/exhibits/${id}`)).body
-    } while (!detail || detail.status === 'RUNNING')
-    runs.push({ id, policy, params: detail.params, stats: detail.stats, tasks: detail.tasks })
-    await writeFile(values.out!, `${JSON.stringify(runs, null, 2)}\n`)
-    console.log(`${policy} seed ${seed}: ${JSON.stringify(detail.stats)}`)
+    const { params, stats, tasks } = await ended(id)
+    if (!stats) {
+      console.log(`${policy} seed ${seed}: ended without stats`)
+      continue
+    }
+    runs.push({ id, policy, params, stats, tasks })
+    await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
+    console.log(`${policy} seed ${seed}: ${JSON.stringify(stats)}`)
     await sleep(Number(values.gap) * 1000)
   }
 }

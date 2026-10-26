@@ -2,9 +2,9 @@ import { fork } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { round, summary } from '@poof/core/stats'
 import { Redis } from 'ioredis'
 import { environment, writeResult } from './results.ts'
-import { round, summary } from './stats.ts'
 
 const { values } = parseArgs({
   options: {

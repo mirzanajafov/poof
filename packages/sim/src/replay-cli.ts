@@ -1,12 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
+import { parseManifest, type ExhibitParams, type ExhibitRun, type ExhibitStats } from '@poof/contracts'
 import { defaultTimeoutRule, isExhibitPolicyName, isPresetName } from '@poof/core'
-import { defaultResultsDir, loadCalibration } from './calibration.ts'
+import { mean, quantile } from '@poof/core/stats'
+import { itemCostSamples, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems } from './replay.ts'
-import { mean, quantile } from './stats.ts'
 
 const { values } = parseArgs({
   options: {
@@ -20,10 +19,8 @@ const { values } = parseArgs({
   },
 })
 
-interface RecordedRun {
-  id: string
+type RecordedRun = Omit<ExhibitRun, 'params'> & {
   params: Omit<ExhibitParams, 'policy' | 'preset'> & { policy: string; preset: string }
-  stats: ExhibitStats
 }
 
 interface Numbers {
@@ -40,9 +37,7 @@ const calibration = loadCalibration(values.calibration!)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
 const timeoutRule = { ...defaultTimeoutRule, growth: Number(values['timeout-growth']) }
 const speed = Number(values.speed)
-const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
-  samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
-}
+const samples = itemCostSamples(values.calibration)
 const runs = (JSON.parse(readFileSync(values.runs!, 'utf8')) as RecordedRun[]).map(({ id, params, stats }) => {
   const { policy, preset } = params
   if (!isExhibitPolicyName(policy)) throw new Error(`run ${id} has no simulator policy for ${policy}`)
@@ -53,7 +48,7 @@ const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.ma
 
 function measured(preset: string): Map<string, number> {
   const walls = new Map<string, number[]>()
-  for (const s of b1.samples) {
+  for (const s of samples) {
     if (s.preset !== preset || s.source !== 'synthetic') continue
     walls.set(s.file, [...(walls.get(s.file) ?? []), s.wallMs])
   }

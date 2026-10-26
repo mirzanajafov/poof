@@ -43,8 +43,10 @@ function machine(name: string, cores: number, memoryMb: number, pidsLimit: numbe
   }
 }
 
+export const cage = machine('cage', 1.5, 1536, 512)
+
 export const machines: Record<string, MachineSpec> = {
-  cage: machine('cage', 1.5, 1536, 512),
+  cage,
   c2: machine('c2', 2, 2048, 512),
   c4: machine('c4', 4, 4096, 1024),
 }

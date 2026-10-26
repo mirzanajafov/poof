@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { exhibitCapacityCores, exhibitMaxProcesses } from '@poof/core'
 import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 
 export class Env {
@@ -29,7 +30,7 @@ export class Env {
   @IsOptional()
   @IsNumber()
   @Min(0.1)
-  readonly CAPACITY_CORES: number = 1.32
+  readonly CAPACITY_CORES: number = exhibitCapacityCores
 
   @IsOptional()
   @IsNumber()
@@ -81,7 +82,7 @@ export class Env {
   @IsInt()
   @Min(1)
   @Max(256)
-  readonly EXHIBIT_MAX_PROCESSES: number = 35
+  readonly EXHIBIT_MAX_PROCESSES: number = exhibitMaxProcesses
 
   @IsOptional()
   @IsNumber()

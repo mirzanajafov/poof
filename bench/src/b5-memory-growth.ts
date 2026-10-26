@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
+import { round } from '@poof/core/stats'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled } from './dataset.ts'
 import { cgroupAnonMb, rssMb } from './memory.ts'
 import { environment, writeResult } from './results.ts'
-import { round } from './stats.ts'
 
 const { values } = parseArgs({
   options: {

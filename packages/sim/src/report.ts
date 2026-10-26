@@ -1,5 +1,5 @@
+import { bootstrap, mean, quantile, type Interval } from '@poof/core/stats'
 import type { RunMetrics } from './metrics.ts'
-import { bootstrap, mean, quantile, type Interval } from './stats.ts'
 
 export interface Cell {
   machine: string

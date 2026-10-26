@@ -3,10 +3,11 @@ import { availableParallelism } from 'node:os'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import type { ConcurrencyRow } from '@poof/contracts'
+import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
 import { cgroupAnonMb } from './memory.ts'
-import { environment, readResult, writeResult } from './results.ts'
-import { mean, median, round } from './stats.ts'
+import { environment, readItemCosts, writeResult } from './results.ts'
 
 const { values } = parseArgs({
   options: {
@@ -23,10 +24,6 @@ const { values } = parseArgs({
   },
 })
 
-interface B1 {
-  samples: Array<{ source: string; file: string; preset: string; wallMs: number }>
-}
-
 interface Done {
   type: 'done'
   completions: Array<{ file: string; at: number; wallMs: number }>
@@ -39,10 +36,10 @@ const kMax = Number(values['k-max'] ?? Math.ceil(3 * cpus))
 const durationMs = Number(values.duration) * 1000
 const warmupMs = Number(values.warmup) * 1000
 const dataset = await loadDataset(values.data!)
-const b1 = await readResult<B1>(values.label!, 'b1-item-cost')
+const samples = await readItemCosts(values.label)
 
 const costs = new Map<string, number[]>()
-for (const s of b1.samples) {
+for (const s of samples) {
   if (s.preset !== values.preset || s.source !== dataset.source) continue
   costs.set(s.file, [...(costs.get(s.file) ?? []), s.wallMs])
 }
@@ -64,7 +61,7 @@ function nextMessage<T>(child: ChildProcess, type: string): Promise<T> {
   })
 }
 
-const rows = []
+const rows: ConcurrencyRow[] = []
 const ks = values.ks ? values.ks.split(',').map(Number) : Array.from({ length: kMax }, (_, i) => i + 1)
 for (const k of ks) {
   const children = Array.from({ length: k }, (_, i) =>
@@ -98,7 +95,7 @@ for (const k of ks) {
   const window = results.flatMap((r) => r.completions).filter((c) => c.at >= from && c.at < to)
   const workMs = window.reduce((sum, c) => sum + (cost.get(c.file) ?? 0), 0)
   const effectiveCores = workMs / durationMs
-  const row = {
+  const row: ConcurrencyRow = {
     k,
     items: window.length,
     effectiveCores: round(effectiveCores),

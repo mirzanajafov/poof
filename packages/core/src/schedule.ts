@@ -1,5 +1,9 @@
 import { Rng } from './rng.ts'
 
+export const exhibitCapacityCores = 1.32
+
+export const exhibitMaxProcesses = 35
+
 export interface ScheduleParams {
   durationMs: number
   utilization: number

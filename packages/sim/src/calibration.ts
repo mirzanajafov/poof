@@ -1,8 +1,9 @@
-import type { CostModel } from '@poof/core'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { linearFit, powerFit, quantile } from './stats.ts'
+import type { ConcurrencyRow, ItemCostSample } from '@poof/contracts'
+import type { CostModel } from '@poof/core'
+import { linearFit, powerFit, quantile } from '@poof/core/stats'
 
 export interface Curve {
   cpus: number
@@ -22,13 +23,13 @@ export interface Calibration {
 }
 
 interface B1 {
-  samples: Array<{ source: string; file: string; preset: string; mp: number; wallMs: number; peakRssMb: number }>
+  samples: ItemCostSample[]
 }
 
 interface B2 {
   cpus: number
   knee: number
-  rows: Array<{ k: number; effectiveCores: number; medianPeakRssMb: number; cgroupAnonPeakMb?: number | null }>
+  rows: Array<Pick<ConcurrencyRow, 'k' | 'effectiveCores' | 'medianPeakRssMb'> & { cgroupAnonPeakMb?: number | null }>
 }
 
 interface B3 {
@@ -37,8 +38,12 @@ interface B3 {
 
 export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
 
-function read<T>(dir: string, name: string): T {
-  return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8')) as T
+function readJson(dir: string, name: string): unknown {
+  return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'))
+}
+
+export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCostSample[] {
+  return (readJson(join(dir, label), 'b1-item-cost') as B1).samples
 }
 
 function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel> {
@@ -65,12 +70,12 @@ function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel
 export function loadCalibration(label: string, dir = defaultResultsDir, sources = ['synthetic', 'nasa']): Calibration {
   const base = join(dir, label)
   if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
-  const b1 = read<B1>(base, 'b1-item-cost')
-  const b3 = read<B3>(base, 'b3-spawn')
+  const b1 = readJson(base, 'b1-item-cost') as B1
+  const b3 = readJson(base, 'b3-spawn') as B3
   const b2s = mergeByCpus(
     readdirSync(base)
       .filter((file) => file.startsWith('b2-concurrency-c'))
-      .map((file) => read<B2>(base, file.replace(/\.json$/, ''))),
+      .map((file) => readJson(base, file.replace(/\.json$/, '')) as B2),
   )
   const measured = b2s.flatMap((b2) =>
     b2.rows.filter(
