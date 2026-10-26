@@ -67,14 +67,13 @@ function nextMessage<T>(child: ChildProcess, type: string): Promise<T> {
 }
 
 const rows: ConcurrencyRow[] = []
-const ks = values.ks
-  ? values.ks
-      .split(',')
-      .map(Number)
-      .sort((a, b) => a - b)
-  : Array.from({ length: kMax }, (_, i) => i + 1)
-if (ks.length === 0 || ks.some((k) => !Number.isInteger(k) || k < 1)) {
-  throw new Error('--ks and --k-max need worker counts that are whole numbers above zero')
+const ks = values.ks ? values.ks.split(',').map(Number) : Array.from({ length: kMax }, (_, i) => i + 1)
+if (
+  !Number.isInteger(kMax) ||
+  ks.length === 0 ||
+  ks.some((k, i) => !Number.isInteger(k) || k < 1 || ks.indexOf(k) !== i)
+) {
+  throw new Error('--ks and --k-max need distinct worker counts that are whole numbers above zero')
 }
 for (const k of ks) {
   const children = Array.from({ length: k }, (_, i) =>

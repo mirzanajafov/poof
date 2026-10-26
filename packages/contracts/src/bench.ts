@@ -130,7 +130,7 @@ export function parseConcurrencyRun(text: string, origin: string): ConcurrencyRu
   const json = parseJson(text, origin)
   const rows = entries<ConcurrencyPoint>(isRecord(json) ? json.rows : undefined, concurrencyPointChecks, 'rows', origin)
   assertFields<Omit<ConcurrencyRun, 'rows'>>(json, { cpus: 'number', knee: 'number' }, origin)
-  return { cpus: json.cpus, knee: json.knee, rows }
+  return { cpus: json.cpus, knee: json.knee, rows: rows.sort((a, b) => a.k - b.k) }
 }
 
 export function parseSpawnRun(text: string, origin: string): SpawnRun {

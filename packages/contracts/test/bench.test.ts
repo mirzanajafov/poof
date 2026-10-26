@@ -88,6 +88,11 @@ describe('parseConcurrencyRun', () => {
     expect(parseConcurrencyRun(text, 'b2.json')).toEqual({ cpus: 1.5, knee: 2, rows: [row, measured] })
   })
 
+  it('hands the rows over in worker order whatever order they were measured in', () => {
+    const text = JSON.stringify({ cpus: 2, knee: 2, rows: [{ ...row, k: 3 }, { ...row, k: 1 }, row] })
+    expect(parseConcurrencyRun(text, 'b2.json').rows.map((r) => r.k)).toEqual([1, 2, 3])
+  })
+
   it('refuses a row without the cgroup memory field and a run without a knee', () => {
     const withoutPeak = { ...row, cgroupAnonPeakMb: undefined }
     expect(() => parseConcurrencyRun(JSON.stringify({ cpus: 2, knee: 2, rows: [withoutPeak] }), 'b2.json')).toThrow(
