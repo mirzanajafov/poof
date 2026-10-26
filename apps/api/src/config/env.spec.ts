@@ -15,6 +15,14 @@ describe('Env', () => {
     expect(parseEnv(Env, base)).toMatchObject({ PORT: 3111, TASKS_PER_MINUTE: 10, PUBLIC_EXHIBIT_SECONDS: 60 })
   })
 
+  it('reads TRUST_PROXY as a switch, a hop count or a list of addresses', () => {
+    const trust = (TRUST_PROXY: string) => parseEnv(Env, { ...base, TRUST_PROXY }).TRUST_PROXY
+    expect(trust('false')).toBe(false)
+    expect(trust('true')).toBe(true)
+    expect(trust('2')).toBe(2)
+    expect(trust('loopback, uniquelocal')).toBe('loopback, uniquelocal')
+  })
+
   it('refuses a short admin token and missing settings', () => {
     expect(() => parseEnv(Env, { ...base, ADMIN_TOKEN: 'short' })).toThrow(/ADMIN_TOKEN/)
     expect(() => parseEnv(Env, { ...base, SUPERVISOR_URL: undefined })).toThrow(/SUPERVISOR_URL/)

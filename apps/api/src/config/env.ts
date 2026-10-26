@@ -1,5 +1,11 @@
 import 'reflect-metadata'
+import { Transform, type TransformFnParams } from 'class-transformer'
 import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator'
+
+function trustProxy({ value }: TransformFnParams): unknown {
+  if (value === 'true' || value === 'false') return value === 'true'
+  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
+}
 
 export class Env {
   @IsString()
@@ -28,8 +34,8 @@ export class Env {
   readonly PORT: number = 3111
 
   @IsOptional()
-  @IsString()
-  readonly TRUST_PROXY: string = 'loopback'
+  @Transform(trustProxy)
+  readonly TRUST_PROXY: boolean | number | string = 'loopback'
 
   @IsOptional()
   @IsString()
