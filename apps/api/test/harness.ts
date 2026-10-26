@@ -37,17 +37,22 @@ export class StubSupervisor {
 
   async start(): Promise<void> {
     const server = createServer((req, res) => {
-      void read(req).then((body) => {
-        const call = {
-          method: req.method ?? 'GET',
-          path: req.url ?? '/',
-          body: body ? parseJson(body, 'the request to the stub supervisor') : undefined,
-        }
-        this.calls.push(call)
-        const reply = this.reply(call)
-        res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
-        res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
-      })
+      void read(req)
+        .then((body) => {
+          const call = {
+            method: req.method ?? 'GET',
+            path: req.url ?? '/',
+            body: body ? parseJson(body, 'the request to the stub supervisor') : undefined,
+          }
+          this.calls.push(call)
+          const reply = this.reply(call)
+          res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
+          res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
+        })
+        .catch((error: unknown) => {
+          res.writeHead(500, { 'content-type': 'text/plain' })
+          res.end(error instanceof Error ? error.message : 'the stub supervisor failed')
+        })
     })
     this.server = server
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
