@@ -14,8 +14,8 @@ export class TaskQueries {
     })
   }
 
-  async detail(id: string) {
-    const task = await this.db.client.task.findUnique({
+  detail(id: string) {
+    return this.db.client.task.findUnique({
       where: { id },
       include: {
         leases: { orderBy: [{ depth: 'asc' }, { lo: 'asc' }] },
@@ -23,6 +23,5 @@ export class TaskQueries {
         decisions: { orderBy: { at: 'asc' }, take: 200 },
       },
     })
-    return task && { ...task, decisions: task.decisions.map((d) => ({ ...d, id: d.id.toString() })) }
   }
 }

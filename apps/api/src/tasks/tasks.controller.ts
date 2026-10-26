@@ -1,8 +1,9 @@
+import { STATUS_CODES } from 'node:http'
 import {
   Body,
   Controller,
   Get,
-  InternalServerErrorException,
+  HttpException,
   Logger,
   Next,
   NotFoundException,
@@ -44,7 +45,7 @@ export class TasksController {
   async detail(@Param('id', new ParseUUIDPipe()) id: string) {
     const task = await this.tasks.detail(id)
     if (!task) throw new NotFoundException()
-    return task
+    return { ...task, decisions: task.decisions.map((d) => ({ ...d, id: d.id.toString() })) }
   }
 
   @Post()
@@ -61,20 +62,17 @@ export class TasksController {
     @Res() res: Response,
     @Next() next: NextFunction,
   ) {
-    const path = await this.outputs.path(id, item)
-    if (!path) throw new NotFoundException()
-    res.sendFile(
-      path,
-      { maxAge: '1d', immutable: true, lastModified: false, acceptRanges: false, dotfiles: 'allow' },
-      (error) => {
-        if (!error || ('code' in error && error.code === 'ECONNABORTED')) return
-        if ('status' in error && error.status === 404) {
-          next(new NotFoundException())
-          return
-        }
-        this.logger.error(error)
-        next(new InternalServerErrorException())
-      },
-    )
+    const file = await this.outputs.find(id, item)
+    if (!file) throw new NotFoundException()
+    res.sendFile(file.name, { root: file.dir, maxAge: '1d', immutable: true }, (error) => {
+      if (!error || clientWentAway(error)) return
+      const status = 'status' in error && typeof error.status === 'number' ? error.status : 500
+      if (status >= 500) this.logger.error(error)
+      next(new HttpException(STATUS_CODES[status] ?? 'Error', status))
+    })
   }
+}
+
+function clientWentAway(error: Error): boolean {
+  return ('code' in error && error.code === 'ECONNABORTED') || ('syscall' in error && error.syscall === 'write')
 }
