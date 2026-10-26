@@ -24,7 +24,7 @@ import {
   type TimeoutRule,
   type View,
 } from '@poof/core'
-import { curveFor, effectiveCores, type Calibration, type FittedCurve } from './calibration.ts'
+import { curveFor, effectiveCores, nearestCurve, type Calibration, type FittedCurve } from './calibration.ts'
 import { inWindow, Workload, type Arrivals, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
@@ -826,7 +826,7 @@ export function workerMemoryMb(calibration: Calibration, items: number): number 
 }
 
 export function defaultBudget(calibration: Calibration, machine: MachineSpec): number {
-  const curve = curveFor(calibration, machine.cores)
+  const curve = nearestCurve(calibration, machine.cores)
   const knee = Math.round((curve.knee * machine.cores) / curve.cpus)
   const byMemory = Math.floor((machine.memoryMb - machine.supervisorMb) / calibration.steadyRssMb)
   return Math.max(1, Math.min(knee, byMemory, machine.maxProcesses))

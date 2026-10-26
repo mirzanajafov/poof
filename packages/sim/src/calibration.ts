@@ -121,12 +121,17 @@ export interface FittedCurve extends Curve {
   decline: number
 }
 
-export function curveFor(calibration: Calibration, cpus: number): FittedCurve {
+export function nearestCurve(calibration: Calibration, cpus: number): Curve {
   let best = valueAt(calibration.curves, 0)
   for (const curve of calibration.curves) {
     if (Math.abs(curve.cpus - cpus) < Math.abs(best.cpus - cpus)) best = curve
   }
-  return { ...best, decline: decline(best) }
+  return best
+}
+
+export function curveFor(calibration: Calibration, cpus: number): FittedCurve {
+  const curve = nearestCurve(calibration, cpus)
+  return { ...curve, decline: decline(curve) }
 }
 
 function decline(curve: Curve): number {
