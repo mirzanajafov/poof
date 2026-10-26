@@ -120,6 +120,7 @@ describe('supervisor', () => {
     })
     const a = await finished(running, taskId(relaxed.body))
     const b = await finished(running, taskId(urgent.body))
+    expect([a.status, b.status]).toEqual(['DONE', 'DONE'])
     if (!a.finishedAt || !b.finishedAt) throw new Error('a finished task has no finish time')
     expect(b.finishedAt.getTime()).toBeLessThan(a.finishedAt.getTime())
   })

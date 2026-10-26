@@ -38,7 +38,13 @@ describe('planSplit', () => {
   })
 
   it('never hands out more children than items', () => {
-    expect(planSplit(10, 13, 4, 50, 0)).toMatchObject({ cut: 11, children: [{}, {}] })
+    expect(planSplit(10, 13, 4, 50, 0)).toEqual({
+      cut: 11,
+      children: [
+        { lo: 11, hi: 12 },
+        { lo: 12, hi: 13 },
+      ],
+    })
   })
 
   it('refuses a range with a single item left', () => {

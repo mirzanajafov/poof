@@ -46,9 +46,9 @@ async function waitUntilOffTheLiveView(running: Running) {
 }
 
 async function waitUntilThePoolResumes(running: Running, workers: number) {
-  return vi.waitUntil(async () => {
+  await vi.waitUntil(async () => {
     const health = (await http(running).get('/health')).body as Health
-    return !health.paused && health.workers === workers ? health : null
+    return !health.paused && health.workers === workers
   }, patience)
 }
 

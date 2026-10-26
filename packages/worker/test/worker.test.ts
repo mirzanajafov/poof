@@ -78,7 +78,7 @@ describe('worker', () => {
     expect(done.hi).toBe(5)
     expect(items.map((i) => i.item)).toEqual([1, 2, 3, 4])
     expect(items.every((i) => i.ok)).toBe(true)
-    for (const i of items.filter((item) => item.ok)) expect(i.stepCpuMs).toBeGreaterThanOrEqual(i.cpuMs)
+    for (const item of items.filter((i) => i.ok)) expect(item.stepCpuMs).toBeGreaterThanOrEqual(item.cpuMs)
     for (const i of [1, 2, 3, 4]) expect(existsSync(join(taskDir, 'out', `${i}.webp`))).toBe(true)
     expect(existsSync(join(taskDir, 'out', '0.webp'))).toBe(false)
     handle.stop()
