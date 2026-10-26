@@ -3,7 +3,7 @@ import { availableParallelism } from 'node:os'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { concurrencyResultPrefix, type ConcurrencyRow } from '@poof/contracts'
+import { concurrencyResultPrefix, itemCostMedians, type ConcurrencyRow } from '@poof/contracts'
 import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
 import { cgroupAnonMb } from './memory.ts'
@@ -38,12 +38,7 @@ const warmupMs = Number(values.warmup) * 1000
 const dataset = await loadDataset(values.data)
 const samples = await readItemCosts(values.label)
 
-const costs = new Map<string, number[]>()
-for (const s of samples) {
-  if (s.preset !== values.preset || s.source !== dataset.source) continue
-  costs.set(s.file, [...(costs.get(s.file) ?? []), s.wallMs])
-}
-const cost = new Map([...costs].map(([file, walls]) => [file, median(walls)]))
+const cost = itemCostMedians(samples, values.preset, dataset.source)
 
 const childPath = fileURLToPath(new URL('./b2-child.js', import.meta.url))
 

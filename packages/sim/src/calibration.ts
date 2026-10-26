@@ -9,7 +9,7 @@ import {
   parseSpawnRun,
   spawnResult,
   type ConcurrencyRun,
-  type ItemCostSample,
+  type ItemCost,
 } from '@poof/contracts'
 import { valueAt, type CostModel } from '@poof/core'
 import { linearFit, powerFit, quantile } from '@poof/core/stats'
@@ -38,11 +38,11 @@ function readResult<T>(dir: string, name: string, parse: (text: string, origin: 
   return parse(readFileSync(path, 'utf8'), path)
 }
 
-export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCostSample[] {
+export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCost[] {
   return readResult(join(dir, label), itemCostsResult, parseItemCosts)
 }
 
-function typeCosts(samples: readonly ItemCostSample[], sources: readonly string[]): Record<string, CostModel> {
+function typeCosts(samples: readonly ItemCost[], sources: readonly string[]): Record<string, CostModel> {
   const byImage = new Map<string, { preset: string; mp: number; walls: number[] }>()
   for (const s of samples) {
     if (!sources.includes(s.source)) continue
