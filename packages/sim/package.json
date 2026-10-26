@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./results/server/summary.json": "./results/server/summary.json"
+    "./results/server/*": "./results/server/*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

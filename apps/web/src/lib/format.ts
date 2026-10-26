@@ -1,4 +1,4 @@
-import type { ExitReason, LiveEvent } from '@poof/contracts'
+import { exitReasons, type ExhibitStats, type ExitReason, type LiveEvent } from '@poof/contracts'
 
 export function short(id: string): string {
   return id.slice(0, 6)
@@ -23,6 +23,17 @@ export const exitWords: Record<ExitReason, string> = {
   heartbeat: 'killed for going silent',
   killed: 'stopped',
   normal: 'retired',
+}
+
+export function exitCounts(exits: ExhibitStats['exits']): Array<{ reason: ExitReason; count: number }> {
+  return exitReasons.flatMap((reason) => {
+    const count = exits[reason] ?? 0
+    return count > 0 ? [{ reason, count }] : []
+  })
+}
+
+export function capitalized(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 function range(lo: number, hi: number): string {

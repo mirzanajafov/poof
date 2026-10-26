@@ -4,10 +4,11 @@ import type { ExhibitLeaseView, ExhibitSnapshot } from '@poof/contracts'
 import type { ExhibitPolicyName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
-import { seconds, short } from '@/lib/format'
+import { capitalized, exitCounts, short } from '@/lib/format'
 import { post, refusal } from '@/lib/post'
 import { layoutLeases } from '@/lib/tree'
-import { useNow } from './useNow'
+import { Remaining } from './Remaining'
+import { Stats } from './Stats'
 
 const choices: Array<{ policy: ExhibitPolicyName; title: string; text: string }> = [
   {
@@ -44,7 +45,7 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
       const answer = await post('/api/exhibits', { policy })
       if (answer.status !== 201) {
         const retry = answer.retryAfter ? `. Try again in ${answer.retryAfter} s.` : '.'
-        setMessage(`${refusal(answer)}${retry}`)
+        setMessage(`${capitalized(refusal(answer))}${retry}`)
       }
     } catch {
       setMessage('The box did not answer.')
@@ -100,40 +101,36 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
 }
 
 function ExhibitLive({ exhibit, processes }: { exhibit: ExhibitSnapshot; processes: number[] }) {
-  const left = Math.max(0, exhibit.endsAt - useNow(1000))
   const s = exhibit.stats
-  const kills = Object.entries(s.exits)
-    .filter(([reason]) => reason !== 'normal')
-    .reduce((sum, [, n]) => sum + n, 0)
-  const stats = [
-    ['Processes now', String(exhibit.processes)],
-    ['Peak', String(s.peakProcesses)],
-    ['Tasks in / on time', `${s.submitted - s.rejected} / ${s.met}`],
-    ['Turned away', String(s.rejected)],
-    ['Spawns', String(s.spawns)],
-    ['Splits', String(s.splits)],
-    ['Workers killed', String(kills)],
-    ['Deepest split', String(s.maxDepth)],
-  ]
+  const lost = exitCounts(s.exits)
+    .filter(({ reason }) => reason !== 'normal')
+    .reduce((sum, { count }) => sum + count, 0)
   return (
     <div className="mt-4 space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm">
           Running <span className="font-semibold">{exhibit.params.policy}</span> ·{' '}
-          <span className="tabular text-muted">{seconds(left)} left</span>
+          <span className="tabular text-muted">
+            <Remaining until={exhibit.endsAt} /> left
+          </span>
         </p>
         <Link href={`/exhibits/${exhibit.id}`} className="text-xs text-accent-ink underline">
           Details
         </Link>
       </div>
-      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {stats.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-line bg-raised px-3 py-2">
-            <dt className="text-xs text-muted">{label}</dt>
-            <dd className="tabular text-lg font-semibold">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <Stats
+        tone="panel"
+        items={[
+          ['Processes now', exhibit.processes],
+          ['Peak', s.peakProcesses],
+          ['Tasks in / on time', `${s.submitted - s.rejected} / ${s.met}`],
+          ['Turned away', s.rejected],
+          ['Spawns', s.spawns],
+          ['Splits', s.splits],
+          ['Workers lost', lost],
+          ['Deepest split', s.maxDepth],
+        ]}
+      />
       <Sparkline points={processes} budget={exhibit.budget} />
       <div>
         <h3 className="text-sm font-semibold">Who called whom</h3>
@@ -184,7 +181,7 @@ function LeaseTree({ leases }: { leases: ExhibitLeaseView[] }) {
         {layout.nodes.map(({ lease, x, y }) => (
           <circle key={lease.id} cx={x} cy={y} r={6} strokeWidth={1.5} className={states[lease.state].className}>
             <title>
-              {`images ${lease.lo}-${lease.hi - 1}, ${lease.state}${lease.pid ? `, pid ${lease.pid}` : ''}`}
+              {`images ${lease.lo}-${lease.hi - 1}, ${states[lease.state].label}${lease.pid ? `, pid ${lease.pid}` : ''}`}
             </title>
           </circle>
         ))}

@@ -2,6 +2,7 @@ import type { TaskDetail, TaskStatus } from '@poof/contracts'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
+import type { ReactNode } from 'react'
 import { Elapsed } from '@/components/Elapsed'
 import { Refresh } from '@/components/Refresh'
 import { Stats } from '@/components/Stats'
@@ -53,9 +54,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           ['Images', `${task.done} / ${task.items}`],
           ['Predicted work', seconds(task.predictedMs)],
           ['Allowed', seconds(deadline - submitted)],
-          finished
-            ? ['Took', `${seconds(finished - submitted)}${finished <= deadline ? ', on time' : ', late'}`]
-            : ['Running for', <Elapsed key="elapsed" since={submitted} />],
+          outcome(task, submitted, deadline, finished),
         ]}
       />
       {task.status !== 'REJECTED' && (
@@ -134,4 +133,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       </div>
     </div>
   )
+}
+
+function outcome(task: TaskDetail, submitted: number, deadline: number, finished: number | null): [string, ReactNode] {
+  if (task.status === 'REJECTED') return ['Result', 'turned away']
+  if (finished === null) return ['Running for', <Elapsed since={submitted} />]
+  const took = seconds(finished - submitted)
+  if (task.status === 'FAILED') return ['Stopped after', took]
+  return ['Took', `${took}${finished <= deadline ? ', on time' : ', late'}`]
 }

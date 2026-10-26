@@ -1,7 +1,7 @@
 'use client'
 
-import type { DatasetSummary } from '@poof/contracts'
-import type { PresetName } from '@poof/core'
+import { parseSubmitResult, type DatasetSummary } from '@poof/contracts'
+import { isPresetName, type PresetName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
 import { post, refusal } from '@/lib/post'
@@ -10,14 +10,14 @@ type Outcome =
   | { kind: 'accepted'; id: string; items: number; predictedSeconds: number }
   | { kind: 'refused'; message: string; retryAfter: number | null }
 
-const presets: Partial<Record<PresetName, string>> = {
-  'webp-1600': 'WebP, 1600 px',
-  'thumb-320': 'Thumbnail, 320 px',
-}
+const presets = [
+  ['webp-1600', 'WebP, 1600 px'],
+  ['thumb-320', 'Thumbnail, 320 px'],
+] as const satisfies ReadonlyArray<readonly [PresetName, string]>
 
 export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
   const [dataset, setDataset] = useState(datasets[0]?.name ?? 'synthetic')
-  const [preset, setPreset] = useState('webp-1600')
+  const [preset, setPreset] = useState<PresetName>(presets[0][0])
   const [count, setCount] = useState(60)
   const [deadline, setDeadline] = useState(60)
   const [busy, setBusy] = useState(false)
@@ -27,10 +27,10 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
     setBusy(true)
     try {
       const answer = await post('/api/tasks', { dataset, preset, count, deadlineSeconds: deadline })
-      const accepted = answer.status === 201 ? acceptedTask(answer.body) : null
+      const result = parseSubmitResult(answer.body)
       setOutcome(
-        accepted
-          ? { kind: 'accepted', ...accepted }
+        result?.accepted
+          ? { kind: 'accepted', id: result.id, items: result.items, predictedSeconds: result.predictedSeconds }
           : { kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter },
       )
     } catch {
@@ -75,10 +75,12 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
           <span className="text-muted">Output</span>
           <select
             value={preset}
-            onChange={(e) => setPreset(e.target.value)}
+            onChange={(e) => {
+              if (isPresetName(e.target.value)) setPreset(e.target.value)
+            }}
             className="mt-1 w-full rounded-md border border-line bg-raised px-2 py-1.5"
           >
-            {Object.entries(presets).map(([value, label]) => (
+            {presets.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -134,11 +136,4 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
       )}
     </form>
   )
-}
-
-function acceptedTask(body: unknown): { id: string; items: number; predictedSeconds: number } | null {
-  if (typeof body !== 'object' || body === null || !('id' in body) || !('items' in body)) return null
-  if (!('predictedSeconds' in body) || typeof body.id !== 'string') return null
-  if (typeof body.items !== 'number' || typeof body.predictedSeconds !== 'number') return null
-  return { id: body.id, items: body.items, predictedSeconds: body.predictedSeconds }
 }

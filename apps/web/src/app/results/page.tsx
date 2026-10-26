@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import summary from '@poof/sim/results/server/summary.json'
 import type { Metadata } from 'next'
@@ -6,7 +7,6 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Results' }
 export const dynamic = 'force-static'
 
-const results = join(process.cwd(), 'node_modules', '@poof', 'sim', 'results', 'server')
 const policies = [
   'never',
   'static-4',
@@ -19,8 +19,10 @@ const policies = [
 ]
 const scenarios = ['calm', 'skew', 'neighbour', 'burst', 'poison']
 
+const resolve = createRequire(join(process.cwd(), 'package.json')).resolve
+
 async function svg(name: string): Promise<string> {
-  return readFile(join(results, name), 'utf8')
+  return readFile(resolve(`@poof/sim/results/server/${name}`), 'utf8')
 }
 
 function pct(value: number): string {

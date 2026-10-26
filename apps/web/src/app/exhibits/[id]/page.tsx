@@ -1,11 +1,11 @@
-import { exitReasons, type ExhibitDetail } from '@poof/contracts'
+import type { ExhibitDetail } from '@poof/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Refresh } from '@/components/Refresh'
 import { Stats } from '@/components/Stats'
 import { api } from '@/lib/api'
-import { exitWords, seconds, short } from '@/lib/format'
+import { exitCounts, exitWords, seconds, short } from '@/lib/format'
 import { isUuid } from '@/lib/ids'
 
 export const dynamic = 'force-dynamic'
@@ -20,10 +20,7 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
   const exhibit = await api<ExhibitDetail>(`/exhibits/${id}`)
   if (!exhibit) notFound()
   const s = exhibit.stats
-  const kills = exitReasons.flatMap((reason) => {
-    const n = s?.exits[reason]
-    return reason !== 'normal' && n ? [{ reason, n }] : []
-  })
+  const exits = s ? exitCounts(s.exits) : []
   return (
     <div className="space-y-6">
       {exhibit.status === 'RUNNING' && <Refresh every={3000} />}
@@ -53,12 +50,12 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
       ) : (
         <p className="text-sm text-muted">Still running. The numbers land here when it ends.</p>
       )}
-      {kills.length > 0 && (
+      {exits.length > 0 && (
         <p className="text-sm">
           How workers ended:{' '}
-          {kills.map(({ reason, n }) => (
+          {exits.map(({ reason, count }) => (
             <span key={reason} className="mr-3">
-              {n} {exitWords[reason]}
+              {count} {exitWords[reason]}
             </span>
           ))}
         </p>

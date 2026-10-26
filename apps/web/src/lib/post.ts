@@ -23,6 +23,7 @@ export function refusal(answer: Answer): string {
   if (typeof body === 'object' && body !== null) {
     if ('reason' in body && typeof body.reason === 'string') return body.reason
     if ('message' in body && typeof body.message === 'string') return body.message
+    if ('message' in body && Array.isArray(body.message)) return body.message.join(', ')
   }
   return `the box said ${answer.status}`
 }
