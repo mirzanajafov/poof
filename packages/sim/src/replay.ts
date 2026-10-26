@@ -22,7 +22,7 @@ export interface ReplayItem {
   predictedMs: number
 }
 
-export const replayMachine: MachineSpec = { ...cage, maxProcesses: exhibitMaxProcesses }
+const replayMachine: MachineSpec = { ...cage, maxProcesses: exhibitMaxProcesses }
 
 export function replayItems(
   manifest: readonly ManifestItem[],
