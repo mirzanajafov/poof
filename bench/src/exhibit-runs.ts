@@ -23,14 +23,20 @@ const { values } = parseArgs({
 const policies: ExhibitPolicyName[] = []
 const unknown: string[] = []
 for (const name of values.policies.split(',')) {
-  if (isExhibitPolicyName(name)) policies.push(name)
+  if (isExhibitPolicyName(name) && !policies.includes(name)) policies.push(name)
   else unknown.push(name)
 }
-if (unknown.length > 0) throw new Error(`no exhibit policy ${unknown.join(', ')}`)
+if (unknown.length > 0) throw new Error(`unknown or repeated exhibit policy ${unknown.join(', ')}`)
+const durationSeconds = Number(values.duration)
+const gapMs = Number(values.gap) * 1000
+const seeds = values.seeds.split(',').map(Number)
+if (!(durationSeconds > 0) || !(gapMs >= 0) || !seeds.every((seed) => Number.isInteger(seed))) {
+  throw new Error('--duration needs seconds above zero, --gap seconds and --seeds whole numbers')
+}
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
-const patienceMs = (2 * Number(values.duration) + 60) * 1000
+const patienceMs = (2 * durationSeconds + 60) * 1000
 if (existsSync(values.out)) throw new Error(`${values.out} already holds runs, so pick another --out`)
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
@@ -54,7 +60,7 @@ async function idle(): Promise<void> {
   }
 }
 
-async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
+async function start(policy: ExhibitPolicyName, seed: number): Promise<string | null> {
   const deadline = Date.now() + patienceMs
   while (true) {
     await idle()
@@ -64,12 +70,16 @@ async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
       body: JSON.stringify({
         policy,
         seed,
-        durationSeconds: Number(values.duration),
+        durationSeconds,
         utilization: Number(values.utilization),
         dataset: values.dataset,
       }),
     })
     if (status === 201 && isRecord(body) && typeof body.id === 'string') return body.id
+    if (status >= 500) {
+      console.log(`${policy} seed ${seed}: could not start (${status} ${JSON.stringify(body)}), skipped`)
+      return null
+    }
     if (status !== 409) throw new Error(`could not start ${policy} seed ${seed}: ${status} ${JSON.stringify(body)}`)
     if (Date.now() > deadline) throw new Error(`the box stayed busy for ${patienceMs / 1000} s`)
     console.log(`${policy} seed ${seed}: the box is busy, waiting`)
@@ -91,18 +101,19 @@ async function ended(id: string): Promise<ExhibitDetail> {
 }
 
 const runs: ExhibitRun[] = []
-for (const seed of values.seeds.split(',').map(Number)) {
+for (const seed of seeds) {
   for (const policy of policies) {
-    const detail = await ended(await start(policy, seed))
-    const run = recordedRun(detail)
+    const id = await start(policy, seed)
+    const detail = id === null ? null : await ended(id)
+    const run = detail && recordedRun(detail)
     if (run) {
       exhibitRunSummary(run, `${values.api}/api/exhibits/${run.id}`)
       runs.push(run)
       await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
       console.log(`${policy} seed ${seed}: ${JSON.stringify(run.stats)}`)
-    } else {
+    } else if (detail) {
       console.log(`${policy} seed ${seed}: ended ${detail.status}, not recorded`)
     }
-    await sleep(Number(values.gap) * 1000)
+    await sleep(gapMs)
   }
 }
