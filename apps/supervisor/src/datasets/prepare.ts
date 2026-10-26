@@ -1,6 +1,7 @@
 import { access, constants, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { datasetDir, manifestPath, parseManifest } from '@poof/contracts'
+import { parseManifest } from '@poof/contracts'
+import { datasetDir, manifestPath } from '@poof/contracts/layout'
 import type { DatasetSource } from './dataset-source.js'
 import { replaceFile, replaceWithLinkOrCopy } from './files.js'
 

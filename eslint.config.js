@@ -26,9 +26,6 @@ export default defineConfig(
   },
   {
     rules: {
-      '@typescript-eslint/no-base-to-string': 'off',
-      '@typescript-eslint/no-deprecated': 'off',
-      '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unnecessary-type-parameters': 'off',
@@ -44,10 +41,6 @@ export default defineConfig(
     files: ['apps/web/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended, nextPlugin.configs['core-web-vitals']],
     settings: { next: { rootDir: 'apps/web' } },
-    rules: {
-      '@next/next/no-img-element': 'off',
-      'react-hooks/purity': 'off',
-    },
   },
   {
     files: ['**/test/**/*.ts', '**/*.{spec,test}.{ts,tsx}'],
@@ -58,6 +51,7 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
+      'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'expectTypeOf'] }],
       'vitest/no-conditional-expect': 'off',
     },
   },

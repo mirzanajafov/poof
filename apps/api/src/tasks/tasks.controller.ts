@@ -16,7 +16,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { outputDir, outputExtensions, taskDir } from '@poof/contracts'
+import { outputDir, outputExtensions, taskDir } from '@poof/contracts/layout'
 import type { NextFunction, Request, Response } from 'express'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'

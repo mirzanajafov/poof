@@ -1,29 +1,12 @@
-import type { ExhibitParams, ExhibitStats } from '@poof/contracts'
+import type { ExhibitDetail } from '@poof/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Refresh } from '@/components/Refresh'
+import { Stats } from '@/components/Stats'
 import { api } from '@/lib/api'
-import { seconds, short } from '@/lib/format'
-
-interface ExhibitDetail {
-  id: string
-  policy: string
-  status: string
-  startedAt: string
-  endedAt: string | null
-  params: ExhibitParams
-  stats: ExhibitStats | null
-  tasks: Array<{
-    id: string
-    status: string
-    items: number
-    done: number
-    submittedAt: string
-    deadline: string
-    finishedAt: string | null
-  }>
-}
+import { exitCounts, exitWords, seconds, short } from '@/lib/format'
+import { isUuid } from '@/lib/ids'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,18 +16,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ExhibitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!/^[0-9a-f-]{36}$/.test(id)) notFound()
+  if (!isUuid(id)) notFound()
   const exhibit = await api<ExhibitDetail>(`/exhibits/${id}`)
   if (!exhibit) notFound()
   const s = exhibit.stats
-  const kills = s ? Object.entries(s.exits).filter(([r]) => r !== 'normal') : []
-  const killWords: Record<string, string> = {
-    killed: 'stopped when the run ended',
-    timeout: 'by the item timeout',
-    memory: 'by the memory limit',
-    heartbeat: 'for going silent',
-    crash: 'crashed',
-  }
+  const exits = s ? exitCounts(s.exits) : []
   return (
     <div className="space-y-6">
       {exhibit.status === 'RUNNING' && <Refresh every={3000} />}
@@ -59,8 +35,8 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
         </h1>
       </header>
       {s ? (
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
+        <Stats
+          items={[
             ['Tasks submitted', s.submitted],
             ['Turned away', s.rejected],
             ['On time', s.met],
@@ -69,22 +45,17 @@ export default async function ExhibitPage({ params }: { params: Promise<{ id: st
             ['Spawns', s.spawns],
             ['Splits', s.splits],
             ['Images done', s.items],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-line bg-surface px-3 py-3">
-              <dt className="text-xs text-muted">{label}</dt>
-              <dd className="tabular mt-1 text-lg font-semibold">{value}</dd>
-            </div>
-          ))}
-        </dl>
+          ]}
+        />
       ) : (
         <p className="text-sm text-muted">Still running. The numbers land here when it ends.</p>
       )}
-      {kills.length > 0 && (
+      {exits.length > 0 && (
         <p className="text-sm">
-          Workers killed:{' '}
-          {kills.map(([reason, n]) => (
+          How workers ended:{' '}
+          {exits.map(({ reason, count }) => (
             <span key={reason} className="mr-3">
-              {n} {killWords[reason] ?? reason}
+              {count} {exitWords[reason]}
             </span>
           ))}
         </p>

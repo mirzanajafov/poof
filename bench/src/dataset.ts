@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { manifestPath, parseManifest, type ManifestItem } from '@poof/contracts'
+import { parseManifest, type ManifestItem } from '@poof/contracts'
+import { manifestPath } from '@poof/contracts/layout'
 
 export interface DatasetItem extends ManifestItem {
   mp: number

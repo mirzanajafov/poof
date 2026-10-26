@@ -9,7 +9,6 @@ import { useLive } from './useLive'
 
 export function LiveDashboard({ datasets }: { datasets: DatasetSummary[] }) {
   const { connected, snapshot, events, processes, throughput } = useLive()
-  const exhibitRunning = snapshot.exhibit !== null
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -18,7 +17,7 @@ export function LiveDashboard({ datasets }: { datasets: DatasetSummary[] }) {
         </div>
         <div className="space-y-4 lg:col-span-3">
           <Tiles live={snapshot.live} throughput={throughput} connected={connected} />
-          {exhibitRunning ? (
+          {snapshot.live?.paused ? (
             <p className="rounded-lg border border-line bg-warn-soft px-3 py-2 text-sm">
               An exhibit has the box right now. The pool is paused and new tasks are turned away until it ends.
             </p>

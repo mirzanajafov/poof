@@ -1,13 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import {
-  inputDir,
-  manifestPath,
-  outputDir,
-  outputFileName,
-  parseTaskManifest,
-  type TaskManifest,
-} from '@poof/contracts'
+import { parseTaskManifest, type TaskManifest } from '@poof/contracts'
+import { inputDir, manifestPath, outputDir, outputFileName } from '@poof/contracts/layout'
 import { configureSharp, presets, processItem } from '@poof/imaging'
 import type { Assignment, FromWorker, ItemDead, ItemDone, ToWorker } from './protocol.ts'
 

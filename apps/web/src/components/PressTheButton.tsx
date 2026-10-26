@@ -1,51 +1,36 @@
 'use client'
 
-import type { DatasetSummary } from '@poof/contracts'
+import { parseSubmitResult, type DatasetSummary, type SubmitResult } from '@poof/contracts'
+import { isPresetName, type PresetName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
+import { post, refusal } from '@/lib/post'
 
 type Outcome =
-  | { kind: 'accepted'; id: string; items: number; predictedSeconds: number }
+  | { kind: 'accepted'; task: Extract<SubmitResult, { accepted: true }> }
   | { kind: 'refused'; message: string; retryAfter: number | null }
 
 const presets = [
-  { value: 'webp-1600', label: 'WebP, 1600 px' },
-  { value: 'thumb-320', label: 'Thumbnail, 320 px' },
-]
+  ['webp-1600', 'WebP, 1600 px'],
+  ['thumb-320', 'Thumbnail, 320 px'],
+] as const satisfies ReadonlyArray<readonly [PresetName, string]>
 
 export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
   const [dataset, setDataset] = useState(datasets[0]?.name ?? 'synthetic')
-  const [preset, setPreset] = useState(presets[0]!.value)
+  const [preset, setPreset] = useState<PresetName>(presets[0][0])
   const [count, setCount] = useState(60)
   const [deadline, setDeadline] = useState(60)
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault()
+  async function submit() {
     setBusy(true)
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ dataset, preset, count, deadlineSeconds: deadline }),
-      })
-      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
-      if (res.status === 201) {
-        setOutcome({
-          kind: 'accepted',
-          id: String(body.id),
-          items: Number(body.items),
-          predictedSeconds: Number(body.predictedSeconds),
-        })
-      } else {
-        const retry = res.headers.get('retry-after')
-        setOutcome({
-          kind: 'refused',
-          message: String(body.reason ?? body.message ?? `the box said ${res.status}`),
-          retryAfter: retry ? Number(retry) : null,
-        })
-      }
+      const answer = await post('/api/tasks', { dataset, preset, count, deadlineSeconds: deadline })
+      const result = parseSubmitResult(answer.body)
+      if (result?.accepted) setOutcome({ kind: 'accepted', task: result })
+      else if (result) setOutcome({ kind: 'refused', message: result.reason, retryAfter: result.retryAfterSeconds })
+      else setOutcome({ kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter })
     } catch {
       setOutcome({ kind: 'refused', message: 'the box did not answer', retryAfter: null })
     } finally {
@@ -54,7 +39,13 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submit()
+      }}
+      className="rounded-xl border border-line bg-surface p-4 sm:p-5"
+    >
       <h2 className="text-base font-semibold">Press the button</h2>
       <p className="mt-1 text-sm text-muted">
         Send a batch of photos to resize. The box predicts the work from the image sizes and either takes it or tells
@@ -82,12 +73,14 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
           <span className="text-muted">Output</span>
           <select
             value={preset}
-            onChange={(e) => setPreset(e.target.value)}
+            onChange={(e) => {
+              if (isPresetName(e.target.value)) setPreset(e.target.value)
+            }}
             className="mt-1 w-full rounded-md border border-line bg-raised px-2 py-1.5"
           >
-            {presets.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
+            {presets.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>
@@ -128,8 +121,8 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
       </button>
       {outcome?.kind === 'accepted' && (
         <p className="mt-3 rounded-md bg-good-soft px-3 py-2 text-sm">
-          Taken: {outcome.items} images, about {outcome.predictedSeconds} s of work.{' '}
-          <Link href={`/tasks/${outcome.id}`} className="font-medium text-accent-ink underline">
+          Taken: {outcome.task.items} images, about {outcome.task.predictedSeconds} s of work.{' '}
+          <Link href={`/tasks/${outcome.task.id}`} className="font-medium text-accent-ink underline">
             Watch it
           </Link>
         </p>

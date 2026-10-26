@@ -1,4 +1,5 @@
 import type { ExhibitPolicyName, LeaseState, PresetName } from '@poof/core'
+import type { TaskStatus } from './tasks.ts'
 import type { ExitReason } from './workers.ts'
 
 export interface ExhibitParams {
@@ -98,4 +99,23 @@ export interface ExhibitSnapshot {
   processes: number
   stats: ExhibitStats
   tasks: ExhibitTaskView[]
+}
+
+export interface ExhibitDetail {
+  id: string
+  policy: ExhibitPolicyName
+  status: 'RUNNING' | ExhibitEnd
+  startedAt: string
+  endedAt: string | null
+  params: ExhibitParams
+  stats: ExhibitStats | null
+  tasks: Array<{
+    id: string
+    status: TaskStatus
+    items: number
+    done: number
+    submittedAt: string
+    deadline: string
+    finishedAt: string | null
+  }>
 }

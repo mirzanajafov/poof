@@ -1,3 +1,4 @@
+import { isRecord } from './records.ts'
 export const datasetNamePattern = /^[a-z0-9][a-z0-9-]{0,62}$/
 
 export interface TaskManifestItem {
@@ -25,10 +26,6 @@ export interface DatasetSummary {
 }
 
 const fileNamePattern = /^(?!\.\.?$|manifest\.json$)[^/\\]+$/i
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function isDimension(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0

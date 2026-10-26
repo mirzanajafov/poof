@@ -33,13 +33,14 @@ export class StubSupervisor {
   url = ''
 
   async start(): Promise<void> {
-    this.server = createServer(async (req, res) => {
-      const body = await read(req)
-      const call = { method: req.method ?? 'GET', path: req.url ?? '/', body: body ? JSON.parse(body) : undefined }
-      this.calls.push(call)
-      const reply = this.reply(call)
-      res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
-      res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
+    this.server = createServer((req, res) => {
+      void read(req).then((body) => {
+        const call = { method: req.method ?? 'GET', path: req.url ?? '/', body: body ? JSON.parse(body) : undefined }
+        this.calls.push(call)
+        const reply = this.reply(call)
+        res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
+        res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
+      })
     })
     await new Promise<void>((resolve) => this.server!.listen(0, '127.0.0.1', resolve))
     this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`

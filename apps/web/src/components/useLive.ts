@@ -39,7 +39,8 @@ export function useLive(): Live {
         exhibitId.current = id
         setProcesses([])
       }
-      if (next.exhibit) setProcesses((points) => [...points, next.exhibit!.processes].slice(-KEEP_POINTS))
+      const exhibit = next.exhibit
+      if (exhibit) setProcesses((points) => [...points, exhibit.processes].slice(-KEEP_POINTS))
       const now = Date.now()
       items.current = items.current.filter((t) => now - t < 10_000)
       setThroughput(items.current.length / Math.min(10, Math.max(1, (now - since.current) / 1000)))

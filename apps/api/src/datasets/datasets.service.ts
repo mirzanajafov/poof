@@ -1,13 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { Injectable, Logger } from '@nestjs/common'
-import {
-  datasetDir,
-  datasetNamePattern,
-  datasetsDir,
-  manifestPath,
-  parseManifest,
-  type DatasetSummary,
-} from '@poof/contracts'
+import { datasetNamePattern, parseManifest, type DatasetSummary } from '@poof/contracts'
+import { datasetDir, datasetsDir, manifestPath } from '@poof/contracts/layout'
 import { FailureStreak, isMissingFile, readDirIfPresent } from '@poof/nest'
 import { Env } from '../config/env.js'
 
