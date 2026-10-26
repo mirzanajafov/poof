@@ -164,7 +164,18 @@ describe('exhibits', () => {
   it('refuses a null where an exhibit setting has a default', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()
-    for (const field of ['durationSeconds', 'utilization', 'dataset', 'preset', 'minItems', 'maxItems', 'slackMax']) {
+    const fields = [
+      'durationSeconds',
+      'utilization',
+      'dataset',
+      'preset',
+      'minItems',
+      'maxItems',
+      'slackMin',
+      'slackMax',
+      'seed',
+    ]
+    for (const field of fields) {
       expect(
         (
           await http()
@@ -182,6 +193,9 @@ describe('exhibits', () => {
     const items = await http().post('/exhibits').send({ policy: 'box', minItems: 50, maxItems: 30 })
     expect(items.status).toBe(400)
     expect(items.body.message).toEqual(['maxItems must not be below minItems'])
+    const floor = await http().post('/exhibits').send({ policy: 'box', minItems: 'many' })
+    expect(floor.status).toBe(400)
+    expect(floor.body.message).not.toContain('maxItems must not be below minItems')
     const slack = await http().post('/exhibits').send({ policy: 'box', slackMin: 2, slackMax: 1 })
     expect(slack.status).toBe(400)
     expect(slack.body.message).toEqual(['slackMax must not be below slackMin'])
