@@ -153,6 +153,15 @@ describe('submissions', () => {
     expect(res.status).toBe(502)
   })
 
+  it('counts each forwarded address on its own behind a trusted proxy', async () => {
+    running = await start(supervisor.url, { TRUST_PROXY: 'loopback, uniquelocal', TASKS_PER_MINUTE: '1' })
+    const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
+    const from = (address: string) => http().post('/api/tasks').set('X-Forwarded-For', address).send(body)
+    expect((await from('203.0.113.1')).status).toBe(201)
+    expect((await from('203.0.113.1')).status).toBe(429)
+    expect((await from('203.0.113.2')).status).toBe(201)
+  })
+
   it('rate-limits submissions per address, except for the admin token', async () => {
     running = await start(supervisor.url, { TASKS_PER_MINUTE: '3' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
