@@ -1,10 +1,19 @@
 import { rm } from 'node:fs/promises'
 import { exhibitSnapshotKey } from '@poof/contracts'
 import { policies } from '@poof/core'
-import request from 'supertest'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Scheduler } from '../src/scheduler/scheduler.service.js'
-import { exhibitId, makeData, start, taskId, waitFor, waitForExhibitEnd, waitForTask, type Running } from './harness.js'
+import {
+  exhibitId,
+  http,
+  makeData,
+  patience,
+  start,
+  taskId,
+  waitForExhibitEnd,
+  waitForTask,
+  type Running,
+} from './harness.js'
 
 type Health = ReturnType<Scheduler['health']>
 
@@ -24,25 +33,23 @@ afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true })
 })
 
-const http = (running: Running) => request(running.app.getHttpServer())
-
 const onTheLiveView = async (running: Running) => (await running.redis.exists(exhibitSnapshotKey)) === 1
 
 async function waitUntilOnTheLiveView(running: Running) {
-  await waitFor(() => onTheLiveView(running), 2000)
+  await vi.waitUntil(() => onTheLiveView(running), { timeout: 2000, interval: 100 })
 }
 
 async function waitUntilOffTheLiveView(running: Running) {
-  await waitFor(async () => !(await onTheLiveView(running)), 2000)
+  await vi.waitUntil(async () => !(await onTheLiveView(running)), { timeout: 2000, interval: 100 })
   await new Promise((resolve) => setTimeout(resolve, 1500))
   expect(await onTheLiveView(running)).toBe(false)
 }
 
 async function waitUntilThePoolResumes(running: Running, workers: number) {
-  return waitFor(async () => {
+  return vi.waitUntil(async () => {
     const health = (await http(running).get('/health')).body as Health
     return !health.paused && health.workers === workers ? health : null
-  })
+  }, patience)
 }
 
 describe('exhibits', () => {
@@ -197,10 +204,12 @@ describe('exhibits', () => {
     expect(items.body).toHaveProperty('message', ['maxItems must not be below minItems'])
     const floor = await http(running).post('/exhibits').send({ policy: 'box', minItems: 'many' })
     expect(floor.status).toBe(400)
-    expect(floor.body).toHaveProperty('message', expect.not.arrayContaining(['maxItems must not be below minItems']))
+    expect(floor.body).toHaveProperty('message', expect.any(Array))
+    expect(floor.body).not.toHaveProperty('message', expect.arrayContaining(['maxItems must not be below minItems']))
     const ceiling = await http(running).post('/exhibits').send({ policy: 'box', maxItems: 'many' })
     expect(ceiling.status).toBe(400)
-    expect(ceiling.body).toHaveProperty('message', expect.not.arrayContaining(['maxItems must not be below minItems']))
+    expect(ceiling.body).toHaveProperty('message', expect.any(Array))
+    expect(ceiling.body).not.toHaveProperty('message', expect.arrayContaining(['maxItems must not be below minItems']))
     const slack = await http(running).post('/exhibits').send({ policy: 'box', slackMin: 2, slackMax: 1 })
     expect(slack.status).toBe(400)
     expect(slack.body).toHaveProperty('message', ['slackMax must not be below slackMin'])

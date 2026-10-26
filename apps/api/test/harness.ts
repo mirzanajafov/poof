@@ -76,28 +76,30 @@ export interface Running {
   close(): Promise<void>
 }
 
-export async function start(supervisorUrl: string, env: Record<string, string> = {}): Promise<Running> {
-  const dataDir = env.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
+export async function start(
+  supervisorUrl: string,
+  overrides: Partial<Record<keyof Env, string>> = {},
+): Promise<Running> {
+  const dataDir = overrides.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
+  const env = parseEnv(Env, {
+    DATABASE_URL: inject('databaseUrl'),
+    REDIS_URL: redisUrl,
+    SUPERVISOR_URL: supervisorUrl,
+    DATA_DIR: dataDir,
+    ADMIN_TOKEN: adminToken,
+    TRUST_PROXY: 'loopback',
+    WEB_ORIGIN: 'http://localhost:3112',
+    TASKS_PER_MINUTE: '10',
+    EXHIBITS_PER_HOUR: '3',
+    EXHIBIT_COOLDOWN_SECONDS: '120',
+    PUBLIC_EXHIBIT_SECONDS: '60',
+    ...overrides,
+  })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(Env)
-    .useValue(
-      parseEnv(Env, {
-        DATABASE_URL: inject('databaseUrl'),
-        REDIS_URL: redisUrl,
-        SUPERVISOR_URL: supervisorUrl,
-        DATA_DIR: dataDir,
-        ADMIN_TOKEN: adminToken,
-        TRUST_PROXY: 'loopback',
-        WEB_ORIGIN: 'http://localhost:3112',
-        TASKS_PER_MINUTE: '10',
-        EXHIBITS_PER_HOUR: '3',
-        EXHIBIT_COOLDOWN_SECONDS: '120',
-        PUBLIC_EXHIBIT_SECONDS: '60',
-        ...env,
-      }),
-    )
+    .useValue(env)
     .compile()
   const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>({ logger: false }))
   await app.listen(0, '127.0.0.1')

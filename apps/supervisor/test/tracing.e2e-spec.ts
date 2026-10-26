@@ -1,8 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
-import request from 'supertest'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { exhibitId, makeData, start, taskId, waitForExhibitEnd, waitForTask, type Running } from './harness.js'
+import { exhibitId, http, makeData, start, taskId, waitForExhibitEnd, waitForTask, type Running } from './harness.js'
 
 interface Collected {
   traceId: string
@@ -71,7 +70,6 @@ beforeEach(() => {
 afterEach(async () => {
   await running?.close()
   running = null
-  delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
 })
 
 afterAll(async () => {
@@ -83,7 +81,7 @@ describe('tracing', () => {
   it('puts a task, its chunks and every image in the trace the request came with', async () => {
     running = await start(dataDir, { OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
     const traceId = '4bf92f3577b34da6a3ce929d0e0e4736'
-    const res = await request(running.app.getHttpServer())
+    const res = await http(running)
       .post('/tasks')
       .set('traceparent', `00-${traceId}-00f067aa0ba902b7-01`)
       .send({ dataset: 'small', preset: 'webp-1600', deadlineSeconds: 120, count: 12 })
@@ -105,7 +103,7 @@ describe('tracing', () => {
 
   it('draws the same tree of helpers as the lease table during an exhibit of the box', async () => {
     running = await start(dataDir, { OTEL_EXPORTER_OTLP_ENDPOINT: endpoint, BUDGET: '2', EXHIBIT_MAX_PROCESSES: '8' })
-    const res = await request(running.app.getHttpServer()).post('/exhibits').send({
+    const res = await http(running).post('/exhibits').send({
       policy: 'box',
       durationSeconds: 15,
       dataset: 'noisy',

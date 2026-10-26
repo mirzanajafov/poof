@@ -8,7 +8,8 @@ import { createPrisma, type PrismaClient, type Task } from '@poof/db'
 import { enableValidationAndShutdownHooks, parseEnv } from '@poof/nest'
 import { Redis } from 'ioredis'
 import sharp from 'sharp'
-import { inject } from 'vitest'
+import request from 'supertest'
+import { inject, vi } from 'vitest'
 import { AppModule } from '../src/app.module.js'
 import { Env } from '../src/config/env.js'
 
@@ -70,21 +71,24 @@ async function noisy(root: string, name: string, count: number): Promise<void> {
   await writeFile(join(dir, 'manifest.json'), JSON.stringify({ items }))
 }
 
-export async function start(dataDir: string, env: Record<string, string> = {}): Promise<Running> {
+export const patience = { timeout: 60_000, interval: 100 }
+
+export const http = (running: Running) => request(running.app.getHttpServer())
+
+export async function start(dataDir: string, overrides: Partial<Record<keyof Env, string>> = {}): Promise<Running> {
+  const env = parseEnv(Env, {
+    DATABASE_URL: inject('databaseUrl'),
+    REDIS_URL: redisUrl,
+    DATA_DIR: dataDir,
+    BUDGET: '2',
+    CHECKPOINT_MS: '200',
+    ...overrides,
+  })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(Env)
-    .useValue(
-      parseEnv(Env, {
-        DATABASE_URL: inject('databaseUrl'),
-        REDIS_URL: redisUrl,
-        DATA_DIR: dataDir,
-        BUDGET: '2',
-        CHECKPOINT_MS: '200',
-        ...env,
-      }),
-    )
+    .useValue(env)
     .compile()
   const app = enableValidationAndShutdownHooks(
     moduleRef.createNestApplication<NestExpressApplication>({ logger: false }),
@@ -103,28 +107,18 @@ export async function start(dataDir: string, env: Record<string, string> = {}): 
   }
 }
 
-export async function waitFor<T>(probe: () => Promise<T | null | undefined | false>, timeoutMs = 60_000): Promise<T> {
-  const started = Date.now()
-  while (Date.now() - started < timeoutMs) {
-    const value = await probe()
-    if (value) return value
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  throw new Error('timed out waiting')
-}
-
 export async function waitForTask(running: Running, id: string, ready: (task: Task) => boolean) {
-  return waitFor(async () => {
+  return vi.waitUntil(async () => {
     const task = await running.db.task.findUnique({ where: { id } })
     return task && ready(task) ? task : null
-  })
+  }, patience)
 }
 
 export async function waitForExhibitEnd(running: Running, id: string) {
-  return waitFor(async () => {
+  return vi.waitUntil(async () => {
     const exhibit = await running.db.exhibit.findUnique({ where: { id } })
     return exhibit && exhibit.status !== 'RUNNING' ? exhibit : null
-  })
+  }, patience)
 }
 
 export function taskId(body: unknown): string {

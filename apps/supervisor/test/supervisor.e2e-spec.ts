@@ -2,9 +2,8 @@ import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { PoolSnapshot } from '@poof/contracts'
 import { createPrisma } from '@poof/db'
-import request from 'supertest'
-import { afterAll, afterEach, beforeAll, describe, expect, inject, it, onTestFinished } from 'vitest'
-import { makeData, start, taskId, waitFor, waitForTask, type Running } from './harness.js'
+import { afterAll, afterEach, beforeAll, describe, expect, inject, it, onTestFinished, vi } from 'vitest'
+import { http, makeData, patience, start, taskId, waitForTask, type Running } from './harness.js'
 
 let dataDir: string
 let running: Running | null = null
@@ -23,7 +22,7 @@ afterAll(async () => {
 })
 
 async function submit(running: Running, body: Record<string, unknown>) {
-  return request(running.app.getHttpServer()).post('/tasks').send(body)
+  return http(running).post('/tasks').send(body)
 }
 
 async function finished(running: Running, id: string) {
@@ -31,10 +30,10 @@ async function finished(running: Running, id: string) {
 }
 
 async function busyWorker(running: Running) {
-  return waitFor(async () => {
-    const state = (await request(running.app.getHttpServer()).get('/state')).body as PoolSnapshot
+  return vi.waitUntil(async () => {
+    const state = (await http(running).get('/state')).body as PoolSnapshot
     return state.workers.find((w) => w.lease)
-  })
+  }, patience)
 }
 
 async function outputs(id: string): Promise<string[]> {
