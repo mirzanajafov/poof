@@ -15,15 +15,15 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { presetNames, type PresetName } from '@poof/core'
 import { TaskStatus } from '@poof/db'
+import { Database } from '@poof/nest'
 import { Type } from 'class-transformer'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
-import type { Env } from '../config/env.js'
-import { RateLimit, RateLimitGuard } from '../guards/guards.js'
-import { Database } from '../infra/infra.module.js'
+import { RateLimit } from '../access/rate-limit.decorator.js'
+import { RateLimitGuard } from '../access/rate-limit.guard.js'
+import { Env } from '../config/env.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 
 export class SubmitTask {
@@ -71,15 +71,11 @@ const contentTypes: Array<[string, string]> = [
 
 @Controller('tasks')
 export class TasksController {
-  private readonly dataDir: string
-
   constructor(
     private readonly db: Database,
     private readonly supervisor: Supervisor,
-    config: ConfigService<Env, true>,
-  ) {
-    this.dataDir = config.get('DATA_DIR', { infer: true })
-  }
+    private readonly env: Env,
+  ) {}
 
   @Get()
   list(@Query() query: ListTasks) {
@@ -118,7 +114,7 @@ export class TasksController {
     @Res() res: Response,
   ) {
     for (const [ext, type] of contentTypes) {
-      const path = join(this.dataDir, 'tasks', id, 'out', `${item}.${ext}`)
+      const path = join(this.env.DATA_DIR, 'tasks', id, 'out', `${item}.${ext}`)
       const found = await stat(path).catch(() => null)
       if (!found?.isFile()) continue
       res.setHeader('Content-Type', type)

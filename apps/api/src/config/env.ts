@@ -1,68 +1,65 @@
 import 'reflect-metadata'
-import { plainToInstance } from 'class-transformer'
-import { IsInt, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator'
+import { Transform, type TransformFnParams } from 'class-transformer'
+import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator'
+
+function parseTrustProxy({ value }: TransformFnParams): unknown {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
+}
 
 export class Env {
   @IsString()
-  DATABASE_URL: string
+  readonly DATABASE_URL: string
 
   @IsString()
-  REDIS_URL: string
+  readonly REDIS_URL: string
 
   @IsString()
-  SUPERVISOR_URL: string
+  readonly SUPERVISOR_URL: string
 
   @IsOptional()
   @IsString()
-  OTEL_EXPORTER_OTLP_ENDPOINT?: string
+  readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string
 
   @IsString()
-  DATA_DIR: string
+  readonly DATA_DIR: string
 
   @IsString()
   @MinLength(24)
-  ADMIN_TOKEN: string
+  readonly ADMIN_TOKEN: string
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  PORT: number = 3111
+  readonly PORT: number = 3111
+
+  @IsOptional()
+  @Transform(parseTrustProxy)
+  readonly TRUST_PROXY: boolean | number | string = 'loopback'
 
   @IsOptional()
   @IsString()
-  TRUST_PROXY: string = 'loopback'
-
-  @IsOptional()
-  @IsString()
-  WEB_ORIGIN: string = 'http://localhost:3112'
+  readonly WEB_ORIGIN: string = 'http://localhost:3112'
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  TASKS_PER_MINUTE: number = 10
+  readonly TASKS_PER_MINUTE: number = 10
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  EXHIBITS_PER_HOUR: number = 3
+  readonly EXHIBITS_PER_HOUR: number = 3
 
   @IsOptional()
   @IsInt()
   @Min(0)
-  EXHIBIT_COOLDOWN_SECONDS: number = 120
+  readonly EXHIBIT_COOLDOWN_SECONDS: number = 120
 
   @IsOptional()
   @IsInt()
   @Min(10)
   @Max(900)
-  PUBLIC_EXHIBIT_SECONDS: number = 60
-}
-
-export function validateEnv(raw: Record<string, unknown>): Env {
-  const env = plainToInstance(Env, raw, { enableImplicitConversion: true })
-  const errors = validateSync(env)
-  if (errors.length > 0) {
-    throw new Error(errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`).join('; '))
-  }
-  return env
+  readonly PUBLIC_EXHIBIT_SECONDS: number = 60
 }

@@ -12,7 +12,7 @@ import {
 } from '@poof/contracts'
 import { io, type Socket } from 'socket.io-client'
 import request from 'supertest'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { adminToken, start, StubSupervisor, type Running } from './harness.js'
 
 const supervisor = new StubSupervisor()
@@ -27,6 +27,7 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   if (running) {
     await running.close()
     await rm(running.dataDir, { recursive: true, force: true })
@@ -37,7 +38,9 @@ afterEach(async () => {
 })
 
 const http = () => request(running!.app.getHttpServer())
+const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, workers: [], tasks: [], breakers: {} })
 const admin = { Authorization: `Bearer ${adminToken}` }
+const midWindow = new Date('2026-10-26T12:30:30Z')
 
 async function seedTask() {
   const id = randomUUID()
@@ -81,6 +84,11 @@ describe('read model', () => {
     expect((await http().get(`/api/tasks/${randomUUID()}`)).status).toBe(404)
     expect((await http().get('/api/tasks/not-a-uuid')).status).toBe(400)
     expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
+  })
+
+  it('reports that Redis and Postgres answer', async () => {
+    running = await start(supervisor.url)
+    expect((await http().get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
   })
 
   it('lists the datasets on disk that the supervisor would serve', async () => {
@@ -148,7 +156,18 @@ describe('submissions', () => {
     expect(res.status).toBe(502)
   })
 
+  it('counts each forwarded address on its own behind a trusted proxy', async () => {
+    vi.setSystemTime(midWindow)
+    running = await start(supervisor.url, { TRUST_PROXY: 'loopback, uniquelocal', TASKS_PER_MINUTE: '1' })
+    const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
+    const from = (address: string) => http().post('/api/tasks').set('X-Forwarded-For', address).send(body)
+    expect((await from('203.0.113.1')).status).toBe(201)
+    expect((await from('203.0.113.1')).status).toBe(429)
+    expect((await from('203.0.113.2')).status).toBe(201)
+  })
+
   it('rate-limits submissions per address, except for the admin token', async () => {
+    vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { TASKS_PER_MINUTE: '3' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
     for (let i = 0; i < 3; i++) expect((await http().post('/api/tasks').send(body)).status).toBe(201)
@@ -179,6 +198,7 @@ describe('exhibits', () => {
   })
 
   it('lets one address start three public exhibits an hour', async () => {
+    vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { EXHIBIT_COOLDOWN_SECONDS: '0' })
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
     for (let i = 0; i < 3; i++)
@@ -211,8 +231,7 @@ describe('exhibits', () => {
 describe('live view', () => {
   it('sends a snapshot on connect and relays supervisor events in batches', async () => {
     running = await start(supervisor.url)
-    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
-    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
+    await running.redis.set(poolSnapshotKey, JSON.stringify(poolSnapshot()))
     const socket: Socket<LiveSocketEvents> = io(running.url, { transports: ['websocket'] })
     const snapshot = await new Promise<LiveSnapshot>((resolve) => socket.once('snapshot', resolve))
     expect(snapshot.live?.budget).toBe(2)
@@ -224,6 +243,13 @@ describe('live view', () => {
     const received = await batch
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()
+  })
+
+  it('answers the live snapshot over HTTP too', async () => {
+    running = await start(supervisor.url)
+    expect((await http().get('/api/state')).body).toEqual({ live: null, exhibit: null })
+    await running.redis.set(poolSnapshotKey, JSON.stringify(poolSnapshot()))
+    expect((await http().get('/api/state')).body).toEqual({ live: poolSnapshot(), exhibit: null })
   })
 
   it('lets only the configured web origin read the polling handshake', async () => {

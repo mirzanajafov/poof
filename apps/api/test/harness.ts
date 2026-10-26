@@ -84,7 +84,7 @@ export async function start(supervisorUrl: string, env: Record<string, string> =
   })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule.register()] }).compile()
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
   const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>({ logger: false }))
   await app.listen(0, '127.0.0.1')
   const url = `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`

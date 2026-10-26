@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import type { ExitReason } from '@poof/contracts'
 import type { BreakerState, LeaseState, PresetName } from '@poof/core'
 import type { Prisma } from '@poof/db'
-import { exitColumn, leaseColumn } from '../infra/columns.js'
-import { Database } from '../infra/infra.module.js'
+import { Database } from '@poof/nest'
+import { exitColumn, leaseColumn } from './columns.js'
 
 export interface TaskRow {
   id: string

@@ -1,9 +1,8 @@
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
-import type { Env } from '../config/env.js'
-import { Database } from '../infra/infra.module.js'
+import { Database } from '@poof/nest'
+import { Env } from '../config/env.js'
 import { Datasets } from './datasets.service.js'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -16,12 +15,12 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   private timer: NodeJS.Timeout | null = null
 
   constructor(
-    config: ConfigService<Env, true>,
+    env: Env,
     private readonly db: Database,
     private readonly datasets: Datasets,
   ) {
-    this.ttlMs = config.get('OUTPUT_TTL_HOURS', { infer: true }) * 3_600_000
-    this.root = join(config.get('DATA_DIR', { infer: true }), 'tasks')
+    this.ttlMs = env.OUTPUT_TTL_HOURS * 3_600_000
+    this.root = join(env.DATA_DIR, 'tasks')
   }
 
   onApplicationBootstrap(): void {

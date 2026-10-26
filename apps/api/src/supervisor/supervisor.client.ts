@@ -1,19 +1,18 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { Traces } from '@poof/nest'
 import { extract, inject, SpanKind, SpanStatusCode, within } from '@poof/tracing'
 import type { Response } from 'express'
-import type { Env } from '../config/env.js'
-import { Traces } from '../infra/infra.module.js'
+import { Env } from '../config/env.js'
 
 @Injectable()
 export class Supervisor {
   private readonly base: string
 
   constructor(
-    config: ConfigService<Env, true>,
+    env: Env,
     private readonly traces: Traces,
   ) {
-    this.base = config.get('SUPERVISOR_URL', { infer: true }).replace(/\/$/, '')
+    this.base = env.SUPERVISOR_URL.replace(/\/$/, '')
   }
 
   async relay(

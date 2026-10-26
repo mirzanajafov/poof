@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable, Logger, type BeforeApplicationShutdown, type OnApplicationBootstrap } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import type { PoolSnapshot } from '@poof/contracts'
 import {
   admits,
@@ -14,11 +13,12 @@ import {
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
+import { Traces } from '@poof/nest'
 import { resume, SpanStatusCode, within, type Context } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
-import type { Env } from '../config/env.js'
+import { Env } from '../config/env.js'
 import { Datasets } from '../datasets/datasets.service.js'
-import { Events, Traces } from '../infra/infra.module.js'
+import { Events } from '../infra/events.js'
 import { Task, type TaskLease } from '../tasks/task.js'
 import { TaskBook } from '../tasks/task-book.js'
 import { TaskStore } from '../tasks/task-store.js'
@@ -34,20 +34,6 @@ export interface SubmitRequest {
 export type SubmitResult =
   | { accepted: true; id: string; items: number; predictedSeconds: number }
   | { accepted: false; id: string | null; reason: string; retryAfterSeconds: number; code: 429 | 503 }
-
-type Settings = Pick<
-  Env,
-  | 'BUDGET'
-  | 'WORKER_CPU_CORES'
-  | 'ADMISSION_PRIOR_RATIO'
-  | 'CHUNK_ITEMS'
-  | 'MAX_ATTEMPTS'
-  | 'DEAD_LETTER_SHARE'
-  | 'RECYCLE_ITEMS'
-  | 'WORKER_RSS_MB'
-  | 'CHECKPOINT_MS'
-  | 'MAX_TASK_ITEMS'
->
 
 interface Chunk extends TaskLease {
   readonly task: Task<Chunk>
@@ -67,7 +53,6 @@ const forgetAfterMs = 60_000
 @Injectable()
 export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private readonly logger = new Logger(Scheduler.name)
-  private readonly settings: Settings
   private readonly book: TaskBook<Chunk>
   private readonly workers = new Set<PoolWorker>()
   private readonly ratios = new Map<PresetName, WorkRatio>()
@@ -78,30 +63,18 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private pausedUntil = 0
 
   constructor(
-    config: ConfigService<Env, true>,
+    private readonly env: Env,
     private readonly store: TaskStore,
     private readonly events: Events,
     private readonly datasets: Datasets,
     private readonly traces: Traces,
   ) {
-    this.settings = {
-      BUDGET: config.get('BUDGET', { infer: true }),
-      WORKER_CPU_CORES: config.get('WORKER_CPU_CORES', { infer: true }),
-      ADMISSION_PRIOR_RATIO: config.get('ADMISSION_PRIOR_RATIO', { infer: true }),
-      CHUNK_ITEMS: config.get('CHUNK_ITEMS', { infer: true }),
-      MAX_ATTEMPTS: config.get('MAX_ATTEMPTS', { infer: true }),
-      DEAD_LETTER_SHARE: config.get('DEAD_LETTER_SHARE', { infer: true }),
-      RECYCLE_ITEMS: config.get('RECYCLE_ITEMS', { infer: true }),
-      WORKER_RSS_MB: config.get('WORKER_RSS_MB', { infer: true }),
-      CHECKPOINT_MS: config.get('CHECKPOINT_MS', { infer: true }),
-      MAX_TASK_ITEMS: config.get('MAX_TASK_ITEMS', { infer: true }),
-    }
     this.book = new TaskBook(
       store,
       events,
       traces.tracer,
       new Breakers<PresetName>(),
-      { maxAttempts: this.settings.MAX_ATTEMPTS, deadLetterShare: this.settings.DEAD_LETTER_SHARE, deadLetter: true },
+      { maxAttempts: this.env.MAX_ATTEMPTS, deadLetterShare: this.env.DEAD_LETTER_SHARE, deadLetter: true },
       (chunk) => void chunk.worker?.handle.shrink(chunk.id, chunk.cursor + 1),
     )
   }
@@ -112,10 +85,10 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       setInterval(() => {
         this.checkpoint()
         this.book.forget(Date.now() - forgetAfterMs)
-      }, this.settings.CHECKPOINT_MS),
+      }, this.env.CHECKPOINT_MS),
     )
     this.timers.push(setInterval(() => this.events.savePoolSnapshot(this.snapshot()), 1000))
-    for (let i = 0; i < this.settings.BUDGET; i++) void this.spawn()
+    for (let i = 0; i < this.env.BUDGET; i++) void this.spawn()
   }
 
   async beforeApplicationShutdown(): Promise<void> {
@@ -135,7 +108,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     }
     const dataset = await this.datasets.get(request.dataset)
     const offset = request.offset ?? 0
-    const count = Math.min(request.count ?? dataset.items.length, this.settings.MAX_TASK_ITEMS)
+    const count = Math.min(request.count ?? dataset.items.length, this.env.MAX_TASK_ITEMS)
     const items = this.datasets.select(dataset, offset, count)
     const now = Date.now()
     const id = randomUUID()
@@ -167,9 +140,9 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const placement = { dataset: dataset.name, offset, policy: 'pool', exhibitId: options.exhibitId ?? null }
     const backlog = this.book.active().map((t) => ({ id: t.id, deadline: t.deadline, workMs: this.workMs(t) }))
     const workMs = this.workMs(task)
-    if (!admits({ id, deadline: task.deadline, workMs }, backlog, now, this.settings.WORKER_CPU_CORES)) {
+    if (!admits({ id, deadline: task.deadline, workMs }, backlog, now, this.env.WORKER_CPU_CORES)) {
       const backlogMs = backlog.reduce((sum, w) => sum + w.workMs, 0)
-      const retryAfterSeconds = Math.max(1, Math.ceil(backlogMs / this.settings.WORKER_CPU_CORES / 1000))
+      const retryAfterSeconds = Math.max(1, Math.ceil(backlogMs / this.env.WORKER_CPU_CORES / 1000))
       task.span.setAttributes({ 'poof.work_ms': Math.round(workMs), 'poof.retry_after_s': retryAfterSeconds })
       await this.book.reject(task, placement, { workMs, backlogMs, retryAfterSeconds })
       return {
@@ -181,8 +154,8 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       }
     }
     await this.datasets.createTask(id, dataset, items)
-    for (let lo = 0; lo < task.items; lo += this.settings.CHUNK_ITEMS) {
-      const hi = Math.min(task.items, lo + this.settings.CHUNK_ITEMS)
+    for (let lo = 0; lo < task.items; lo += this.env.CHUNK_ITEMS) {
+      const hi = Math.min(task.items, lo + this.env.CHUNK_ITEMS)
       task.leases.push({ id: randomUUID(), task, lo, hi, cursor: lo, state: 'pending', worker: null, span: null })
     }
     await this.book.accept(
@@ -206,7 +179,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
 
   resume(): void {
     this.pausedUntil = 0
-    for (let i = this.workers.size; i < this.settings.BUDGET; i++) void this.spawn()
+    for (let i = this.workers.size; i < this.env.BUDGET; i++) void this.spawn()
   }
 
   get paused(): boolean {
@@ -229,7 +202,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       ok: !this.stopping,
       paused: this.paused,
       workers: this.workers.size,
-      budget: this.settings.BUDGET,
+      budget: this.env.BUDGET,
       tasks: this.book.active().length,
     }
   }
@@ -237,7 +210,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   snapshot(): PoolSnapshot {
     return {
       at: Date.now(),
-      budget: this.settings.BUDGET,
+      budget: this.env.BUDGET,
       workers: [...this.workers].map((w) => ({
         id: w.id,
         pid: w.handle.pid,
@@ -266,12 +239,12 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   }
 
   private prior(): WorkRatio {
-    return priorWorkRatio(this.settings.ADMISSION_PRIOR_RATIO, 20 * 300)
+    return priorWorkRatio(this.env.ADMISSION_PRIOR_RATIO, 20 * 300)
   }
 
   private async spawn(): Promise<void> {
     if (this.stopping || this.paused) return
-    const handle = new WorkerHandle({ limits: { rssMb: this.settings.WORKER_RSS_MB } })
+    const handle = new WorkerHandle({ limits: { rssMb: this.env.WORKER_RSS_MB } })
     try {
       await handle.start()
     } catch (error) {
@@ -347,7 +320,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         preset: task.preset,
         lo: lease.cursor,
         hi: lease.hi,
-        maxAttempts: this.settings.MAX_ATTEMPTS,
+        maxAttempts: this.env.MAX_ATTEMPTS,
       },
       timeoutMs,
     )
@@ -389,7 +362,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     lease.span?.end()
     lease.span = null
     this.store.leaseDone(lease.id, lease.cursor)
-    if (worker.retiring || worker.items >= this.settings.RECYCLE_ITEMS) {
+    if (worker.retiring || worker.items >= this.env.RECYCLE_ITEMS) {
       worker.retiring = true
       worker.handle.stop()
       return

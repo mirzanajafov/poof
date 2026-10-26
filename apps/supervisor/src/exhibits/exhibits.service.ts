@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { ConflictException, Injectable, Logger, type BeforeApplicationShutdown } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import {
   emptyExhibitStats,
   type ExhibitEnd,
@@ -9,10 +8,11 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
+import { Database, Traces } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
-import type { Env } from '../config/env.js'
+import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
-import { Database, Events, Traces } from '../infra/infra.module.js'
+import { Events } from '../infra/events.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
 import { TaskStore } from '../tasks/task-store.js'
 import { LeaseEngine } from './lease-engine.js'
@@ -36,29 +36,16 @@ export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private current: Current | null = null
   private starting: Promise<unknown> | null = null
-  private readonly settings: Pick<
-    Env,
-    'BUDGET' | 'CAPACITY_CORES' | 'MAX_ATTEMPTS' | 'DEAD_LETTER_SHARE' | 'WORKER_RSS_MB' | 'EXHIBIT_MAX_PROCESSES'
-  >
 
   constructor(
-    config: ConfigService<Env, true>,
+    private readonly env: Env,
     private readonly db: Database,
     private readonly events: Events,
     private readonly datasets: Datasets,
     private readonly scheduler: Scheduler,
     private readonly store: TaskStore,
     private readonly traces: Traces,
-  ) {
-    this.settings = {
-      BUDGET: config.get('BUDGET', { infer: true }),
-      CAPACITY_CORES: config.get('CAPACITY_CORES', { infer: true }),
-      MAX_ATTEMPTS: config.get('MAX_ATTEMPTS', { infer: true }),
-      DEAD_LETTER_SHARE: config.get('DEAD_LETTER_SHARE', { infer: true }),
-      WORKER_RSS_MB: config.get('WORKER_RSS_MB', { infer: true }),
-      EXHIBIT_MAX_PROCESSES: config.get('EXHIBIT_MAX_PROCESSES', { infer: true }),
-    }
-  }
+  ) {}
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
     if (this.current || this.starting) throw new ConflictException('an exhibit is already running')
@@ -100,12 +87,12 @@ export class Exhibits implements BeforeApplicationShutdown {
         {
           exhibitId: id,
           policy,
-          budget: this.settings.BUDGET,
-          maxProcesses: this.settings.EXHIBIT_MAX_PROCESSES,
-          capacityCores: this.settings.CAPACITY_CORES,
-          maxAttempts: this.settings.MAX_ATTEMPTS,
-          deadLetterShare: this.settings.DEAD_LETTER_SHARE,
-          rssMb: this.settings.WORKER_RSS_MB,
+          budget: this.env.BUDGET,
+          maxProcesses: this.env.EXHIBIT_MAX_PROCESSES,
+          capacityCores: this.env.CAPACITY_CORES,
+          maxAttempts: this.env.MAX_ATTEMPTS,
+          deadLetterShare: this.env.DEAD_LETTER_SHARE,
+          rssMb: this.env.WORKER_RSS_MB,
           tickMs: 250,
           tracer: this.traces.tracer,
           trace: within(span),
@@ -135,7 +122,7 @@ export class Exhibits implements BeforeApplicationShutdown {
       {
         durationMs: params.durationSeconds * 1000,
         utilization: params.utilization,
-        capacityCores: this.settings.CAPACITY_CORES,
+        capacityCores: this.env.CAPACITY_CORES,
         minItems: params.minItems,
         maxItems: params.maxItems,
         slackMin: params.slackMin,
@@ -244,7 +231,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     const stats = emptyExhibitStats()
     stats.submitted = current.pool.submitted
     stats.rejected = current.pool.rejected
-    stats.peakProcesses = this.settings.BUDGET
+    stats.peakProcesses = this.env.BUDGET
     for (const task of tasks) {
       stats.items += task.done
       stats.deadLettered += task.deadLettered
@@ -269,7 +256,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     if (current.engine) return { ...base, ...current.engine.snapshot() }
     return {
       ...base,
-      budget: this.settings.BUDGET,
+      budget: this.env.BUDGET,
       processes: this.scheduler.health().workers,
       stats: current.pool.stats,
       tasks: [],

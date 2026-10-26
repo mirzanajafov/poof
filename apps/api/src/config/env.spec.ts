@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { validateEnv } from './env.js'
+import { parseEnv } from '@poof/nest'
+import { Env } from './env.js'
 
 const base = {
   DATABASE_URL: 'postgresql://localhost/db',
@@ -9,13 +10,26 @@ const base = {
   ADMIN_TOKEN: 'a-long-enough-admin-token-value',
 }
 
-describe('validateEnv', () => {
+describe('Env', () => {
   it('applies defaults', () => {
-    expect(validateEnv(base)).toMatchObject({ PORT: 3111, TASKS_PER_MINUTE: 10, PUBLIC_EXHIBIT_SECONDS: 60 })
+    expect(parseEnv(Env, base)).toMatchObject({
+      PORT: 3111,
+      TRUST_PROXY: 'loopback',
+      TASKS_PER_MINUTE: 10,
+      PUBLIC_EXHIBIT_SECONDS: 60,
+    })
+  })
+
+  it('reads TRUST_PROXY as a switch, a hop count or a list of addresses', () => {
+    const trust = (TRUST_PROXY: string) => parseEnv(Env, { ...base, TRUST_PROXY }).TRUST_PROXY
+    expect(trust('false')).toBe(false)
+    expect(trust('true')).toBe(true)
+    expect(trust('2')).toBe(2)
+    expect(trust('loopback, uniquelocal')).toBe('loopback, uniquelocal')
   })
 
   it('refuses a short admin token and missing settings', () => {
-    expect(() => validateEnv({ ...base, ADMIN_TOKEN: 'short' })).toThrow(/ADMIN_TOKEN/)
-    expect(() => validateEnv({ ...base, SUPERVISOR_URL: undefined })).toThrow(/SUPERVISOR_URL/)
+    expect(() => parseEnv(Env, { ...base, ADMIN_TOKEN: 'short' })).toThrow(/ADMIN_TOKEN/)
+    expect(() => parseEnv(Env, { ...base, SUPERVISOR_URL: undefined })).toThrow(/SUPERVISOR_URL/)
   })
 })

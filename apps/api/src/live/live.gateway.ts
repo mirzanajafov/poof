@@ -3,7 +3,7 @@ import { type OnGatewayConnection, type OnGatewayInit, WebSocketGateway, WebSock
 import { liveEventsChannel, type LiveEvent, type LiveSocketEvents } from '@poof/contracts'
 import { Redis } from 'ioredis'
 import type { Server, Socket } from 'socket.io'
-import { Cache } from '../infra/infra.module.js'
+import { Cache } from '../infra/cache.js'
 
 const BATCH_MS = 150
 const SNAPSHOT_MS = 1000

@@ -3,7 +3,7 @@ import { presetNames, type PresetName } from '@poof/core'
 import { extract } from '@poof/tracing'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Response } from 'express'
-import { Scheduler, type SubmitResult } from '../scheduler/scheduler.service.js'
+import { Scheduler, type SubmitResult } from './scheduler.service.js'
 
 export class SubmitTask {
   @IsString()
@@ -29,7 +29,7 @@ export class SubmitTask {
 }
 
 @Controller()
-export class TasksController {
+export class SchedulerController {
   constructor(private readonly scheduler: Scheduler) {}
 
   @Post('tasks')
