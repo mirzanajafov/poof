@@ -13,12 +13,12 @@ import {
   type PresetName,
   type WorkRatio,
 } from '@poof/core'
-import { NotFoundError, Traces } from '@poof/nest'
+import { NotFoundError, TracingService } from '@poof/nest'
 import { resume, SpanStatusCode, within, type Context } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
-import { Events } from '../infra/events.js'
+import { LivePublisher } from '../infra/live-publisher.js'
 import { Task, type TaskLease } from '../tasks/task.js'
 import { TaskBook } from '../tasks/task-book.js'
 import { TaskStore } from '../tasks/task-store.js'
@@ -61,14 +61,14 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   constructor(
     private readonly env: Env,
     private readonly store: TaskStore,
-    private readonly events: Events,
+    private readonly publisher: LivePublisher,
     private readonly datasets: Datasets,
-    private readonly traces: Traces,
+    private readonly tracing: TracingService,
   ) {
     this.book = new TaskBook(
       store,
-      events,
-      traces.tracer,
+      publisher,
+      tracing.tracer,
       new Breakers<PresetName>(),
       { maxAttempts: this.env.MAX_ATTEMPTS, deadLetterShare: this.env.DEAD_LETTER_SHARE, deadLetter: true },
       (chunk) => void chunk.worker?.handle.shrink(chunk.id, chunk.cursor + 1),
@@ -83,7 +83,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         this.book.forget(Date.now() - forgetAfterMs)
       }, this.env.CHECKPOINT_MS),
     )
-    this.timers.push(setInterval(() => this.events.savePoolSnapshot(this.snapshot()), 1000))
+    this.timers.push(setInterval(() => this.publisher.savePoolSnapshot(this.snapshot()), 1000))
     for (let i = 0; i < this.env.BUDGET; i++) void this.spawn()
   }
 
@@ -117,7 +117,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       deadline: now + request.deadlineSeconds * 1000,
       dir: this.datasets.taskDir(id),
       predicted,
-      span: this.traces.tracer.startSpan(
+      span: this.tracing.tracer.startSpan(
         'task',
         {
           startTime: now,
@@ -263,7 +263,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     handle.on('item', (message) => this.onItem(worker, message))
     handle.on('leaseDone', (message) => this.onLeaseDone(worker, message))
     handle.on('exit', (exit) => this.onExit(worker, exit))
-    this.events.publish({ kind: 'worker.spawned', worker: worker.id, pid: handle.pid })
+    this.publisher.publish({ kind: 'worker.spawned', worker: worker.id, pid: handle.pid })
     this.claim(worker)
   }
 
@@ -296,7 +296,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
     const timeoutMs = itemTimeoutMs(task.predicted, lease.cursor, lease.hi, this.ratio(task.preset), (i) =>
       task.attemptsAt(i),
     )
-    lease.span = this.traces.tracer.startSpan(
+    lease.span = this.tracing.tracer.startSpan(
       'chunk',
       {
         attributes: {
@@ -322,7 +322,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
       timeoutMs,
     )
     this.store.leaseRunning(lease.id, worker.id, lease.cursor)
-    this.events.publish({
+    this.publisher.publish({
       kind: 'lease.claimed',
       task: task.id,
       lease: lease.id,
@@ -370,7 +370,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
   private onExit(worker: PoolWorker, exit: ExitReport): void {
     this.workers.delete(worker)
     this.store.workerExited(worker.id, exit.reason, worker.items)
-    this.events.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
+    this.publisher.publish({ kind: 'worker.exit', worker: worker.id, reason: exit.reason })
     const lease = worker.lease
     if (lease) {
       if (exit.reason !== 'normal')
@@ -427,7 +427,7 @@ export class Scheduler implements OnApplicationBootstrap, BeforeApplicationShutd
         deadline: row.deadline.getTime(),
         dir: this.datasets.taskDir(row.id),
         predicted,
-        span: this.traces.tracer.startSpan(
+        span: this.tracing.tracer.startSpan(
           'task',
           { attributes: { 'poof.task': row.id, 'poof.items': row.items, 'poof.resumed': true } },
           row.traceId ? resume(row.traceId) : undefined,

@@ -8,16 +8,16 @@ import {
   type ExhibitStats,
 } from '@poof/contracts'
 import { exhibitPolicies, exhibitSchedule, predictedCostMs, type Arrival } from '@poof/core'
-import { ConflictError, Database, FailureStreak, Traces } from '@poof/nest'
+import { ConflictError, Database, FailureStreak, TracingService } from '@poof/nest'
 import { within, type Context, type Span } from '@poof/tracing'
 import { Env } from '../config/env.js'
 import { Datasets, type Dataset } from '../datasets/datasets.service.js'
-import { Events } from '../infra/events.js'
+import { LivePublisher } from '../infra/live-publisher.js'
 import { Scheduler } from '../scheduler/scheduler.service.js'
 import { TaskStore } from '../tasks/task-store.js'
 import { LeaseEngine } from './lease-engine.js'
 
-interface Current {
+interface RunningExhibit {
   id: string
   params: ExhibitParams
   dataset: Dataset
@@ -35,17 +35,17 @@ interface Current {
 export class Exhibits implements BeforeApplicationShutdown {
   private readonly logger = new Logger(Exhibits.name)
   private readonly poolReads = new FailureStreak(this.logger, 'counting the pool exhibit tasks')
-  private current: Current | null = null
+  private current: RunningExhibit | null = null
   private starting: Promise<unknown> | null = null
 
   constructor(
     private readonly env: Env,
     private readonly db: Database,
-    private readonly events: Events,
+    private readonly publisher: LivePublisher,
     private readonly datasets: Datasets,
     private readonly scheduler: Scheduler,
     private readonly store: TaskStore,
-    private readonly traces: Traces,
+    private readonly tracing: TracingService,
   ) {}
 
   async start(params: ExhibitParams, trace?: Context): Promise<{ id: string; endsAt: number }> {
@@ -65,7 +65,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     const startedAt = Date.now()
     const endsAt = startedAt + params.durationSeconds * 1000
     await this.db.client.exhibit.create({ data: { id, policy: params.policy, params: { ...params } } })
-    const span = this.traces.tracer.startSpan(
+    const span = this.tracing.tracer.startSpan(
       'exhibit',
       {
         startTime: startedAt,
@@ -95,16 +95,16 @@ export class Exhibits implements BeforeApplicationShutdown {
           deadLetterShare: this.env.DEAD_LETTER_SHARE,
           rssMb: this.env.WORKER_RSS_MB,
           tickMs: 250,
-          tracer: this.traces.tracer,
+          tracer: this.tracing.tracer,
           trace: within(span),
         },
         this.store,
-        this.events,
+        this.publisher,
         this.datasets,
       )
       engine.start()
     }
-    const current: Current = {
+    const current: RunningExhibit = {
       id,
       params,
       dataset,
@@ -145,12 +145,12 @@ export class Exhibits implements BeforeApplicationShutdown {
       ),
     )
     current.timers.push(setInterval(() => void this.publishState(current), 1000))
-    this.events.saveExhibitSnapshot(this.snapshot(current))
-    this.events.publish({ kind: 'exhibit.started', exhibit: id, policy: params.policy, endsAt })
+    this.publisher.saveExhibitSnapshot(this.snapshot(current))
+    this.publisher.publish({ kind: 'exhibit.started', exhibit: id, policy: params.policy, endsAt })
     return { id, endsAt }
   }
 
-  private async arrive(current: Current, arrival: Arrival): Promise<void> {
+  private async arrive(current: RunningExhibit, arrival: Arrival): Promise<void> {
     if (current.finishing) return
     const { params, dataset } = current
     const items = this.datasets.select(dataset, arrival.offset, arrival.count)
@@ -175,7 +175,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     else current.pool.rejected++
   }
 
-  private schedule(current: Current, arrive: () => Promise<void>): void {
+  private schedule(current: RunningExhibit, arrive: () => Promise<void>): void {
     current.arriving = current.arriving
       .then(arrive)
       .catch((error: unknown) => this.logger.error('an exhibit arrival failed', error))
@@ -188,7 +188,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     return current.finishing
   }
 
-  private async end(current: Current, status: ExhibitEnd): Promise<ExhibitStats> {
+  private async end(current: RunningExhibit, status: ExhibitEnd): Promise<ExhibitStats> {
     for (const timer of current.timers) clearTimeout(timer)
     try {
       await current.arriving
@@ -207,16 +207,16 @@ export class Exhibits implements BeforeApplicationShutdown {
         'poof.peak_processes': stats.peakProcesses,
       })
       current.span.end()
-      this.events.publish({ kind: 'exhibit.ended', exhibit: current.id, status, stats })
+      this.publisher.publish({ kind: 'exhibit.ended', exhibit: current.id, status, stats })
       return stats
     } finally {
       if (current.engine) this.scheduler.resume()
       this.current = null
-      this.events.clearExhibitSnapshot()
+      this.publisher.clearExhibitSnapshot()
     }
   }
 
-  private async finishPool(current: Current): Promise<ExhibitStats> {
+  private async finishPool(current: RunningExhibit): Promise<ExhibitStats> {
     const cancelled = this.scheduler.cancel(current.pool.tasks, 'exhibit ended')
     await this.store.flush()
     const stats = await this.poolCounts(current)
@@ -224,7 +224,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     return stats
   }
 
-  private async poolCounts(current: Current): Promise<ExhibitStats> {
+  private async poolCounts(current: RunningExhibit): Promise<ExhibitStats> {
     const tasks = await this.db.client.task.findMany({
       where: { exhibitId: current.id },
       select: { status: true, done: true, deadLettered: true, deadline: true, finishedAt: true },
@@ -243,7 +243,7 @@ export class Exhibits implements BeforeApplicationShutdown {
     return stats
   }
 
-  private async publishState(current: Current): Promise<void> {
+  private async publishState(current: RunningExhibit): Promise<void> {
     if (!current.engine) {
       try {
         current.pool.stats = await this.poolCounts(current)
@@ -252,18 +252,18 @@ export class Exhibits implements BeforeApplicationShutdown {
         this.poolReads.failed(error)
       }
     }
-    if (!current.finishing) this.events.saveExhibitSnapshot(this.snapshot(current))
+    if (!current.finishing) this.publisher.saveExhibitSnapshot(this.snapshot(current))
   }
 
   state(): ExhibitSnapshot | null {
     return this.current ? this.snapshot(this.current) : null
   }
 
-  private snapshot(current: Current): ExhibitSnapshot {
-    const base = { id: current.id, params: current.params, startedAt: current.startedAt, endsAt: current.endsAt }
-    if (current.engine) return { ...base, ...current.engine.snapshot() }
+  private snapshot(current: RunningExhibit): ExhibitSnapshot {
+    const shared = { id: current.id, params: current.params, startedAt: current.startedAt, endsAt: current.endsAt }
+    if (current.engine) return { ...shared, ...current.engine.snapshot() }
     return {
-      ...base,
+      ...shared,
       budget: this.env.BUDGET,
       processes: this.scheduler.health().workers,
       stats: current.pool.stats,

@@ -2,16 +2,16 @@ import { HttpException, HttpStatus, Injectable, type CanActivate, type Execution
 import { Reflector } from '@nestjs/core'
 import type { Request, Response } from 'express'
 import { Env } from '../config/env.js'
-import { Cache } from '../infra/cache.js'
-import { Admin } from './admin.js'
+import { RedisStore } from '../infra/redis-store.js'
+import { AdminToken } from './admin-token.js'
 import { LIMIT, type Limit } from './rate-limit.decorator.js'
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly cache: Cache,
-    private readonly admin: Admin,
+    private readonly store: RedisStore,
+    private readonly adminToken: AdminToken,
     private readonly env: Env,
   ) {}
 
@@ -19,12 +19,12 @@ export class RateLimitGuard implements CanActivate {
     const limit = this.reflector.get<Limit | undefined>(LIMIT, ctx.getHandler())
     if (!limit) return true
     const request = ctx.switchToHttp().getRequest<Request>()
-    if (this.admin.is(request)) return true
+    if (this.adminToken.matches(request)) return true
     const now = Date.now()
     const windowMs = limit.windowSeconds * 1000
     const windowStart = Math.floor(now / windowMs) * windowMs
     const key = `poof:limit:${limit.name}:${request.ip}:${windowStart}`
-    const count = await this.cache.increment(key, windowMs)
+    const count = await this.store.increment(key, windowMs)
     if (count <= this.env[limit.setting]) return true
     const retryAfter = Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000))
     ctx.switchToHttp().getResponse<Response>().setHeader('Retry-After', String(retryAfter))

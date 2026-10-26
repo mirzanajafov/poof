@@ -64,13 +64,13 @@ function typeCosts(samples: readonly ItemCost[], sources: readonly string[]): Re
 }
 
 export function loadCalibration(label: string, dir = defaultResultsDir, sources = ['synthetic', 'nasa']): Calibration {
-  const base = join(dir, label)
-  if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
-  const b3 = readResult(base, spawnResult, parseSpawnRun)
+  const labelDir = join(dir, label)
+  if (!existsSync(labelDir)) throw new Error(`no calibration results in ${labelDir}`)
+  const b3 = readResult(labelDir, spawnResult, parseSpawnRun)
   const b2s = mergeByCpus(
-    readdirSync(base)
+    readdirSync(labelDir)
       .filter((file) => file.startsWith(concurrencyResultPrefix))
-      .map((file) => readResult(base, file.replace(/\.json$/, ''), parseConcurrencyRun)),
+      .map((file) => readResult(labelDir, file.replace(/\.json$/, ''), parseConcurrencyRun)),
   )
   const measured = b2s.flatMap((b2) =>
     b2.rows.flatMap(({ k, cgroupAnonPeakMb }) =>

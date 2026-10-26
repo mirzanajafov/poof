@@ -12,14 +12,14 @@ import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
-export class Events implements OnApplicationShutdown {
+export class LivePublisher implements OnApplicationShutdown {
   private readonly redis: Redis
-  private readonly logger = new Logger(Events.name)
+  private readonly logger = new Logger(LivePublisher.name)
   private readonly publishes = new FailureStreak(this.logger, 'publishing live events')
   private readonly saves = new FailureStreak(this.logger, 'saving the live snapshots')
 
   constructor(env: Env) {
-    this.redis = connectRedis(env.REDIS_URL, Events.name)
+    this.redis = connectRedis(env.REDIS_URL, LivePublisher.name)
   }
 
   publish(event: LiveEventBody): void {

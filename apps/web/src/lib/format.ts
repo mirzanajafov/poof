@@ -1,6 +1,6 @@
 import { exitReasons, type ExhibitStats, type ExitReason, type LiveEvent } from '@poof/contracts'
 
-export function short(id: string): string {
+export function shortId(id: string): string {
   return id.slice(0, 6)
 }
 
@@ -11,7 +11,7 @@ export function seconds(ms: number): string {
   return `${Math.round(s / 60)} min`
 }
 
-export function until(deadline: number, now: number): string {
+export function deadlineText(deadline: number, now: number): string {
   const left = deadline - now
   return left >= 0 ? `due in ${seconds(left)}` : `${seconds(left)} late`
 }
@@ -41,24 +41,24 @@ function range(lo: number, hi: number): string {
   return lo === last ? `image ${lo}` : `images ${lo}-${last}`
 }
 
-export function describe(event: LiveEvent): string | null {
+export function eventSentence(event: LiveEvent): string | null {
   switch (event.kind) {
     case 'task.accepted':
-      return `Task ${short(event.task)} accepted: ${event.items} images, ${until(event.deadline, event.at)}`
+      return `Task ${shortId(event.task)} accepted: ${event.items} images, ${deadlineText(event.deadline, event.at)}`
     case 'task.rejected':
       return event.exhibit
-        ? `Task ${short(event.task)} turned away at the door`
-        : `Task ${short(event.task)} turned away: it cannot make its deadline behind the current queue`
+        ? `Task ${shortId(event.task)} turned away at the door`
+        : `Task ${shortId(event.task)} turned away: it cannot make its deadline behind the current queue`
     case 'task.done':
-      return `Task ${short(event.task)} done${event.met ? ', on time' : ', late'}${event.dead > 0 ? `, ${event.dead} images dead-lettered` : ''}`
+      return `Task ${shortId(event.task)} done${event.met ? ', on time' : ', late'}${event.dead > 0 ? `, ${event.dead} images dead-lettered` : ''}`
     case 'task.failed':
-      return `Task ${short(event.task)} failed: ${event.reason}`
+      return `Task ${shortId(event.task)} failed: ${event.reason}`
     case 'lease.claimed':
-      return `A worker took ${range(event.lo, event.hi)} of task ${short(event.task)}`
+      return `A worker took ${range(event.lo, event.hi)} of task ${shortId(event.task)}`
     case 'lease.created':
-      return event.depth > 0 ? `Task ${short(event.task)} split: a helper got ${range(event.lo, event.hi)}` : null
+      return event.depth > 0 ? `Task ${shortId(event.task)} split: a helper got ${range(event.lo, event.hi)}` : null
     case 'item.dead':
-      return `Image ${event.item} of task ${short(event.task)} dead-lettered after ${event.attempts} tries`
+      return `Image ${event.item} of task ${shortId(event.task)} dead-lettered after ${event.attempts} tries`
     case 'worker.spawned':
       return `Worker ${event.pid} started`
     case 'worker.exit':

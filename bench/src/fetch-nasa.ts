@@ -38,12 +38,12 @@ async function json<T>(url: string): Promise<T> {
   return (await res.json()) as T
 }
 
-const out = values.out
+const outDir = values.out
 const count = Number(values.count)
 const maxBytes = Number(values['max-mb']) * 1e6
 const perQuery = Math.ceil(count / queries.length)
 
-await mkdir(out, { recursive: true })
+await mkdir(outDir, { recursive: true })
 const items: Array<DatasetItem & { bytes: number; nasaId: string; title: string }> = []
 for (const query of queries) {
   const search = await json<SearchResult>(
@@ -66,7 +66,7 @@ for (const query of queries) {
     const meta = await sharp(body).metadata()
     if (meta.format !== 'jpeg' || !meta.width || !meta.height) continue
     const file = `nasa-${data.nasa_id.replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`
-    await writeFile(join(out, file), body)
+    await writeFile(join(outDir, file), body)
     items.push({
       file,
       width: meta.width,
@@ -82,6 +82,6 @@ for (const query of queries) {
   }
 }
 await writeFile(
-  manifestPath(out),
+  manifestPath(outDir),
   `${JSON.stringify({ source: 'nasa', origin: 'images-api.nasa.gov originals', items }, null, 2)}\n`,
 )

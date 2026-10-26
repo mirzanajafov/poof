@@ -6,14 +6,14 @@ import type { ReactNode } from 'react'
 import { Elapsed } from '@/components/Elapsed'
 import { Refresh } from '@/components/Refresh'
 import { Stats } from '@/components/Stats'
-import { api } from '@/lib/api'
-import { seconds, short } from '@/lib/format'
+import { getJson } from '@/lib/api'
+import { seconds, shortId } from '@/lib/format'
 import { isUuid } from '@/lib/ids'
 
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  return { title: `Task ${short((await params).id)}` }
+  return { title: `Task ${shortId((await params).id)}` }
 }
 
 const statusTone: Record<TaskStatus, string> = {
@@ -27,7 +27,7 @@ const statusTone: Record<TaskStatus, string> = {
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!isUuid(id)) notFound()
-  const task = await api<TaskDetail>(`/tasks/${id}`)
+  const task = await getJson<TaskDetail>(`/tasks/${id}`)
   if (!task) notFound()
   const submitted = new Date(task.submittedAt).getTime()
   const deadline = new Date(task.deadline).getTime()
@@ -43,7 +43,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {task.dataset} · {task.preset} · {task.policy}
         </p>
         <h1 className="mt-1 flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
-          Task {short(task.id)}
+          Task {shortId(task.id)}
           <span className={`rounded-full px-2.5 py-0.5 text-sm font-medium ${statusTone[task.status]}`}>
             {task.status.toLowerCase()}
           </span>

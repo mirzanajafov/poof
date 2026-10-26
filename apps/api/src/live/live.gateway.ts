@@ -9,7 +9,7 @@ import {
 } from '@poof/contracts'
 import { FailureStreak } from '@poof/nest'
 import type { Server, Socket } from 'socket.io'
-import { Cache } from '../infra/cache.js'
+import { RedisStore } from '../infra/redis-store.js'
 
 const BATCH_MS = 150
 const SNAPSHOT_MS = 1000
@@ -26,10 +26,10 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   private dropped = 0
   private timers: NodeJS.Timeout[] = []
 
-  constructor(private readonly cache: Cache) {}
+  constructor(private readonly store: RedisStore) {}
 
   afterInit(): void {
-    this.cache.subscribe(liveEventsChannel, (message) => {
+    this.store.subscribe(liveEventsChannel, (message) => {
       const event = parseLiveEvent(message)
       if (!event) {
         this.logger.warn(`dropped a message that is not a live event: ${message.slice(0, 200)}`)
@@ -64,7 +64,7 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
 
   private async snapshot(): Promise<LiveSnapshot | null> {
     try {
-      const snapshot = await this.cache.liveSnapshot()
+      const snapshot = await this.store.liveSnapshot()
       this.snapshots.succeeded()
       return snapshot
     } catch (error) {

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { Admin } from './admin.js'
+import { AdminToken } from './admin-token.js'
 
-@Module({ providers: [Admin], exports: [Admin] })
+@Module({ providers: [AdminToken], exports: [AdminToken] })
 export class AccessModule {}

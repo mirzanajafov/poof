@@ -84,14 +84,14 @@ async function render(rng: Rng, width: number, height: number, quality: number):
   return sharp(pixels, { raw }).jpeg({ quality }).toBuffer()
 }
 
-const out = values.out
+const outDir = values.out
 const count = Number(values.count)
 const seed = Number(values.seed)
 const minMp = Number(values['min-mp'])
 const maxMp = Number(values['max-mp'])
 const quality = Number(values.quality)
 
-await mkdir(out, { recursive: true })
+await mkdir(outDir, { recursive: true })
 const items: Array<DatasetItem & { bytes: number }> = []
 for (let i = 0; i < count; i++) {
   const rng = new Rng(seed * 1000 + i)
@@ -102,9 +102,9 @@ for (let i = 0; i < count; i++) {
   const started = performance.now()
   const jpeg = await render(rng, width, height, quality)
   const file = `syn-${String(i).padStart(3, '0')}-${width}x${height}.jpg`
-  await writeFile(join(out, file), jpeg)
+  await writeFile(join(outDir, file), jpeg)
   items.push({ file, width, height, bytes: jpeg.length, mp: (width * height) / 1e6 })
   const bpp = ((jpeg.length * 8) / (width * height)).toFixed(2)
   console.log(`${file} ${(jpeg.length / 1e6).toFixed(1)} MB ${bpp} bpp ${Math.round(performance.now() - started)} ms`)
 }
-await writeFile(manifestPath(out), `${JSON.stringify({ source: 'synthetic', items }, null, 2)}\n`)
+await writeFile(manifestPath(outDir), `${JSON.stringify({ source: 'synthetic', items }, null, 2)}\n`)

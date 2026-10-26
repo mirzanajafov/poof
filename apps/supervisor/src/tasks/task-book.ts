@@ -2,7 +2,7 @@ import type { Breakers, PresetName } from '@poof/core'
 import type { Prisma } from '@poof/db'
 import { SpanStatusCode, traceIdOf, within, type Span, type Tracer } from '@poof/tracing'
 import type { ExitReport, ItemDead, ItemDone } from '@poof/worker'
-import type { Events } from '../infra/events.js'
+import type { LivePublisher } from '../infra/live-publisher.js'
 import type { Task, TaskLease } from './task.js'
 import type { LeaseRow, TaskStore } from './task-store.js'
 
@@ -38,7 +38,7 @@ export class TaskBook<Lease extends TaskLease> {
 
   constructor(
     private readonly store: BookStore,
-    private readonly events: Pick<Events, 'publish'>,
+    private readonly publisher: Pick<LivePublisher, 'publish'>,
     private readonly tracer: Tracer,
     readonly breakers: Breakers<PresetName>,
     private readonly rules: BookRules,
@@ -51,7 +51,7 @@ export class TaskBook<Lease extends TaskLease> {
 
   async reject(task: Task<Lease>, placement: Placement, detail: Prisma.InputJsonObject): Promise<void> {
     await this.store.reject(this.row(task, placement), detail)
-    this.events.publish({ kind: 'task.rejected', task: task.id, exhibit: placement.exhibitId })
+    this.publisher.publish({ kind: 'task.rejected', task: task.id, exhibit: placement.exhibitId })
     task.span.setAttributes({ 'poof.outcome': 'rejected' })
     task.span.end()
   }
@@ -59,7 +59,7 @@ export class TaskBook<Lease extends TaskLease> {
   async accept(task: Task<Lease>, placement: Placement, leases: readonly LeaseRow[]): Promise<void> {
     await this.store.accept(this.row(task, placement), leases)
     this.tasks.set(task.id, task)
-    this.events.publish({ kind: 'task.accepted', task: task.id, items: task.items, deadline: task.deadline })
+    this.publisher.publish({ kind: 'task.accepted', task: task.id, items: task.items, deadline: task.deadline })
   }
 
   start(task: Task<Lease>): void {
@@ -73,14 +73,14 @@ export class TaskBook<Lease extends TaskLease> {
     this.counts.items++
     this.traceImage(lease.span, message)
     this.record(task.preset, true)
-    this.events.publish({ kind: 'item', task: task.id, lease: lease.id, item: message.item, ok: true })
+    this.publisher.publish({ kind: 'item', task: task.id, lease: lease.id, item: message.item, ok: true })
     this.settle(task)
   }
 
   failedItem(task: Task<Lease>, lease: TaskLease, message: ItemDead): void {
     this.traceImage(lease.span, message)
     this.deadLetter(task, message.item, message.attempts, message.error)
-    this.events.publish({ kind: 'item', task: task.id, lease: lease.id, item: message.item, ok: false })
+    this.publisher.publish({ kind: 'item', task: task.id, lease: lease.id, item: message.item, ok: false })
     this.settle(task)
   }
 
@@ -133,7 +133,7 @@ export class TaskBook<Lease extends TaskLease> {
     if (kind === 'cancel') this.counts.cancelled++
     else this.counts.failed++
     this.store.failed(task, kind, reason, new Date(task.finishedAt))
-    this.events.publish({ kind: 'task.failed', task: task.id, reason })
+    this.publisher.publish({ kind: 'task.failed', task: task.id, reason })
     task.span.setAttributes({
       'poof.outcome': kind === 'cancel' ? 'cancelled' : 'failed',
       'poof.reason': reason,
@@ -158,7 +158,7 @@ export class TaskBook<Lease extends TaskLease> {
       lease.state = 'done'
       lease.span?.end()
     }
-    this.events.publish({ kind: 'task.done', task: task.id, met, dead: task.dead })
+    this.publisher.publish({ kind: 'task.done', task: task.id, met, dead: task.dead })
     task.span.setAttributes({ 'poof.outcome': met ? 'met' : 'late', 'poof.done': task.done, 'poof.dead': task.dead })
     task.span.end(task.finishedAt)
   }
@@ -168,7 +168,7 @@ export class TaskBook<Lease extends TaskLease> {
     this.counts.deadLettered++
     this.record(task.preset, false)
     this.store.deadLettered(task.id, item, attempts, error)
-    this.events.publish({ kind: 'item.dead', task: task.id, item, attempts, error: error.slice(0, 200) })
+    this.publisher.publish({ kind: 'item.dead', task: task.id, item, attempts, error: error.slice(0, 200) })
     if (this.rules.deadLetter && task.tooManyDead(this.rules.deadLetterShare)) this.fail(task, 'too many dead letters')
   }
 
@@ -179,7 +179,7 @@ export class TaskBook<Lease extends TaskLease> {
     const after = this.breakers.state(preset, now)
     if (after === before) return
     this.store.breakerChanged(preset, after)
-    this.events.publish({ kind: 'breaker', preset, state: after })
+    this.publisher.publish({ kind: 'breaker', preset, state: after })
   }
 
   private row(task: Task<Lease>, placement: Placement) {

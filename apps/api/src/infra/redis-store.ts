@@ -11,13 +11,13 @@ import type { Redis } from 'ioredis'
 import { Env } from '../config/env.js'
 
 @Injectable()
-export class Cache implements OnApplicationShutdown {
-  private readonly logger = new Logger(Cache.name)
+export class RedisStore implements OnApplicationShutdown {
+  private readonly logger = new Logger(RedisStore.name)
   private readonly redis: Redis
   private subscriber: Redis | null = null
 
   constructor(private readonly env: Env) {
-    this.redis = connectRedis(env.REDIS_URL, Cache.name)
+    this.redis = connectRedis(env.REDIS_URL, RedisStore.name)
   }
 
   exhibitSnapshot(): Promise<ExhibitSnapshot | null> {
@@ -53,7 +53,7 @@ export class Cache implements OnApplicationShutdown {
   }
 
   subscribe(channel: string, onMessage: (message: string) => void): void {
-    this.subscriber ??= connectRedis(this.env.REDIS_URL, `${Cache.name} subscriber`, { maxRetriesPerRequest: null })
+    this.subscriber ??= connectRedis(this.env.REDIS_URL, `${RedisStore.name} subscriber`, { maxRetriesPerRequest: null })
     this.subscriber.on('message', (received: string, message: string) => {
       if (received === channel) onMessage(message)
     })

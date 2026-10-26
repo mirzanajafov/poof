@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Traces, UpstreamError } from '@poof/nest'
+import { TracingService, UpstreamError } from '@poof/nest'
 import { extract, inject, SpanKind, SpanStatusCode, within } from '@poof/tracing'
 import { Env } from '../config/env.js'
 
@@ -15,7 +15,7 @@ export class Supervisor {
 
   constructor(
     env: Env,
-    private readonly traces: Traces,
+    private readonly tracing: TracingService,
   ) {
     this.base = env.SUPERVISOR_URL.replace(/\/$/, '')
   }
@@ -26,7 +26,7 @@ export class Supervisor {
     body: unknown,
     incoming: Record<string, unknown>,
   ): Promise<SupervisorReply> {
-    const span = this.traces.tracer.startSpan(
+    const span = this.tracing.tracer.startSpan(
       `${method} /api${path}`,
       { kind: SpanKind.SERVER, attributes: { 'http.request.method': method, 'url.path': `/api${path}` } },
       extract(incoming),

@@ -27,10 +27,10 @@ export function itemPath(dataset: Dataset, item: DatasetItem): string {
 
 export function shuffled<T>(items: T[], seed: number): T[] {
   const rng = new Rng(seed)
-  const out = [...items]
-  for (let i = out.length - 1; i > 0; i--) {
+  const shuffledItems = [...items]
+  for (let i = shuffledItems.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1))
-    ;[out[i], out[j]] = [valueAt(out, j), valueAt(out, i)]
+    ;[shuffledItems[i], shuffledItems[j]] = [valueAt(shuffledItems, j), valueAt(shuffledItems, i)]
   }
-  return out
+  return shuffledItems
 }
