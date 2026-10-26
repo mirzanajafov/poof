@@ -196,6 +196,8 @@ describe('exhibits', () => {
     const floor = await http().post('/exhibits').send({ policy: 'box', minItems: 'many' })
     expect(floor.status).toBe(400)
     expect(floor.body.message).not.toContain('maxItems must not be below minItems')
+    const ceiling = await http().post('/exhibits').send({ policy: 'box', maxItems: 'many' })
+    expect(ceiling.body.message).not.toContain('maxItems must not be below minItems')
     const slack = await http().post('/exhibits').send({ policy: 'box', slackMin: 2, slackMax: 1 })
     expect(slack.status).toBe(400)
     expect(slack.body.message).toEqual(['slackMax must not be below slackMin'])

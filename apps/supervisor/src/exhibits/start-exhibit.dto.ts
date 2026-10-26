@@ -18,7 +18,7 @@ class NotBelow implements ValidatorConstraintInterface {
   validate(value: unknown, { object, constraints }: ValidationArguments): boolean {
     const other: unknown = constraints[0]
     const floor: unknown = typeof other === 'string' ? Reflect.get(object, other) : undefined
-    return typeof floor !== 'number' || (typeof value === 'number' && value >= floor)
+    return typeof value !== 'number' || typeof floor !== 'number' || value >= floor
   }
 
   defaultMessage({ property, constraints }: ValidationArguments): string {
