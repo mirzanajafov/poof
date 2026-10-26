@@ -1,7 +1,7 @@
 {
-  "extends": "../../tsconfig.nest.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "declaration": true,
+    "experimentalDecorators": true,
     "rootDir": "src",
     "outDir": "dist"
   },
