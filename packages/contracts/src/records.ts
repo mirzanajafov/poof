@@ -22,9 +22,11 @@ type Check<T> = [T] extends [boolean]
         ? 'number or null'
         : [T] extends [string | null]
           ? 'string or null'
-          : [T] extends [object]
-            ? 'object'
-            : never
+          : [T] extends [readonly unknown[]]
+            ? never
+            : [T] extends [object]
+              ? 'object'
+              : never
 
 export type Checks<T> = { [F in keyof T]-?: Check<T[F]> }
 
