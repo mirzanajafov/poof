@@ -17,6 +17,7 @@ probe='Promise.all([
 healthy() {
   local deadline=$((SECONDS + 180))
   while [ "$SECONDS" -lt "$deadline" ]; do
+    local api
     api=$(docker inspect -f '{{.State.Health.Status}}' poof-api 2>/dev/null || true)
     if [ "$api" = healthy ] && timeout 15 docker exec poof-api node -e "$probe" 2>/dev/null; then
       return 0
@@ -27,7 +28,7 @@ healthy() {
 }
 
 release() {
-  "${compose[@]}" build && "${compose[@]}" up -d --remove-orphans
+  "${compose[@]}" up -d --build --remove-orphans
 }
 
 previous=$(git rev-parse HEAD)
@@ -51,7 +52,8 @@ if release; then
     say "Live: $(git log --oneline -1)"
     exit 0
   fi
-  say "Not healthy"
+  say "Not healthy, the last lines of its logs:"
+  "${compose[@]}" logs --tail 30 || true
 else
   say "The release did not build or start"
 fi
@@ -67,6 +69,6 @@ if release && healthy; then
   echo "Rolled back. If the failed release got as far as its migrations, they stay applied,"
   echo "and the dump taken above is in backups/db if the schema change has to be undone."
 else
-  echo "Rollback is not healthy either. Check: ${compose[*]} logs" >&2
+  echo "The rollback did not come up either. Check: ${compose[*]} logs --tail 100" >&2
 fi
 exit 1
