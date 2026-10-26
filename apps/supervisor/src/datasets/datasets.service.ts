@@ -1,7 +1,18 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
+import {
+  datasetDir,
+  datasetNamePattern,
+  inputDir,
+  manifestPath,
+  outputDir,
+  parseManifest,
+  taskDir,
+  tasksDir,
+  type ManifestItem,
+  type TaskManifest,
+} from '@poof/contracts'
 import { Env } from '../config/env.js'
 import { linkOrCopy } from './files.js'
 
@@ -20,7 +31,7 @@ export class Datasets {
     if (!datasetNamePattern.test(name)) throw new NotFoundException(`no dataset ${name}`)
     const cached = this.cache.get(name)
     if (cached) return cached
-    const path = join(this.env.DATA_DIR, 'datasets', name, 'manifest.json')
+    const path = manifestPath(datasetDir(this.env.DATA_DIR, name))
     let text: string
     try {
       text = await readFile(path, 'utf8')
@@ -42,20 +53,24 @@ export class Datasets {
   }
 
   taskDir(taskId: string): string {
-    return join(this.env.DATA_DIR, 'tasks', taskId)
+    return taskDir(this.env.DATA_DIR, taskId)
+  }
+
+  taskFolders(): Promise<string[]> {
+    return readdir(tasksDir(this.env.DATA_DIR)).catch(() => [])
   }
 
   async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
     const dir = this.taskDir(taskId)
-    await mkdir(join(dir, 'input'), { recursive: true })
-    await mkdir(join(dir, 'out'), { recursive: true })
+    await mkdir(inputDir(dir), { recursive: true })
+    await mkdir(outputDir(dir), { recursive: true })
     const manifest: TaskManifest = { items: [] }
     for (const [i, item] of items.entries()) {
       const file = `${i}-${item.file}`
-      await linkOrCopy(join(this.env.DATA_DIR, 'datasets', dataset.name, item.file), join(dir, 'input', file))
+      await linkOrCopy(join(datasetDir(this.env.DATA_DIR, dataset.name), item.file), join(inputDir(dir), file))
       manifest.items.push({ file })
     }
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))
+    await writeFile(manifestPath(dir), JSON.stringify(manifest))
   }
 
   async removeTask(taskId: string): Promise<void> {

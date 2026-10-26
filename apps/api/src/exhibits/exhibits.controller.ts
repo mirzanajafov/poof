@@ -14,55 +14,31 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { exhibitPolicyNames, type ExhibitPolicyName } from '@poof/core'
-import { Database } from '@poof/nest'
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
 import { Admin } from '../access/admin.js'
 import { AdminGuard } from '../access/admin.guard.js'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'
-import { Env } from '../config/env.js'
 import { Cache } from '../infra/cache.js'
+import { respondWith } from '../supervisor/respond.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
-
-export class StartExhibit {
-  @IsIn(exhibitPolicyNames)
-  policy: ExhibitPolicyName
-
-  @IsInt()
-  @Min(10)
-  @Max(900)
-  durationSeconds: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.1)
-  @Max(3)
-  utilization?: number
-
-  @IsOptional()
-  @IsString()
-  dataset?: string
-
-  @IsOptional()
-  @IsInt()
-  seed?: number
-}
+import { ExhibitGate } from './exhibit-gate.js'
+import { ExhibitQueries } from './exhibit-queries.js'
+import { StartExhibit } from './start-exhibit.dto.js'
 
 @Controller('exhibits')
 export class ExhibitsController {
   constructor(
-    private readonly db: Database,
+    private readonly exhibits: ExhibitQueries,
+    private readonly gate: ExhibitGate,
     private readonly cache: Cache,
     private readonly supervisor: Supervisor,
     private readonly admin: Admin,
-    private readonly env: Env,
   ) {}
 
   @Get()
-  async list() {
-    return this.db.client.exhibit.findMany({ orderBy: { startedAt: 'desc' }, take: 20 })
+  list() {
+    return this.exhibits.list()
   }
 
   @Get('current')
@@ -74,23 +50,7 @@ export class ExhibitsController {
 
   @Get(':id')
   async detail(@Param('id', new ParseUUIDPipe()) id: string) {
-    const exhibit = await this.db.client.exhibit.findUnique({
-      where: { id },
-      include: {
-        tasks: {
-          orderBy: { submittedAt: 'asc' },
-          select: {
-            id: true,
-            status: true,
-            items: true,
-            done: true,
-            submittedAt: true,
-            deadline: true,
-            finishedAt: true,
-          },
-        },
-      },
-    })
+    const exhibit = await this.exhibits.detail(id)
     if (!exhibit) throw new NotFoundException()
     return exhibit
   }
@@ -99,33 +59,22 @@ export class ExhibitsController {
   @UseGuards(RateLimitGuard)
   @RateLimit({ name: 'exhibits', setting: 'EXHIBITS_PER_HOUR', windowSeconds: 3600 })
   async start(@Body() body: StartExhibit, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    if (!this.admin.is(req)) {
-      if (body.durationSeconds > this.env.PUBLIC_EXHIBIT_SECONDS) {
-        throw new BadRequestException(`exhibits are limited to ${this.env.PUBLIC_EXHIBIT_SECONDS} s`)
-      }
-      if (this.env.EXHIBIT_COOLDOWN_SECONDS > 0) {
-        const started = await this.cache.redis.set(
-          'poof:exhibit-cooldown',
-          '1',
-          'EX',
-          this.env.EXHIBIT_COOLDOWN_SECONDS + body.durationSeconds,
-          'NX',
-        )
-        if (!started) {
-          const ttl = await this.cache.redis.ttl('poof:exhibit-cooldown')
-          res.setHeader('Retry-After', String(Math.max(1, ttl)))
-          throw new HttpException('the box is cooling down after the last exhibit', HttpStatus.TOO_MANY_REQUESTS)
-        }
-      }
+    const admission = this.admin.is(req) ? null : await this.gate.enter(body.durationSeconds)
+    if (admission?.kind === 'too-long') {
+      throw new BadRequestException(`exhibits are limited to ${admission.limitSeconds} s`)
     }
-    const result = await this.supervisor.relay('POST', '/exhibits', body, res, req.headers)
-    if (res.statusCode >= 400) await this.cache.redis.del('poof:exhibit-cooldown')
-    return result
+    if (admission?.kind === 'cooling-down') {
+      res.setHeader('Retry-After', String(admission.retryAfterSeconds))
+      throw new HttpException('the box is cooling down after the last exhibit', HttpStatus.TOO_MANY_REQUESTS)
+    }
+    const reply = await this.supervisor.forward('POST', '/exhibits', body, req.headers)
+    if (reply.status >= 400) await admission?.giveBack()
+    return respondWith(res, reply)
   }
 
   @Delete('current')
   @UseGuards(AdminGuard)
-  stop(@Res({ passthrough: true }) res: Response) {
-    return this.supervisor.relay('DELETE', '/exhibits/current', undefined, res)
+  async stop(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return respondWith(res, await this.supervisor.forward('DELETE', '/exhibits/current', undefined, req.headers))
   }
 }

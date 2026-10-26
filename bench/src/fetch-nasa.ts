@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { manifestPath } from '@poof/contracts'
 import sharp from 'sharp'
 import type { DatasetItem } from './dataset.ts'
 
@@ -81,6 +82,6 @@ for (const query of queries) {
   }
 }
 await writeFile(
-  join(out, 'manifest.json'),
+  manifestPath(out),
   `${JSON.stringify({ source: 'nasa', origin: 'images-api.nasa.gov originals', items }, null, 2)}\n`,
 )

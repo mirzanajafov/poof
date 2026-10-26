@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { manifestPath } from '@poof/contracts'
 import sharp from 'sharp'
 import { mulberry32, type DatasetItem } from './dataset.ts'
 
@@ -106,4 +107,4 @@ for (let i = 0; i < count; i++) {
   const bpp = ((jpeg.length * 8) / (width * height)).toFixed(2)
   console.log(`${file} ${(jpeg.length / 1e6).toFixed(1)} MB ${bpp} bpp ${Math.round(performance.now() - started)} ms`)
 }
-await writeFile(join(out, 'manifest.json'), `${JSON.stringify({ source: 'synthetic', items }, null, 2)}\n`)
+await writeFile(manifestPath(out), `${JSON.stringify({ source: 'synthetic', items }, null, 2)}\n`)

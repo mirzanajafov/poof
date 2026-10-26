@@ -11,12 +11,11 @@ import { Env } from '../config/env.js'
 
 @Injectable()
 export class Cache implements OnApplicationShutdown {
-  readonly redis: Redis
-  readonly url: string
+  private readonly redis: Redis
+  private subscriber: Redis | null = null
 
   constructor(env: Env) {
-    this.url = env.REDIS_URL
-    this.redis = new Redis(this.url, { maxRetriesPerRequest: 2 })
+    this.redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })
     this.redis.on('error', () => undefined)
   }
 
@@ -29,12 +28,44 @@ export class Cache implements OnApplicationShutdown {
     return { live, exhibit }
   }
 
+  ping(): Promise<boolean> {
+    return this.redis.ping().then(
+      () => true,
+      () => false,
+    )
+  }
+
+  async increment(key: string, windowMs: number): Promise<number> {
+    const results = await this.redis.multi().incr(key).pexpire(key, windowMs).exec()
+    return Number(results?.[0]?.[1] ?? 0)
+  }
+
+  async claim(key: string, seconds: number): Promise<{ claimed: true } | { claimed: false; ttlSeconds: number }> {
+    if ((await this.redis.set(key, '1', 'EX', seconds, 'NX')) === 'OK') return { claimed: true }
+    return { claimed: false, ttlSeconds: Math.max(1, await this.redis.ttl(key)) }
+  }
+
+  async release(key: string): Promise<void> {
+    await this.redis.del(key)
+  }
+
+  subscribe(channel: string, onMessage: (message: string) => void): void {
+    if (!this.subscriber) {
+      this.subscriber = this.redis.duplicate({ maxRetriesPerRequest: null })
+      this.subscriber.on('error', () => undefined)
+    }
+    this.subscriber.on('message', (received: string, message: string) => {
+      if (received === channel) onMessage(message)
+    })
+    void this.subscriber.subscribe(channel).catch(() => undefined)
+  }
+
   private async json<T>(key: string): Promise<T | null> {
     const raw = await this.redis.get(key).catch(() => null)
     return raw ? (JSON.parse(raw) as T) : null
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit().catch(() => undefined)
+    await Promise.allSettled([this.redis.quit(), this.subscriber?.quit()])
   }
 }

@@ -22,6 +22,7 @@ export interface Call {
 export interface Reply {
   status: number
   body?: unknown
+  raw?: string
   headers?: Record<string, string>
 }
 
@@ -38,7 +39,7 @@ export class StubSupervisor {
       this.calls.push(call)
       const reply = this.reply(call)
       res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
-      res.end(reply.body === undefined ? '' : JSON.stringify(reply.body))
+      res.end(reply.raw ?? (reply.body === undefined ? '' : JSON.stringify(reply.body)))
     })
     await new Promise<void>((resolve) => this.server!.listen(0, '127.0.0.1', resolve))
     this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`
@@ -67,7 +68,7 @@ export interface Running {
 }
 
 export async function start(supervisorUrl: string, env: Record<string, string> = {}): Promise<Running> {
-  const dataDir = await mkdtemp(join(tmpdir(), 'poof-api-'))
+  const dataDir = env.DATA_DIR ?? (await mkdtemp(join(tmpdir(), 'poof-api-')))
   Object.assign(process.env, {
     DATABASE_URL: inject('databaseUrl'),
     REDIS_URL: redisUrl,

@@ -161,6 +161,50 @@ describe('exhibits', () => {
     expect(tasks.filter((t) => t.status === 'DONE')).toHaveLength(stats.done)
   })
 
+  it('refuses a null where an exhibit setting has a default', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    const fields = [
+      'durationSeconds',
+      'utilization',
+      'dataset',
+      'preset',
+      'minItems',
+      'maxItems',
+      'slackMin',
+      'slackMax',
+      'seed',
+    ]
+    for (const field of fields) {
+      expect(
+        (
+          await http()
+            .post('/exhibits')
+            .send({ policy: 'box', [field]: null })
+        ).status,
+      ).toBe(400)
+    }
+    expect(await running.db.exhibit.count()).toBe(before)
+  })
+
+  it('refuses an exhibit whose largest task or loosest deadline is below its smallest', async () => {
+    running = await start(dataDir)
+    const before = await running.db.exhibit.count()
+    const items = await http().post('/exhibits').send({ policy: 'box', minItems: 50, maxItems: 30 })
+    expect(items.status).toBe(400)
+    expect(items.body.message).toEqual(['maxItems must not be below minItems'])
+    const floor = await http().post('/exhibits').send({ policy: 'box', minItems: 'many' })
+    expect(floor.status).toBe(400)
+    expect(floor.body.message).not.toContain('maxItems must not be below minItems')
+    const ceiling = await http().post('/exhibits').send({ policy: 'box', maxItems: 'many' })
+    expect(ceiling.status).toBe(400)
+    expect(ceiling.body.message).not.toContain('maxItems must not be below minItems')
+    const slack = await http().post('/exhibits').send({ policy: 'box', slackMin: 2, slackMax: 1 })
+    expect(slack.status).toBe(400)
+    expect(slack.body.message).toEqual(['slackMax must not be below slackMin'])
+    expect(await running.db.exhibit.count()).toBe(before)
+  })
+
   it('refuses an exhibit policy or preset it does not know', async () => {
     running = await start(dataDir)
     const before = await running.db.exhibit.count()

@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { exhibitDefaults } from '@poof/contracts'
 import { Transform, type TransformFnParams } from 'class-transformer'
 import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator'
 
@@ -59,7 +60,7 @@ export class Env {
 
   @IsOptional()
   @IsInt()
-  @Min(10)
+  @Min(exhibitDefaults.durationSeconds)
   @Max(900)
-  readonly PUBLIC_EXHIBIT_SECONDS: number = 60
+  readonly PUBLIC_EXHIBIT_SECONDS: number = exhibitDefaults.durationSeconds
 }

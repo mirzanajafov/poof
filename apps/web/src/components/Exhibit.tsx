@@ -42,7 +42,7 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
       const res = await fetch('/api/exhibits', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ policy, durationSeconds: 60, dataset: 'synthetic', utilization: 1.2 }),
+        body: JSON.stringify({ policy }),
       })
       if (res.status !== 201) {
         const body = (await res.json().catch(() => ({}))) as { message?: string }

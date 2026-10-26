@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  exhibitDefaults,
   liveEventsChannel,
   poolSnapshotKey,
   type LiveBatch,
@@ -86,6 +88,15 @@ describe('read model', () => {
     expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
   })
 
+  it('serves images from a data directory with a dot in its path', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), '.poof-api-'))
+    running = await start(supervisor.url, { DATA_DIR: dataDir })
+    const id = randomUUID()
+    await mkdir(join(dataDir, 'tasks', id, 'out'), { recursive: true })
+    await writeFile(join(dataDir, 'tasks', id, 'out', '0.webp'), Buffer.from('RIFF....WEBP'))
+    expect((await http().get(`/api/tasks/${id}/items/0`)).status).toBe(200)
+  })
+
   it('reports that Redis and Postgres answer', async () => {
     running = await start(supervisor.url)
     expect((await http().get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
@@ -113,7 +124,17 @@ describe('read model', () => {
     const res = await http().get(`/api/tasks/${id}/items/3`)
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toBe('image/webp')
-    expect((await http().get(`/api/tasks/${id}/items/4`)).status).toBe(404)
+    expect(res.headers['cache-control']).toBe('public, max-age=86400, immutable')
+    const missing = await http().get(`/api/tasks/${id}/items/4`)
+    expect(missing.status).toBe(404)
+    expect(missing.body).toEqual({ message: 'Not Found', statusCode: 404 })
+    const changed = await http().get(`/api/tasks/${id}/items/3`).set('If-Unmodified-Since', new Date(0).toUTCString())
+    expect(changed.status).toBe(412)
+    expect(changed.headers['cache-control']).toBeUndefined()
+    expect(changed.headers['access-control-allow-origin']).toBe('http://localhost:3112')
+    await writeFile(join(running.dataDir, 'tasks', id, 'out', '5.jpg'), Buffer.from('not really a jpeg'))
+    expect((await http().get(`/api/tasks/${id}/items/5`)).headers['content-type']).toBe('image/jpeg')
+    expect((await http().get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
     expect((await http().get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
     expect((await http().get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
   })
@@ -152,6 +173,13 @@ describe('submissions', () => {
 
   it('answers 502 when the supervisor is down', async () => {
     running = await start('http://127.0.0.1:9')
+    const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
+    expect(res.status).toBe(502)
+  })
+
+  it('answers 502 when the supervisor sends something that is not JSON', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 200, raw: '<html>bad gateway</html>' })
     const res = await http().post('/api/tasks').send({ dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 })
     expect(res.status).toBe(502)
   })
@@ -195,6 +223,53 @@ describe('exhibits', () => {
     expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box', durationSeconds: 300 })).status).toBe(
       201,
     )
+  })
+
+  it('keeps the cooldown when the supervisor does not answer, since the exhibit may have started', async () => {
+    running = await start('http://127.0.0.1:9')
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
+    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect(cooling.status).toBe(429)
+    expect(cooling.body.message).toMatch(/cooling down/)
+  })
+
+  it('keeps the cooldown of a visitor when the supervisor refuses an exhibit the admin started', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
+    expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box' })).status).toBe(409)
+    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect(cooling.status).toBe(429)
+    expect(cooling.body.message).toMatch(/cooling down/)
+  })
+
+  it('refuses a null where an exhibit setting has a default, without asking the supervisor', async () => {
+    running = await start(supervisor.url)
+    for (const field of ['policy', 'durationSeconds', 'utilization', 'dataset', 'seed']) {
+      expect(
+        (
+          await http()
+            .post('/api/exhibits')
+            .set(admin)
+            .send({ policy: 'box', [field]: null })
+        ).status,
+      ).toBe(400)
+    }
+    expect(supervisor.calls).toHaveLength(0)
+  })
+
+  it('fills in the public exhibit for a visitor who only picks a policy', async () => {
+    running = await start(supervisor.url)
+    supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
+    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
+    expect(supervisor.calls[0]?.body).toEqual({
+      policy: 'box',
+      durationSeconds: exhibitDefaults.durationSeconds,
+      utilization: exhibitDefaults.utilization,
+      dataset: exhibitDefaults.dataset,
+      seed: exhibitDefaults.seed,
+    })
   })
 
   it('lets one address start three public exhibits an hour', async () => {

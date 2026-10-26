@@ -3,7 +3,6 @@ import sharp, { type Sharp } from 'sharp'
 
 export interface Preset {
   name: PresetName
-  ext: string
   apply(image: Sharp): Sharp
 }
 
@@ -12,17 +11,14 @@ const fit1600 = { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: 
 export const presets: Record<PresetName, Preset> = {
   'webp-1600': {
     name: 'webp-1600',
-    ext: 'webp',
     apply: (image) => image.resize(fit1600).webp({ quality: 80 }),
   },
   'avif-1600': {
     name: 'avif-1600',
-    ext: 'avif',
     apply: (image) => image.resize(fit1600).avif({ quality: 50, effort: 4 }),
   },
   'thumb-320': {
     name: 'thumb-320',
-    ext: 'jpg',
     apply: (image) => image.resize({ width: 320, height: 320, fit: 'cover' }).jpeg({ quality: 80 }),
   },
 }

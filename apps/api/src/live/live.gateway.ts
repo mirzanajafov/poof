@@ -1,7 +1,6 @@
 import type { OnApplicationShutdown } from '@nestjs/common'
 import { type OnGatewayConnection, type OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
 import { liveEventsChannel, type LiveEvent, type LiveSocketEvents } from '@poof/contracts'
-import { Redis } from 'ioredis'
 import type { Server, Socket } from 'socket.io'
 import { Cache } from '../infra/cache.js'
 
@@ -14,7 +13,6 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   @WebSocketServer()
   server: Server<Record<string, never>, LiveSocketEvents>
 
-  private subscriber: Redis | null = null
   private buffer: LiveEvent[] = []
   private dropped = 0
   private timers: NodeJS.Timeout[] = []
@@ -22,10 +20,7 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
   constructor(private readonly cache: Cache) {}
 
   afterInit(): void {
-    this.subscriber = new Redis(this.cache.url, { maxRetriesPerRequest: null })
-    this.subscriber.on('error', () => undefined)
-    void this.subscriber.subscribe(liveEventsChannel).catch(() => undefined)
-    this.subscriber.on('message', (_channel: string, message: string) => {
+    this.cache.subscribe(liveEventsChannel, (message) => {
       if (this.buffer.length >= MAX_BUFFER) {
         this.dropped++
         return
@@ -51,8 +46,7 @@ export class LiveGateway implements OnGatewayInit, OnGatewayConnection, OnApplic
     this.server.emit('snapshot', await this.cache.liveSnapshot())
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  onApplicationShutdown(): void {
     for (const timer of this.timers) clearInterval(timer)
-    await this.subscriber?.quit().catch(() => undefined)
   }
 }
