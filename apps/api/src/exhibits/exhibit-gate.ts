@@ -21,9 +21,8 @@ export class ExhibitGate {
     if (durationSeconds > limitSeconds) return { kind: 'too-long', limitSeconds }
     const cooldownSeconds = this.env.EXHIBIT_COOLDOWN_SECONDS
     if (cooldownSeconds === 0) return { kind: 'admitted', giveBack: () => Promise.resolve() }
-    if (await this.cache.claim(cooldownKey, cooldownSeconds + durationSeconds)) {
-      return { kind: 'admitted', giveBack: () => this.cache.release(cooldownKey) }
-    }
-    return { kind: 'cooling-down', retryAfterSeconds: Math.max(1, await this.cache.ttl(cooldownKey)) }
+    const claim = await this.cache.claim(cooldownKey, cooldownSeconds + durationSeconds)
+    if (claim.claimed) return { kind: 'admitted', giveBack: () => this.cache.release(cooldownKey) }
+    return { kind: 'cooling-down', retryAfterSeconds: claim.ttlSeconds }
   }
 }

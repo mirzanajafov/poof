@@ -130,6 +130,7 @@ describe('read model', () => {
     expect(missing.body).toEqual({ message: 'Not Found', statusCode: 404 })
     const changed = await http().get(`/api/tasks/${id}/items/3`).set('If-Unmodified-Since', new Date(0).toUTCString())
     expect(changed.status).toBe(412)
+    expect(changed.headers['cache-control']).toBeUndefined()
     expect((await http().get(`/api/tasks/${randomUUID()}/items/3`)).status).toBe(404)
     expect((await http().get(`/api/tasks/${id}/items/..%2F..%2Fsecret`)).status).toBe(400)
     expect((await http().get('/api/tasks/..%2F..%2Fetc/items/1')).status).toBe(400)
@@ -217,7 +218,9 @@ describe('exhibits', () => {
   it('keeps the cooldown when the supervisor does not answer, since the exhibit may have started', async () => {
     running = await start('http://127.0.0.1:9')
     expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(502)
-    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(429)
+    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect(cooling.status).toBe(429)
+    expect(cooling.body.message).toMatch(/cooling down/)
   })
 
   it('keeps the cooldown of a visitor when the supervisor refuses an exhibit the admin started', async () => {
@@ -226,7 +229,9 @@ describe('exhibits', () => {
     expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(201)
     supervisor.reply = () => ({ status: 409, body: { message: 'an exhibit is already running' } })
     expect((await http().post('/api/exhibits').set(admin).send({ policy: 'box' })).status).toBe(409)
-    expect((await http().post('/api/exhibits').send({ policy: 'box' })).status).toBe(429)
+    const cooling = await http().post('/api/exhibits').send({ policy: 'box' })
+    expect(cooling.status).toBe(429)
+    expect(cooling.body.message).toMatch(/cooling down/)
   })
 
   it('refuses a null where an exhibit setting has a default, without asking the supervisor', async () => {

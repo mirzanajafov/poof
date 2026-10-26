@@ -40,12 +40,9 @@ export class Cache implements OnApplicationShutdown {
     return Number(results?.[0]?.[1] ?? 0)
   }
 
-  async claim(key: string, seconds: number): Promise<boolean> {
-    return (await this.redis.set(key, '1', 'EX', seconds, 'NX')) === 'OK'
-  }
-
-  ttl(key: string): Promise<number> {
-    return this.redis.ttl(key)
+  async claim(key: string, seconds: number): Promise<{ claimed: true } | { claimed: false; ttlSeconds: number }> {
+    if ((await this.redis.set(key, '1', 'EX', seconds, 'NX')) === 'OK') return { claimed: true }
+    return { claimed: false, ttlSeconds: Math.max(1, await this.redis.ttl(key)) }
   }
 
   async release(key: string): Promise<void> {

@@ -74,7 +74,7 @@ export class ExhibitsController {
 
   @Delete('current')
   @UseGuards(AdminGuard)
-  async stop(@Res({ passthrough: true }) res: Response) {
-    return respondWith(res, await this.supervisor.forward('DELETE', '/exhibits/current', undefined))
+  async stop(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return respondWith(res, await this.supervisor.forward('DELETE', '/exhibits/current', undefined, req.headers))
   }
 }

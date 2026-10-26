@@ -16,15 +16,18 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
+import { outputDir, outputExtensions, taskDir } from '@poof/contracts'
 import type { NextFunction, Request, Response } from 'express'
 import { RateLimit } from '../access/rate-limit.decorator.js'
 import { RateLimitGuard } from '../access/rate-limit.guard.js'
+import { Env } from '../config/env.js'
 import { respondWith } from '../supervisor/respond.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 import { ListTasks } from './list-tasks.dto.js'
-import { OutputFiles } from './output-files.js'
 import { SubmitTask } from './submit-task.dto.js'
 import { TaskQueries } from './task-queries.js'
+
+const extensions = [...new Set(Object.values(outputExtensions))]
 
 @Controller('tasks')
 export class TasksController {
@@ -32,8 +35,8 @@ export class TasksController {
 
   constructor(
     private readonly tasks: TaskQueries,
-    private readonly outputs: OutputFiles,
     private readonly supervisor: Supervisor,
+    private readonly env: Env,
   ) {}
 
   @Get()
@@ -56,23 +59,27 @@ export class TasksController {
   }
 
   @Get(':id/items/:item')
-  async item(
+  item(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('item', new ParseIntPipe()) item: number,
     @Res() res: Response,
     @Next() next: NextFunction,
-  ) {
-    const file = await this.outputs.find(id, item)
-    if (!file) throw new NotFoundException()
-    res.sendFile(file.name, { root: file.dir, maxAge: '1d', immutable: true }, (error) => {
-      if (!error || clientWentAway(error)) return
-      const status = 'status' in error && typeof error.status === 'number' ? error.status : 500
-      if (status >= 500) this.logger.error(error)
-      next(new HttpException(STATUS_CODES[status] ?? 'Error', status))
+  ): void {
+    const options = { root: outputDir(taskDir(this.env.DATA_DIR, id)), extensions, maxAge: '1d', immutable: true }
+    res.sendFile(String(item), options, (error) => {
+      if (error) this.sendFailed(error, res, next)
     })
   }
-}
 
-function clientWentAway(error: Error): boolean {
-  return ('code' in error && error.code === 'ECONNABORTED') || ('syscall' in error && error.syscall === 'write')
+  private sendFailed(error: Error, res: Response, next: NextFunction): void {
+    if (('code' in error && error.code === 'ECONNABORTED') || ('syscall' in error && error.syscall === 'write')) return
+    if (res.headersSent) {
+      res.destroy(error)
+      return
+    }
+    for (const name of res.getHeaderNames()) res.removeHeader(name)
+    const status = 'status' in error && typeof error.status === 'number' ? error.status : 500
+    if (status >= 500) this.logger.error(error)
+    next(new HttpException(STATUS_CODES[status] ?? 'Error', status))
+  }
 }
