@@ -25,20 +25,18 @@ const octaves: Array<[scale: number, amplitude: number]> = [
   [1, 14],
 ]
 
-type Rand = () => number
-
-function noise(rand: Rand, width: number, height: number, channels: number, amplitude: number): Buffer {
+function noise(rng: Rng, width: number, height: number, channels: number, amplitude: number): Buffer {
   const data = Buffer.allocUnsafe(width * height * channels)
   for (let i = 0; i < data.length; i++) {
-    data[i] = Math.max(0, Math.min(255, Math.round(128 + (rand() * 2 - 1) * amplitude)))
+    data[i] = Math.max(0, Math.min(255, Math.round(128 + (rng.next() * 2 - 1) * amplitude)))
   }
   return data
 }
 
-async function layer(rand: Rand, width: number, height: number, scale: number, channels: number, amplitude: number) {
+async function layer(rng: Rng, width: number, height: number, scale: number, channels: number, amplitude: number) {
   const w = Math.max(2, Math.round(width / scale))
   const h = Math.max(2, Math.round(height / scale))
-  const small = noise(rand, w, h, channels, amplitude)
+  const small = noise(rng, w, h, channels, amplitude)
   if (scale === 1) return small
   return sharp(small, { raw: { width: w, height: h, channels: channels as 1 | 3 } })
     .resize(width, height, { fit: 'fill', kernel: 'cubic' })
@@ -47,17 +45,18 @@ async function layer(rand: Rand, width: number, height: number, scale: number, c
     .toBuffer()
 }
 
-function shapes(rand: Rand, width: number, height: number): Buffer {
+function shapes(rng: Rng, width: number, height: number): Buffer {
   const parts: string[] = []
-  const color = () => `rgb(${Math.floor(rand() * 256)},${Math.floor(rand() * 256)},${Math.floor(rand() * 256)})`
+  const color = () =>
+    `rgb(${Math.floor(rng.next() * 256)},${Math.floor(rng.next() * 256)},${Math.floor(rng.next() * 256)})`
   for (let i = 0; i < 24; i++) {
-    const x = Math.round(rand() * width)
-    const y = Math.round(rand() * height)
-    const w = Math.round(rand() * width * 0.4) + 1
-    const h = Math.round(rand() * height * 0.4) + 1
-    const opacity = (0.2 + rand() * 0.6).toFixed(2)
+    const x = Math.round(rng.next() * width)
+    const y = Math.round(rng.next() * height)
+    const w = Math.round(rng.next() * width * 0.4) + 1
+    const h = Math.round(rng.next() * height * 0.4) + 1
+    const opacity = (0.2 + rng.next() * 0.6).toFixed(2)
     parts.push(
-      rand() < 0.5
+      rng.next() < 0.5
         ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color()}" fill-opacity="${opacity}"/>`
         : `<ellipse cx="${x}" cy="${y}" rx="${w}" ry="${h}" fill="${color()}" fill-opacity="${opacity}"/>`,
     )
@@ -67,15 +66,15 @@ function shapes(rand: Rand, width: number, height: number): Buffer {
   )
 }
 
-async function render(rand: Rand, width: number, height: number, quality: number): Promise<Buffer> {
+async function render(rng: Rng, width: number, height: number, quality: number): Promise<Buffer> {
   const raw = { width, height, channels: 3 as const }
-  let pixels = await sharp(await layer(rand, width, height, 256, 3, 110), { raw })
-    .composite([{ input: shapes(rand, width, height), blend: 'over' }])
+  let pixels = await sharp(await layer(rng, width, height, 256, 3, 110), { raw })
+    .composite([{ input: shapes(rng, width, height), blend: 'over' }])
     .removeAlpha()
     .raw()
     .toBuffer()
   for (const [scale, amplitude] of octaves) {
-    const detail = await layer(rand, width, height, scale, 1, amplitude)
+    const detail = await layer(rng, width, height, scale, 1, amplitude)
     pixels = await sharp(pixels, { raw })
       .composite([{ input: detail, raw: { width, height, channels: 1 }, blend: 'overlay' }])
       .removeAlpha()
@@ -96,13 +95,12 @@ await mkdir(out, { recursive: true })
 const items: Array<DatasetItem & { bytes: number }> = []
 for (let i = 0; i < count; i++) {
   const rng = new Rng(seed * 1000 + i)
-  const rand = () => rng.next()
-  const mp = Math.exp(Math.log(minMp) + rand() * (Math.log(maxMp) - Math.log(minMp)))
-  const aspect = valueAt(aspects, Math.floor(rand() * aspects.length))
+  const mp = rng.logUniform(minMp, maxMp)
+  const aspect = valueAt(aspects, rng.int(0, aspects.length - 1))
   const width = Math.round(Math.sqrt(mp * 1e6 * aspect) / 2) * 2
   const height = Math.round((mp * 1e6) / width / 2) * 2
   const started = performance.now()
-  const jpeg = await render(rand, width, height, quality)
+  const jpeg = await render(rng, width, height, quality)
   const file = `syn-${String(i).padStart(3, '0')}-${width}x${height}.jpg`
   await writeFile(join(out, file), jpeg)
   items.push({ file, width, height, bytes: jpeg.length, mp: (width * height) / 1e6 })
