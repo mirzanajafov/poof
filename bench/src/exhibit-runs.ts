@@ -35,8 +35,10 @@ async function call(path: string, init?: RequestInit): Promise<{ status: number;
 async function ended(id: string): Promise<ExhibitDetail> {
   while (true) {
     await sleep(3000)
-    const detail = (await call(`/api/exhibits/${id}`)).body as ExhibitDetail | null
-    if (detail && detail.status !== 'RUNNING') return detail
+    const { status, body } = await call(`/api/exhibits/${id}`)
+    if (status !== 200) continue
+    const detail = body as ExhibitDetail
+    if (detail.status !== 'RUNNING') return detail
   }
 }
 
@@ -61,13 +63,13 @@ for (const seed of values.seeds.split(',').map(Number)) {
       continue
     }
     const { params, stats, tasks } = await ended(id)
-    if (!stats) {
+    if (stats) {
+      runs.push({ id, policy, params, stats, tasks })
+      await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
+      console.log(`${policy} seed ${seed}: ${JSON.stringify(stats)}`)
+    } else {
       console.log(`${policy} seed ${seed}: ended without stats`)
-      continue
     }
-    runs.push({ id, policy, params, stats, tasks })
-    await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
-    console.log(`${policy} seed ${seed}: ${JSON.stringify(stats)}`)
     await sleep(Number(values.gap) * 1000)
   }
 }
