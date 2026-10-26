@@ -23,13 +23,13 @@ services:
 
   migrate:
     environment:
-      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
+      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@poof-postgres:5432/poof
 
   supervisor:
     ports: !reset []
     user: '${APP_UID:-1000}:${APP_GID:-1000}'
     environment:
-      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@postgres:5432/poof
+      DATABASE_URL: postgresql://poof:${POSTGRES_PASSWORD}@poof-postgres:5432/poof
       LOG_JSON: 'true'
     restart: unless-stopped
 
@@ -59,7 +59,7 @@ services:
       - edge
     restart: unless-stopped
 
-  web:
+  poof-web:
     build:
       args:
         NEXT_PUBLIC_LIVE_URL: ''
@@ -75,7 +75,7 @@ services:
     profiles: ['app']
     user: '${BACKUP_UID:-1000}:${BACKUP_GID:-1000}'
     environment:
-      PGHOST: postgres
+      PGHOST: poof-postgres
       PGUSER: poof
       PGDATABASE: poof
       PGPASSWORD: ${POSTGRES_PASSWORD}
