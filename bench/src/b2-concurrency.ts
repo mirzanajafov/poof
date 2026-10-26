@@ -4,6 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { concurrencyResultPrefix, itemCostMedians, type ConcurrencyRow } from '@poof/contracts/bench'
+import { valueAt } from '@poof/core'
 import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
 import { cgroupAnonMb } from './memory.ts'
@@ -39,6 +40,7 @@ const dataset = await loadDataset(values.data)
 const samples = await readItemCosts(values.label)
 
 const cost = itemCostMedians(samples, values.preset, dataset.source)
+if (cost.size === 0) throw new Error(`${values.label} has no item costs for ${values.preset} on ${dataset.source}`)
 
 const childPath = fileURLToPath(new URL('./b2-child.js', import.meta.url))
 
@@ -109,7 +111,7 @@ const flat = rows.find((row, i) => {
   const next = rows[i + 1]
   return next !== undefined && next.effectiveCores < row.effectiveCores * 1.05
 })
-const knee = flat ? flat.k : rows.length
+const knee = (flat ?? valueAt(rows, rows.length - 1)).k
 
 const name = values.name ?? `${concurrencyResultPrefix}${cpus}`
 const path = await writeResult(values.label, name, {
