@@ -89,7 +89,8 @@ export class TaskStore {
   }
 
   workerStarted(workerId: string, pid: number): void {
-    this.write(() => this.db.client.worker.create({ data: { id: workerId, pid } }))
+    const startedAt = new Date()
+    this.write(() => this.db.client.worker.create({ data: { id: workerId, pid, startedAt } }))
   }
 
   workerExited(workerId: string, reason: ExitReason, items: number): void {

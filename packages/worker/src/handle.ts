@@ -105,12 +105,14 @@ export class WorkerHandle extends EventEmitter<HandleEvents> {
       child.stderr?.on('data', (chunk: Buffer) => {
         this.stderr = (this.stderr + chunk.toString()).slice(-4096)
       })
+      child.once('error', reject)
       child.once('exit', (code, signal) => {
         if (!this.ready) reject(new Error(`worker exited with ${code} before ready: ${this.stderr}`))
         this.onExit(code, signal)
       })
       child.on('message', (message: FromWorker) => {
         if (message.type === 'ready') {
+          child.off('error', reject)
           this.ready = true
           this.lastBeat = Date.now()
           this.reportedRssMb = message.rssMb

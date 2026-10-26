@@ -347,11 +347,12 @@ export class LeaseEngine {
     const result = await lease.worker.handle.shrink(lease.id, plan.cut)
     this.reserved -= plan.children.length
     lease.busy = false
-    if (!result.ok || this.stopped) return
+    if (this.stopped) return
     if (!lease.task.open) {
       this.stopLease(lease)
       return
     }
+    if (!result.ok) return
     lease.hi = plan.cut
     lease.lastSplitAt = Date.now()
     this.counters.splits++
@@ -383,12 +384,12 @@ export class LeaseEngine {
     worker.yielding = true
     const result = await worker.handle.shrink(lease.id, cut)
     lease.busy = false
-    if (!result.ok) {
-      worker.yielding = false
-      return
-    }
     if (!lease.task.open) {
       this.stopLease(lease)
+      return
+    }
+    if (!result.ok) {
+      worker.yielding = false
       return
     }
     const rest = lease.hi

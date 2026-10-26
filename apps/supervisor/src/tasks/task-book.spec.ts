@@ -143,6 +143,22 @@ describe('TaskBook', () => {
     expect(events.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'task.failed' }))
   })
 
+  it('puts a lease back as pending for an open task and as done for a closed one', () => {
+    const { book, store } = setup()
+    const open = newTask()
+    const waiting = addLease(open, 0, 10)
+    waiting.cursor = 4
+    book.putBack(open, waiting)
+    expect(waiting.state).toBe('pending')
+    expect(store.leaseReleased).toHaveBeenLastCalledWith(waiting.id, 'pending', 4)
+    const failed = newTask()
+    const stranded = addLease(failed, 0, 10)
+    book.fail(failed, 'cancelled by the test', 'cancel')
+    book.putBack(failed, stranded)
+    expect(stranded.state).toBe('done')
+    expect(store.leaseReleased).toHaveBeenLastCalledWith(stranded.id, 'done', 0)
+  })
+
   it('tells the store and the live view once when a preset breaker opens', () => {
     const { book, store, events } = setup({ deadLetterShare: 1 })
     const task = newTask(20)
