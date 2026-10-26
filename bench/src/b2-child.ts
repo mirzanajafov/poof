@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { presetExtensions } from '@poof/core'
+import { outputFileName } from '@poof/core'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled } from './dataset.ts'
 import { peakRssMb, rssMb } from './memory.ts'
@@ -33,7 +33,7 @@ async function run(): Promise<void> {
     const started = performance.now()
     const output = await processItem(input, preset)
     if (values.write) {
-      const target = join(outDir, `${i % 50}.${presetExtensions[preset.name]}`)
+      const target = join(outDir, outputFileName(i % 50, preset.name))
       await writeFile(`${target}.tmp`, output)
       await rename(`${target}.tmp`, target)
     }

@@ -1,19 +1,19 @@
+import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Injectable } from '@nestjs/common'
-import { isPresetName, presetExtensions } from '@poof/core'
-import { Database } from '@poof/nest'
+import { outputFileName, presetNames } from '@poof/core'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class OutputFiles {
-  constructor(
-    private readonly db: Database,
-    private readonly env: Env,
-  ) {}
+  constructor(private readonly env: Env) {}
 
   async path(taskId: string, item: number): Promise<string | null> {
-    const task = await this.db.client.task.findUnique({ where: { id: taskId }, select: { preset: true } })
-    if (!task || !isPresetName(task.preset)) return null
-    return resolve(this.env.DATA_DIR, 'tasks', taskId, 'out', `${item}.${presetExtensions[task.preset]}`)
+    for (const preset of presetNames) {
+      const path = resolve(this.env.DATA_DIR, 'tasks', taskId, 'out', outputFileName(item, preset))
+      const found = await stat(path).catch(() => null)
+      if (found?.isFile()) return path
+    }
+    return null
   }
 }
