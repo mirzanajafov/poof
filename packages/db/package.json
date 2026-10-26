@@ -10,9 +10,8 @@
       "default": "./dist/index.js"
     },
     "./testing": {
-      "source": "./src/testing.ts",
-      "types": "./dist/testing.d.ts",
-      "default": "./dist/testing.js"
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {
