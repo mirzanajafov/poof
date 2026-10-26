@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { rssMb } from './memory.ts'
 
 const started = performance.now()
+if (!process.send) throw new Error('b3-child runs only as a child process with an IPC channel')
+const send = process.send.bind(process)
 const { configureSharp, presets, processItem } = await import('@poof/imaging')
 const { default: sharp } = await import('sharp')
 configureSharp()
@@ -10,7 +12,7 @@ const tiny = await sharp({ create: { width: 64, height: 64, channels: 3, backgro
   .toBuffer()
 await processItem(tiny, presets['webp-1600'])
 const cpu = process.cpuUsage()
-process.send!({
+send({
   type: 'ready',
   sinceStartMs: performance.now(),
   importMs: performance.now() - started,

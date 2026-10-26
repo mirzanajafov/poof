@@ -35,7 +35,7 @@ const cpus = Number(values.cpus ?? process.env.CPU_LIMIT ?? availableParallelism
 const kMax = Number(values['k-max'] ?? Math.ceil(3 * cpus))
 const durationMs = Number(values.duration) * 1000
 const warmupMs = Number(values.warmup) * 1000
-const dataset = await loadDataset(values.data!)
+const dataset = await loadDataset(values.data)
 const samples = await readItemCosts(values.label)
 
 const costs = new Map<string, number[]>()
@@ -67,9 +67,9 @@ for (const k of ks) {
   const children = Array.from({ length: k }, (_, i) =>
     fork(childPath, [
       '--data',
-      values.data!,
+      values.data,
       '--preset',
-      values.preset!,
+      values.preset,
       '--seed',
       String(100 + i),
       ...(values.write ? ['--write'] : []),
@@ -110,17 +110,15 @@ for (const k of ks) {
   console.log(JSON.stringify(row))
 }
 
-let knee = rows.length
-for (let i = 0; i + 1 < rows.length; i++) {
-  if (rows[i + 1]!.effectiveCores < rows[i]!.effectiveCores * 1.05) {
-    knee = rows[i]!.k
-    break
-  }
-}
+const flat = rows.find((row, i) => {
+  const next = rows[i + 1]
+  return next !== undefined && next.effectiveCores < row.effectiveCores * 1.05
+})
+const knee = flat ? flat.k : rows.length
 
 const name = values.name ?? `b2-concurrency-c${cpus}`
-const path = await writeResult(values.label!, name, {
-  env: environment(values.label!),
+const path = await writeResult(values.label, name, {
+  env: environment(values.label),
   cpus,
   preset: values.preset,
   source: dataset.source,

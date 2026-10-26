@@ -1,3 +1,4 @@
+export * from './arrays.ts'
 export * from './types.ts'
 export * from './presets.ts'
 export * from './estimate.ts'

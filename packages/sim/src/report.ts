@@ -1,3 +1,4 @@
+import { valueAt } from '@poof/core'
 import { bootstrap, mean, quantile, type Interval } from '@poof/core/stats'
 import type { RunMetrics } from './metrics.ts'
 
@@ -53,7 +54,7 @@ export function summarize(metrics: readonly RunMetrics[]): Cell[] {
   const groups = new Map<string, RunMetrics[]>()
   for (const m of metrics) groups.set(key(m), [...(groups.get(key(m)) ?? []), m])
   return [...groups.values()].map((runs) => {
-    const first = runs[0]!
+    const first = valueAt(runs, 0)
     const lateness = runs.flatMap((r) => r.lateness).filter(Number.isFinite)
     const skewed = present(runs.map((r) => r.skewedHitRate))
     const others = present(runs.map((r) => r.otherTypeHitRate))
@@ -153,7 +154,8 @@ export function table(cells: readonly Cell[]): string {
   for (const cell of cells)
     groups.set(`${cell.machine} ${cell.scenario}`, [...(groups.get(`${cell.machine} ${cell.scenario}`) ?? []), cell])
   for (const [name, group] of groups) {
-    lines.push(`\n${name} (budget ${group[0]!.budget}, ${group[0]!.tasks} tasks over ${group[0]!.seeds} seeds)`)
+    const { budget, tasks, seeds } = valueAt(group, 0)
+    lines.push(`\n${name} (budget ${budget}, ${tasks} tasks over ${seeds} seeds)`)
     lines.push(header.join('\t'))
     for (const c of group) {
       lines.push(

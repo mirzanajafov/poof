@@ -33,18 +33,21 @@ interface Numbers {
   items: number
 }
 
-const calibration = loadCalibration(values.calibration!)
+if (!values.runs || !values.manifest) {
+  throw new Error('usage: replay --runs <exhibit runs file> --manifest <dataset manifest> [--calibration <label>]')
+}
+const calibration = loadCalibration(values.calibration)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
 const timeoutRule = { ...defaultTimeoutRule, growth: Number(values['timeout-growth']) }
 const speed = Number(values.speed)
 const samples = itemCostSamples(values.calibration)
-const runs = (JSON.parse(readFileSync(values.runs!, 'utf8')) as RecordedRun[]).map(({ id, params, stats }) => {
+const runs = (JSON.parse(readFileSync(values.runs, 'utf8')) as RecordedRun[]).map(({ id, params, stats }) => {
   const { policy, preset } = params
   if (!isExhibitPolicyName(policy)) throw new Error(`run ${id} has no simulator policy for ${policy}`)
   if (!isPresetName(preset)) throw new Error(`run ${id} has no cost model for ${preset}`)
   return { id, params: { ...params, policy, preset }, stats }
 })
-const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
+const manifest = parseManifest(readFileSync(values.manifest, 'utf8'), values.manifest).items
 
 function measured(preset: string): Map<string, number> {
   const walls = new Map<string, number[]>()

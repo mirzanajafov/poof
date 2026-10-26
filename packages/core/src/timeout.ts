@@ -1,3 +1,5 @@
+import { valueAt } from './arrays.ts'
+
 export interface TimeoutRule {
   floorMs: number
   multiple: number
@@ -16,7 +18,7 @@ export function itemTimeoutMs(
 ): number {
   let limit = rule.floorMs
   for (let i = from; i < to; i++) {
-    limit = Math.max(limit, rule.multiple * predicted[i]! * scale * rule.growth ** attempts(i))
+    limit = Math.max(limit, rule.multiple * valueAt(predicted, i) * scale * rule.growth ** attempts(i))
   }
   return limit
 }

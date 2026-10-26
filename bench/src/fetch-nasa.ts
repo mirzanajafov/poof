@@ -38,7 +38,7 @@ async function json<T>(url: string): Promise<T> {
   return (await res.json()) as T
 }
 
-const out = values.out!
+const out = values.out
 const count = Number(values.count)
 const maxBytes = Number(values['max-mb']) * 1e6
 const perQuery = Math.ceil(count / queries.length)

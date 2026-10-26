@@ -22,7 +22,7 @@ const series = JSON.parse(await readFile(join(dir, 'raw', 'series.json'), 'utf8'
   policy: string
   samples: Sample[]
 }>
-const machine = values.machine!
+const machine = values.machine
 const policies = [
   'never',
   'static-4',
@@ -39,7 +39,8 @@ await writeFile(
   join(dir, `hit-rate-${machine}.svg`),
   hitRateChart(summary.cells, machine, policies, `Deadline hit rate by policy (${machine})`),
 )
-const burst = scenarios.burst!.burst!
+const burst = scenarios.burst?.burst
+if (!burst) throw new Error('the burst scenario has no burst window')
 const picks: Array<[string, string]> = [
   ['forecast+budget', 's1'],
   ['box', 's2'],

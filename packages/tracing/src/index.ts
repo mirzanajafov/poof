@@ -40,8 +40,8 @@ export function startTracing(service: string, options: TracingOptions = {}): Tra
     return {
       enabled: false,
       tracer: trace.getTracer(service),
-      flush: async () => undefined,
-      shutdown: async () => undefined,
+      flush: () => Promise.resolve(),
+      shutdown: () => Promise.resolve(),
     }
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ [ATTR_SERVICE_NAME]: service }),

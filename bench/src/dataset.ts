@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseManifest, type ManifestItem } from '@poof/contracts'
 import { manifestPath } from '@poof/contracts/layout'
-import { Rng } from '@poof/core'
+import { Rng, valueAt } from '@poof/core'
 
 export interface DatasetItem extends ManifestItem {
   mp: number
@@ -30,7 +30,7 @@ export function shuffled<T>(items: T[], seed: number): T[] {
   const out = [...items]
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1))
-    ;[out[i], out[j]] = [out[j]!, out[i]!]
+    ;[out[i], out[j]] = [valueAt(out, j), valueAt(out, i)]
   }
   return out
 }

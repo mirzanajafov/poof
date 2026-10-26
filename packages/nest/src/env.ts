@@ -13,7 +13,7 @@ export function parseEnv<T extends object>(type: new () => T, raw: Record<string
 
 @Module({})
 export class EnvModule {
-  static forRoot<T extends object>(type: new () => T): DynamicModule {
+  static forRoot(type: new () => object): DynamicModule {
     return {
       module: EnvModule,
       global: true,

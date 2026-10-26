@@ -7,9 +7,7 @@ const config: NextConfig = {
   poweredByHeader: false,
   output: 'standalone',
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
-  async rewrites() {
-    return [{ source: '/api/:path*', destination: `${api}/api/:path*` }]
-  },
+  rewrites: () => Promise.resolve([{ source: '/api/:path*', destination: `${api}/api/:path*` }]),
 }
 
 export default config

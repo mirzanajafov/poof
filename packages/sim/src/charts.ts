@@ -1,3 +1,4 @@
+import { valueAt } from '@poof/core'
 import type { Sample } from './engine.ts'
 import type { Cell } from './report.ts'
 import { scenarios } from './scenarios.ts'
@@ -163,14 +164,18 @@ export function timelineChart(
       .map((s, i) => `${i === 0 ? 'M' : 'L'}${x(s.t).toFixed(1)},${y(value(s)).toFixed(1)}`)
       .join(' ')
     body.push(`<path class="line ${line.cls}" style="fill:none" d="${d}"/>`)
-    labels.push({ y: y(value(line.samples[line.samples.length - 1]!)), text: line.policy, cls: line.cls })
+    labels.push({ y: y(value(valueAt(line.samples, line.samples.length - 1))), text: line.policy, cls: line.cls })
   }
   labels.sort((a, b) => a.y - b.y)
-  for (let i = 1; i < labels.length; i++) labels[i]!.y = Math.max(labels[i]!.y, labels[i - 1]!.y + 15)
-  const floor = top + plotH + 6
-  for (let i = labels.length - 1; i >= 0; i--) {
-    const limit = i === labels.length - 1 ? floor : labels[i + 1]!.y - 15
-    labels[i]!.y = Math.min(labels[i]!.y, limit)
+  let previous: number | null = null
+  for (const label of labels) {
+    if (previous !== null) label.y = Math.max(label.y, previous + 15)
+    previous = label.y
+  }
+  let limit = top + plotH + 6
+  for (const label of [...labels].reverse()) {
+    label.y = Math.min(label.y, limit)
+    limit = label.y - 15
   }
   for (const label of labels) {
     const ly = label.y

@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ConcurrencyRow, ItemCostSample } from '@poof/contracts'
-import type { CostModel } from '@poof/core'
+import { valueAt, type CostModel } from '@poof/core'
 import { linearFit, powerFit, quantile } from '@poof/core/stats'
 
 export interface Curve {
@@ -34,6 +34,12 @@ interface B2 {
 
 interface B3 {
   warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number }; anonMb?: { p50: number } | null }
+}
+
+export function costModel(types: Readonly<Record<string, CostModel>>, type: string): CostModel {
+  const model = types[type]
+  if (!model) throw new Error(`no cost model for ${type}`)
+  return model
 }
 
 export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
@@ -110,7 +116,7 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
 
 function mergeByCpus(files: B2[]): B2[] {
   const byCpus = new Map<number, B2>()
-  for (const file of [...files].sort((a, b) => a.rows[0]!.k - b.rows[0]!.k)) {
+  for (const file of [...files].sort((a, b) => valueAt(a.rows, 0).k - valueAt(b.rows, 0).k)) {
     const known = byCpus.get(file.cpus)
     if (!known) {
       byCpus.set(file.cpus, { ...file, rows: [...file.rows] })
@@ -123,7 +129,7 @@ function mergeByCpus(files: B2[]): B2[] {
 }
 
 export function curveFor(calibration: Calibration, cpus: number): Curve {
-  let best = calibration.curves[0]!
+  let best = valueAt(calibration.curves, 0)
   for (const curve of calibration.curves) {
     if (Math.abs(curve.cpus - cpus) < Math.abs(best.cpus - cpus)) best = curve
   }
@@ -132,13 +138,13 @@ export function curveFor(calibration: Calibration, cpus: number): Curve {
 
 function onCurve(curve: Curve, workers: number): number {
   const points = curve.points
-  const first = points[0]!
-  const last = points[points.length - 1]!
+  const first = valueAt(points, 0)
+  const last = valueAt(points, points.length - 1)
   if (workers <= first.workers) return (first.effectiveCores * workers) / first.workers
   if (workers <= last.workers) {
     const hi = points.findIndex((p) => p.workers >= workers)
-    const a = points[hi - 1]!
-    const b = points[hi]!
+    const a = valueAt(points, hi - 1)
+    const b = valueAt(points, hi)
     const t = (workers - a.workers) / (b.workers - a.workers)
     return a.effectiveCores + t * (b.effectiveCores - a.effectiveCores)
   }

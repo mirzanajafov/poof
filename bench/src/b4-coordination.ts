@@ -85,6 +85,6 @@ if (values.redis) {
   await client.quit()
 }
 
-const result = { env: environment(values.label!), reps, ipcRoundTripUs: micros(ipc), redis }
+const result = { env: environment(values.label), reps, ipcRoundTripUs: micros(ipc), redis }
 console.log(JSON.stringify(result, null, 2))
-console.log(`wrote ${await writeResult(values.label!, 'b4-coordination', result)}`)
+console.log(`wrote ${await writeResult(values.label, 'b4-coordination', result)}`)

@@ -42,7 +42,7 @@ const pick = (key: Exclude<keyof Run, 'anonMb'>) => describe(warm.map((r) => r[k
 const anon = warm.map((r) => r.anonMb).filter((v): v is number => v !== null)
 
 const result = {
-  env: environment(values.label!),
+  env: environment(values.label),
   first: runs[0],
   warm: {
     wallMs: pick('wallMs'),
@@ -55,4 +55,4 @@ const result = {
   },
 }
 console.log(JSON.stringify(result.warm, null, 2))
-console.log(`wrote ${await writeResult(values.label!, 'b3-spawn', result)}`)
+console.log(`wrote ${await writeResult(values.label, 'b3-spawn', result)}`)

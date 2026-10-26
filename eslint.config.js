@@ -27,12 +27,7 @@ export default defineConfig(
   {
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
-      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
-      '@typescript-eslint/prefer-for-of': 'off',
-      '@typescript-eslint/require-await': 'off',
-      'no-useless-assignment': 'off',
     },
   },
   { files: ['**/*.{js,cjs,mjs}'], extends: [tseslint.configs.disableTypeChecked] },

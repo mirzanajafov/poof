@@ -5,6 +5,7 @@ import {
   exhibitPolicies,
   exhibitSchedule,
   predictedCostMs,
+  valueAt,
   type Arrival,
   type PresetName,
   type TimeoutRule,
@@ -71,16 +72,16 @@ export class ReplayArrivals implements Arrivals {
   nextArrival(): number | null {
     if (this.next >= this.arrivals.length) return null
     this.current = this.next++
-    return this.arrivals[this.current]!.at
+    return valueAt(this.arrivals, this.current).at
   }
 
   task(submittedAt: number): TaskPlan {
-    const arrival = this.arrivals[this.current]!
+    const arrival = valueAt(this.arrivals, this.current)
     const costs = new Float64Array(arrival.count)
     const mp = new Float32Array(arrival.count)
     let predictedMs = 0
     for (let i = 0; i < arrival.count; i++) {
-      const item = this.items[(arrival.offset + i) % this.items.length]!
+      const item = valueAt(this.items, (arrival.offset + i) % this.items.length)
       costs[i] = item.costMs
       mp[i] = item.mp
       predictedMs += item.predictedMs
@@ -88,7 +89,7 @@ export class ReplayArrivals implements Arrivals {
     return {
       index: this.current,
       id: `r${this.current}`,
-      type: this.scenario.types[0]!.value,
+      type: valueAt(this.scenario.types, 0).value,
       profile: 'dataset',
       submittedAt,
       deadline: submittedAt + arrival.slack * predictedMs,

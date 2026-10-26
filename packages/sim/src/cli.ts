@@ -32,12 +32,12 @@ function policyNames(spec: string): string[] {
   return spec.split(',')
 }
 
-const calibration = loadCalibration(values.calibration!)
+const calibration = loadCalibration(values.calibration)
 const seeds = Number(values.seeds)
 const jobs: Job[] = []
-for (const machine of values.machines!.split(',')) {
-  for (const scenario of values.scenarios!.split(',')) {
-    for (const policy of policyNames(values.policies!)) {
+for (const machine of values.machines.split(',')) {
+  for (const scenario of values.scenarios.split(',')) {
+    for (const policy of policyNames(values.policies)) {
       for (let seed = 1; seed <= seeds; seed++) {
         jobs.push({
           machine,
@@ -46,7 +46,7 @@ for (const machine of values.machines!.split(',')) {
           seed,
           dtMs: Number(values.dt),
           keepSeries: seed === 1,
-          checkInvariants: values.invariants!,
+          checkInvariants: values.invariants,
         })
       }
     }
@@ -99,8 +99,8 @@ await new Promise<void>((resolve, reject) => {
 
 const cells = summarize(metrics)
 const comparisons: Comparison[] = []
-for (const machine of values.machines!.split(',')) {
-  for (const scenario of values.scenarios!.split(',')) {
+for (const machine of values.machines.split(',')) {
+  for (const scenario of values.scenarios.split(',')) {
     const pairs: Array<[string, string, Parameters<typeof compare>[5]]> = [
       ['forecast+budget', 'timer+budget', 'hitRate'],
       ['forecast+budget', 'timer+budget', 'skewedHitRate'],
