@@ -24,7 +24,7 @@ export class RateLimitGuard implements CanActivate {
     const windowMs = limit.windowSeconds * 1000
     const windowStart = Math.floor(now / windowMs) * windowMs
     const key = `poof:limit:${limit.name}:${request.ip}:${windowStart}`
-    const count = await this.cache.count(key, windowMs)
+    const count = await this.cache.increment(key, windowMs)
     if (count <= this.env[limit.setting]) return true
     const retryAfter = Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000))
     ctx.switchToHttp().getResponse<Response>().setHeader('Retry-After', String(retryAfter))

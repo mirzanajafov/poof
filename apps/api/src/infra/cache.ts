@@ -35,7 +35,7 @@ export class Cache implements OnApplicationShutdown {
     )
   }
 
-  async count(key: string, windowMs: number): Promise<number> {
+  async increment(key: string, windowMs: number): Promise<number> {
     const results = await this.redis.multi().incr(key).pexpire(key, windowMs).exec()
     return Number(results?.[0]?.[1] ?? 0)
   }
@@ -53,10 +53,12 @@ export class Cache implements OnApplicationShutdown {
   }
 
   subscribe(channel: string, onMessage: (message: string) => void): void {
-    this.subscriber = this.redis.duplicate({ maxRetriesPerRequest: null })
-    this.subscriber.on('error', () => undefined)
-    this.subscriber.on('message', (_channel: string, message: string) => {
-      onMessage(message)
+    if (!this.subscriber) {
+      this.subscriber = this.redis.duplicate({ maxRetriesPerRequest: null })
+      this.subscriber.on('error', () => undefined)
+    }
+    this.subscriber.on('message', (received: string, message: string) => {
+      if (received === channel) onMessage(message)
     })
     void this.subscriber.subscribe(channel).catch(() => undefined)
   }
@@ -67,6 +69,6 @@ export class Cache implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await Promise.all([this.redis.quit(), this.subscriber?.quit()]).catch(() => undefined)
+    await Promise.allSettled([this.redis.quit(), this.subscriber?.quit()])
   }
 }
