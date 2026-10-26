@@ -121,9 +121,7 @@ export function itemCostMedians(costs: readonly ItemCost[], preset: string, sour
   const walls = new Map<string, number[]>()
   for (const cost of costs) {
     if (cost.preset !== preset || cost.source !== source) continue
-    const fileWalls = walls.get(cost.file)
-    if (fileWalls) fileWalls.push(cost.wallMs)
-    else walls.set(cost.file, [cost.wallMs])
+    walls.set(cost.file, [...(walls.get(cost.file) ?? []), cost.wallMs])
   }
   return new Map([...walls].map(([file, ms]) => [file, median(ms)]))
 }
