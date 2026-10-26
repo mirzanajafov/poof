@@ -10,6 +10,10 @@ describe('quantile', () => {
   it('has no quantile for no values', () => {
     expect(quantile([], 0.5)).toBeNaN()
   })
+
+  it('refuses a quantile outside zero to one', () => {
+    expect(() => quantile([1, 2], 1.5)).toThrow(RangeError)
+  })
 })
 
 describe('linearFit', () => {

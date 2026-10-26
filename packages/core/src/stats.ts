@@ -37,24 +37,28 @@ export function stdev(values: readonly number[]): number {
 }
 
 export function linearFit(xs: readonly number[], ys: readonly number[]): LinearFit {
-  const points = pairs(xs, ys)
+  if (xs.length !== ys.length) throw new RangeError(`${xs.length} xs against ${ys.length} ys`)
   const mx = mean(xs)
   const my = mean(ys)
   let sxy = 0
   let sxx = 0
-  for (const [x, y] of points) {
-    sxy += (x - mx) * (y - my)
+  xs.forEach((x, i) => {
+    sxy += (x - mx) * (valueAt(ys, i) - my)
     sxx += (x - mx) ** 2
-  }
+  })
   const slope = sxy / sxx
   const intercept = my - slope * mx
   let ssRes = 0
   let ssTot = 0
-  for (const [x, y] of points) {
-    ssRes += (y - (intercept + slope * x)) ** 2
+  const logResiduals: number[] = []
+  xs.forEach((x, i) => {
+    const y = valueAt(ys, i)
+    const predicted = intercept + slope * x
+    ssRes += (y - predicted) ** 2
     ssTot += (y - my) ** 2
-  }
-  const logResiduals = points.map(([x, y]) => Math.log(y / (intercept + slope * x))).filter((r) => Number.isFinite(r))
+    const logResidual = Math.log(y / predicted)
+    if (Number.isFinite(logResidual)) logResiduals.push(logResidual)
+  })
   return { intercept, slope, r2: 1 - ssRes / ssTot, logResidualSd: stdev(logResiduals) }
 }
 
@@ -62,14 +66,19 @@ export function powerFit(xs: readonly number[], ys: readonly number[]) {
   const lx = xs.map(Math.log)
   const ly = ys.map(Math.log)
   const fit = linearFit(lx, ly)
-  const residuals = pairs(lx, ly).map(([x, y]) => y - (fit.intercept + fit.slope * x))
+  const residuals = lx.map((x, i) => valueAt(ly, i) - (fit.intercept + fit.slope * x))
   return { coef: Math.exp(fit.intercept), exponent: fit.slope, logResidualSd: stdev(residuals) }
 }
 
 export function bootstrap(values: readonly number[], seed = 1, resamples = 2000): Interval {
   const rng = new Rng(seed)
-  const draw = () => valueAt(values, Math.floor(rng.next() * values.length))
-  const means = Array.from({ length: resamples }, () => mean(Array.from({ length: values.length }, draw)))
+  const n = values.length
+  const means: number[] = []
+  for (let r = 0; r < resamples; r++) {
+    let sum = 0
+    for (let i = 0; i < n; i++) sum += valueAt(values, Math.floor(rng.next() * n))
+    means.push(sum / n)
+  }
   return { mean: mean(values), lo: quantile(means, 0.025), hi: quantile(means, 0.975) }
 }
 
@@ -87,9 +96,4 @@ export function summary(values: readonly number[]) {
 export function round(value: number, digits = 3): number {
   const f = 10 ** digits
   return Math.round(value * f) / f
-}
-
-function pairs(xs: readonly number[], ys: readonly number[]): Array<[number, number]> {
-  if (xs.length !== ys.length) throw new RangeError(`${xs.length} xs against ${ys.length} ys`)
-  return xs.map((x, i) => [x, valueAt(ys, i)])
 }
