@@ -4,9 +4,10 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { concurrencyResultPrefix, itemCostMedians, type ConcurrencyRow } from '@poof/contracts/bench'
-import { valueAt } from '@poof/core'
+import { valueFor } from '@poof/core'
 import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
+import { kneeOf } from './knee.ts'
 import { cgroupAnonMb } from './memory.ts'
 import { environment, readItemCosts, writeResult } from './results.ts'
 
@@ -40,7 +41,12 @@ const dataset = await loadDataset(values.data)
 const samples = await readItemCosts(values.label)
 
 const cost = itemCostMedians(samples, values.preset, dataset.source)
-if (cost.size === 0) throw new Error(`${values.label} has no item costs for ${values.preset} on ${dataset.source}`)
+const uncosted = dataset.items.filter((item) => !cost.has(item.file))
+if (uncosted.length > 0) {
+  throw new Error(
+    `${values.label} has no ${values.preset} cost for ${uncosted.length} of the ${dataset.items.length} images in ${values.data}`,
+  )
+}
 
 const childPath = fileURLToPath(new URL('./b2-child.js', import.meta.url))
 
@@ -90,14 +96,14 @@ for (const k of ks) {
   const from = goAt + warmupMs
   const to = from + durationMs
   const window = results.flatMap((r) => r.completions).filter((c) => c.at >= from && c.at < to)
-  const workMs = window.reduce((sum, c) => sum + (cost.get(c.file) ?? 0), 0)
+  const workMs = window.reduce((sum, c) => sum + valueFor(cost, c.file), 0)
   const effectiveCores = workMs / durationMs
   const row: ConcurrencyRow = {
     k,
     items: window.length,
     effectiveCores: round(effectiveCores),
     efficiency: round(effectiveCores / Math.min(k, cpus)),
-    wallInflation: round(mean(window.map((c) => c.wallMs / (cost.get(c.file) ?? c.wallMs)))),
+    wallInflation: round(mean(window.map((c) => c.wallMs / valueFor(cost, c.file)))),
     peakRssMb: round(Math.max(...results.map((r) => r.peakRssMb))),
     medianPeakRssMb: round(median(results.map((r) => r.peakRssMb))),
     cgroupAnonMeanMb: anon.length ? round(mean(anon)) : null,
@@ -107,11 +113,7 @@ for (const k of ks) {
   console.log(JSON.stringify(row))
 }
 
-const flat = rows.find((row, i) => {
-  const next = rows[i + 1]
-  return next !== undefined && next.effectiveCores < row.effectiveCores * 1.05
-})
-const knee = (flat ?? valueAt(rows, rows.length - 1)).k
+const knee = kneeOf(rows)
 
 const name = values.name ?? `${concurrencyResultPrefix}${cpus}`
 const path = await writeResult(values.label, name, {
