@@ -30,7 +30,8 @@ describe('planSplit', () => {
 
   it('covers the remaining range exactly, without overlap', () => {
     const plan = planSplit(17, 1000, 3, 40, 300)
-    const ranges = [{ lo: 17, hi: plan?.cut ?? 17 }, ...(plan?.children ?? [])]
+    if (!plan) throw new Error('planSplit planned no split')
+    const ranges = [{ lo: 17, hi: plan.cut }, ...plan.children]
     expect(ranges.slice(1).map((r) => r.lo)).toEqual(ranges.slice(0, -1).map((r) => r.hi))
     expect(ranges.at(-1)?.hi).toBe(1000)
     for (const range of ranges) expect(range.hi).toBeGreaterThan(range.lo)

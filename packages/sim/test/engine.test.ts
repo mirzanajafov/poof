@@ -32,24 +32,17 @@ describe('Simulation', () => {
 
   for (const policy of mainPolicies) {
     it(`${policy.name} keeps every item owned by exactly one lease`, () => {
-      const result = run({ policy, scenario: burstScenario, checkInvariants: true })
-      expect(result.tasks.filter((t) => t.finishedAt !== null && t.finishedAt < t.submittedAt)).toEqual([])
+      expect(() => run({ policy, scenario: burstScenario, checkInvariants: true })).not.toThrow()
     })
   }
 
   for (const policy of mainPolicies.filter((p) => p.budget)) {
-    it(`${policy.name} finishes every task it admits`, () => {
+    it(`${policy.name} stays inside its budget and finishes every task it admits`, () => {
       const result = run({ policy, scenario: burstScenario })
+      expect(result.peaks.processes).toBeLessThanOrEqual(result.budget)
       expect(result.tasks.filter((t) => !t.rejected && !t.failed && t.finishedAt === null)).toEqual([])
     })
   }
-
-  it('the budgeted policies never run more processes than the budget', () => {
-    for (const policy of [policies.forecastManaged, policies.timerManaged, policies.static, policies.never]) {
-      const result = run({ policy, scenario: burstScenario })
-      expect(result.peaks.processes).toBeLessThanOrEqual(result.budget)
-    }
-  })
 
   it('the box storms under a burst', () => {
     const box = run({ policy: policies.box, scenario: burstScenario })
