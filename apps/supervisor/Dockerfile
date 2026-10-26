@@ -1,10 +1,11 @@
 FROM node:24-bookworm-slim AS manifests
 RUN npm install -g pnpm@11.21.0
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .pnpmfile.cjs ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.nest.json .pnpmfile.cjs ./
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
+COPY packages/nest/package.json packages/nest/
 COPY packages/imaging/package.json packages/imaging/
 COPY packages/tracing/package.json packages/tracing/
 COPY packages/worker/package.json packages/worker/
@@ -24,6 +25,7 @@ RUN pnpm install --frozen-lockfile --filter "@poof/supervisor..."
 COPY packages/contracts packages/contracts
 COPY packages/core packages/core
 COPY packages/db packages/db
+COPY packages/nest packages/nest
 COPY packages/imaging packages/imaging
 COPY packages/tracing packages/tracing
 COPY packages/worker packages/worker
@@ -36,6 +38,7 @@ RUN CI=true pnpm install --prod --frozen-lockfile --filter "@poof/supervisor..."
 COPY --from=build /app/packages/contracts/dist packages/contracts/dist
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/db/dist packages/db/dist
+COPY --from=build /app/packages/nest/dist packages/nest/dist
 COPY --from=build /app/packages/imaging/dist packages/imaging/dist
 COPY --from=build /app/packages/tracing/dist packages/tracing/dist
 COPY --from=build /app/packages/worker/dist packages/worker/dist

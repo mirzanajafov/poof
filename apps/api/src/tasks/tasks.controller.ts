@@ -15,15 +15,15 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { presetNames, type PresetName } from '@poof/core'
 import { TaskStatus } from '@poof/db'
+import { Database } from '@poof/nest'
 import { Type } from 'class-transformer'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
-import type { Env } from '../config/env.js'
-import { RateLimit, RateLimitGuard } from '../guards/guards.js'
-import { Database } from '../infra/infra.module.js'
+import { RateLimit } from '../access/rate-limit.decorator.js'
+import { RateLimitGuard } from '../access/rate-limit.guard.js'
+import { Env } from '../config/env.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 
 export class SubmitTask {
@@ -76,9 +76,9 @@ export class TasksController {
   constructor(
     private readonly db: Database,
     private readonly supervisor: Supervisor,
-    config: ConfigService<Env, true>,
+    env: Env,
   ) {
-    this.dataDir = config.get('DATA_DIR', { infer: true })
+    this.dataDir = env.DATA_DIR
   }
 
   @Get()

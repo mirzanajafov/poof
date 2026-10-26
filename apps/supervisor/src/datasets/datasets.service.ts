@@ -1,9 +1,8 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
-import type { Env } from '../config/env.js'
+import { Env } from '../config/env.js'
 import { linkOrCopy } from './files.js'
 
 export interface Dataset {
@@ -16,8 +15,8 @@ export class Datasets {
   private readonly root: string
   private readonly cache = new Map<string, Dataset>()
 
-  constructor(config: ConfigService<Env, true>) {
-    this.root = config.get('DATA_DIR', { infer: true })
+  constructor(env: Env) {
+    this.root = env.DATA_DIR
   }
 
   async get(name: string): Promise<Dataset> {

@@ -1,6 +1,5 @@
 import 'reflect-metadata'
-import { plainToInstance } from 'class-transformer'
-import { IsInt, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator'
+import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator'
 
 export class Env {
   @IsString()
@@ -56,13 +55,4 @@ export class Env {
   @Min(10)
   @Max(900)
   PUBLIC_EXHIBIT_SECONDS: number = 60
-}
-
-export function validateEnv(raw: Record<string, unknown>): Env {
-  const env = plainToInstance(Env, raw, { enableImplicitConversion: true })
-  const errors = validateSync(env)
-  if (errors.length > 0) {
-    throw new Error(errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`).join('; '))
-  }
-  return env
 }

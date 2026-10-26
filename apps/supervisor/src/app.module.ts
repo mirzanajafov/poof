@@ -1,29 +1,10 @@
-import { Module, ValidationPipe, type DynamicModule, type INestApplication } from '@nestjs/common'
-import { ConfigModule } from '@nestjs/config'
-import { validateEnv } from './config/env.js'
-import { Datasets } from './datasets/datasets.service.js'
-import { Janitor } from './datasets/janitor.service.js'
-import { ExhibitsController } from './exhibits/exhibits.controller.js'
-import { Exhibits } from './exhibits/exhibits.service.js'
+import { Module } from '@nestjs/common'
+import { ConfigModule } from './config/config.module.js'
+import { DatasetsModule } from './datasets/datasets.module.js'
+import { ExhibitsModule } from './exhibits/exhibits.module.js'
 import { InfraModule } from './infra/infra.module.js'
-import { Scheduler } from './scheduler/scheduler.service.js'
-import { TaskStore } from './tasks/task-store.js'
-import { TasksController } from './tasks/tasks.controller.js'
+import { SchedulerModule } from './scheduler/scheduler.module.js'
+import { TasksModule } from './tasks/tasks.module.js'
 
-@Module({})
-export class AppModule {
-  static register(): DynamicModule {
-    return {
-      module: AppModule,
-      imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv, ignoreEnvFile: true }), InfraModule],
-      controllers: [TasksController, ExhibitsController],
-      providers: [Datasets, TaskStore, Scheduler, Exhibits, Janitor],
-    }
-  }
-}
-
-export function configureApp<T extends INestApplication>(app: T): T {
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
-  app.enableShutdownHooks()
-  return app
-}
+@Module({ imports: [ConfigModule, InfraModule, DatasetsModule, TasksModule, SchedulerModule, ExhibitsModule] })
+export class AppModule {}

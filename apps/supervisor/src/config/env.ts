@@ -1,6 +1,5 @@
 import 'reflect-metadata'
-import { plainToInstance } from 'class-transformer'
-import { IsInt, IsNumber, IsOptional, IsString, Max, Min, validateSync } from 'class-validator'
+import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 
 export class Env {
   @IsString()
@@ -88,13 +87,4 @@ export class Env {
   @IsNumber()
   @Min(0.01)
   OUTPUT_TTL_HOURS: number = 24
-}
-
-export function validateEnv(raw: Record<string, unknown>): Env {
-  const env = plainToInstance(Env, raw, { enableImplicitConversion: true })
-  const errors = validateSync(env)
-  if (errors.length > 0) {
-    throw new Error(errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`).join('; '))
-  }
-  return env
 }

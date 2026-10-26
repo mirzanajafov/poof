@@ -2,7 +2,7 @@ import type { Breakers, PresetName } from '@poof/core'
 import type { Prisma } from '@poof/db'
 import { SpanStatusCode, traceIdOf, within, type Span, type Tracer } from '@poof/tracing'
 import type { ExitReport, ItemDead, ItemDone } from '@poof/worker'
-import type { Events } from '../infra/infra.module.js'
+import type { Events } from '../infra/events.js'
 import type { Task, TaskLease } from './task.js'
 import type { LeaseRow, TaskStore } from './task-store.js'
 

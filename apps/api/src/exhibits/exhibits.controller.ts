@@ -14,13 +14,16 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { exhibitPolicyNames, type ExhibitPolicyName } from '@poof/core'
+import { Database } from '@poof/nest'
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
 import type { Request, Response } from 'express'
-import type { Env } from '../config/env.js'
-import { Admin, AdminGuard, RateLimit, RateLimitGuard } from '../guards/guards.js'
-import { Cache, Database } from '../infra/infra.module.js'
+import { Admin } from '../access/admin.js'
+import { AdminGuard } from '../access/admin.guard.js'
+import { RateLimit } from '../access/rate-limit.decorator.js'
+import { RateLimitGuard } from '../access/rate-limit.guard.js'
+import { Env } from '../config/env.js'
+import { Cache } from '../infra/cache.js'
 import { Supervisor } from '../supervisor/supervisor.client.js'
 
 export class StartExhibit {
@@ -57,10 +60,10 @@ export class ExhibitsController {
     private readonly cache: Cache,
     private readonly supervisor: Supervisor,
     private readonly admin: Admin,
-    config: ConfigService<Env, true>,
+    env: Env,
   ) {
-    this.cooldownSeconds = config.get('EXHIBIT_COOLDOWN_SECONDS', { infer: true })
-    this.publicSeconds = config.get('PUBLIC_EXHIBIT_SECONDS', { infer: true })
+    this.cooldownSeconds = env.EXHIBIT_COOLDOWN_SECONDS
+    this.publicSeconds = env.PUBLIC_EXHIBIT_SECONDS
   }
 
   @Get()

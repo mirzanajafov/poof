@@ -1,37 +1,23 @@
-import { Module, ValidationPipe, type DynamicModule, type INestApplication } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { Module } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import { type Env, validateEnv } from './config/env.js'
-import { ExhibitsController } from './exhibits/exhibits.controller.js'
-import { Admin, AdminGuard, RateLimitGuard } from './guards/guards.js'
+import { applyDefaults } from '@poof/nest'
+import { ConfigModule } from './config/config.module.js'
+import { Env } from './config/env.js'
+import { DatasetsModule } from './datasets/datasets.module.js'
+import { ExhibitsModule } from './exhibits/exhibits.module.js'
 import { InfraModule } from './infra/infra.module.js'
 import { LiveAdapter } from './live/live.adapter.js'
-import { LiveGateway } from './live/live.gateway.js'
-import { StateController } from './state/state.controller.js'
-import { Supervisor } from './supervisor/supervisor.client.js'
-import { TasksController } from './tasks/tasks.controller.js'
+import { LiveModule } from './live/live.module.js'
+import { TasksModule } from './tasks/tasks.module.js'
 
-@Module({})
-export class AppModule {
-  static register(): DynamicModule {
-    return {
-      module: AppModule,
-      imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv, ignoreEnvFile: true }), InfraModule],
-      controllers: [TasksController, ExhibitsController, StateController],
-      providers: [Supervisor, Admin, AdminGuard, RateLimitGuard, LiveGateway],
-    }
-  }
-}
+@Module({ imports: [ConfigModule, InfraModule, TasksModule, ExhibitsModule, DatasetsModule, LiveModule] })
+export class AppModule {}
 
-export function configureApp<T extends INestApplication>(app: T): T {
-  const config = app.get(ConfigService<Env, true>)
-  const trustProxy = config.get('TRUST_PROXY', { infer: true })
-  ;(app as unknown as NestExpressApplication).set('trust proxy', trustProxy === 'false' ? false : trustProxy.split(','))
+export function configureApp(app: NestExpressApplication): NestExpressApplication {
+  const env = app.get(Env)
+  app.set('trust proxy', env.TRUST_PROXY === 'false' ? false : env.TRUST_PROXY.split(','))
   app.setGlobalPrefix('api')
-  const webOrigin = config.get('WEB_ORIGIN', { infer: true })
-  app.enableCors({ origin: webOrigin })
-  app.useWebSocketAdapter(new LiveAdapter(app, webOrigin))
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
-  app.enableShutdownHooks()
-  return app
+  app.enableCors({ origin: env.WEB_ORIGIN })
+  app.useWebSocketAdapter(new LiveAdapter(app, env.WEB_ORIGIN))
+  return applyDefaults(app)
 }

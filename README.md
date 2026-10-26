@@ -178,7 +178,8 @@ pnpm --filter @poof/sim replay --runs results/real/runs-60s.json --manifest ../.
 | `packages/contracts`   | what crosses a process boundary: live events, snapshots, exhibit params and stats, the dataset and task manifests                  |
 | `packages/worker`      | the worker process and the handle that limits it                                                                                   |
 | `packages/tracing`     | OpenTelemetry setup, off unless an endpoint is set                                                                                 |
-| `packages/db`          | Prisma schema and migrations                                                                                                       |
+| `packages/db`          | Prisma schema and migrations, and the throwaway database the e2e suites run against                                                |
+| `packages/nest`        | what both Nest apps share: env parsing, the database and tracing providers, request validation                                     |
 | `packages/imaging`     | the presets                                                                                                                        |
 | `apps/supervisor`      | the scheduler, the lease engine for exhibits, datasets and the janitor                                                             |
 | `apps/api`, `apps/web` | the public API and the dashboard                                                                                                   |

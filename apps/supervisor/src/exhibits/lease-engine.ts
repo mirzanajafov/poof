@@ -22,7 +22,7 @@ import {
 import { SpanStatusCode, within, type Context, type Span, type Tracer } from '@poof/tracing'
 import { WorkerHandle, type ExitReport, type ItemDead, type ItemDone, type LeaseDone } from '@poof/worker'
 import type { Dataset, Datasets } from '../datasets/datasets.service.js'
-import type { Events } from '../infra/infra.module.js'
+import type { Events } from '../infra/events.js'
 import { Task, type TaskLease } from '../tasks/task.js'
 import { TaskBook } from '../tasks/task-book.js'
 import type { LeaseRow, TaskStore } from '../tasks/task-store.js'

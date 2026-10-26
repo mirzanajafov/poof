@@ -4,10 +4,11 @@ import { join } from 'node:path'
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { createPrisma, type PrismaClient } from '@poof/db'
+import { applyDefaults } from '@poof/nest'
 import { Redis } from 'ioredis'
 import sharp from 'sharp'
 import { inject } from 'vitest'
-import { AppModule, configureApp } from '../src/app.module.js'
+import { AppModule } from '../src/app.module.js'
 
 const redisUrl = process.env.POOF_TEST_REDIS_URL ?? 'redis://localhost:6387/4'
 
@@ -78,8 +79,8 @@ export async function start(dataDir: string, env: Record<string, string> = {}): 
   })
   const redis = new Redis(redisUrl)
   await redis.flushdb()
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule.register()] }).compile()
-  const app = configureApp(moduleRef.createNestApplication({ logger: false }))
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
+  const app = applyDefaults(moduleRef.createNestApplication({ logger: false }))
   await app.init()
   const db = createPrisma(inject('databaseUrl'))
   return {
