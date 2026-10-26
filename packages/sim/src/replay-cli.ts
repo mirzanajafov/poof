@@ -19,7 +19,7 @@ const { values } = parseArgs({
   },
 })
 
-type RecordedRun = Omit<ExhibitRun, 'params'> & {
+type RecordedRun = Pick<ExhibitRun, 'id' | 'stats'> & {
   params: Omit<ExhibitParams, 'policy' | 'preset'> & { policy: string; preset: string }
 }
 

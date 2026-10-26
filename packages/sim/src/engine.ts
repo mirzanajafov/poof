@@ -1,6 +1,7 @@
 import {
   admits,
   Breakers,
+  costModelFor,
   decide,
   defaultTimeoutRule,
   emptyEstimate,
@@ -10,6 +11,7 @@ import {
   planSplit,
   updateEstimate,
   valueAt,
+  valueFor,
   type Estimate,
   type Preemption,
   type RunningLease,
@@ -22,7 +24,7 @@ import {
   type TimeoutRule,
   type View,
 } from '@poof/core'
-import { costModel, curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
+import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
 import { inWindow, Workload, type Arrivals, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
@@ -245,7 +247,7 @@ export class Simulation {
 
   private get cores(): number {
     const neighbour = this.workload.scenario.neighbour
-    return this.machine.cores * (inWindow(neighbour, this.now) ? neighbour!.capacity : 1)
+    return this.machine.cores * (neighbour && inWindow(neighbour, this.now) ? neighbour.capacity : 1)
   }
 
   private get spawnMs(): number {
@@ -260,15 +262,10 @@ export class Simulation {
   private arrive(at: number): void {
     const plan = this.workload.task(at)
     const items = plan.costs.length
-    const cost = costModel(this.options.calibration.types, plan.type)
-    const predicted = new Float64Array(items)
-    let remainingMs = 0
-    let predictedMs = 0
-    for (let i = 0; i < items; i++) {
-      remainingMs += valueAt(plan.costs, i)
-      predicted[i] = expectedCostMs(cost, valueAt(plan.mp, i))
-      predictedMs += valueAt(predicted, i)
-    }
+    const cost = costModelFor(this.options.calibration.types, plan.type)
+    const predicted = Float64Array.from(plan.mp, (mp) => expectedCostMs(cost, mp))
+    const remainingMs = plan.costs.reduce((sum, itemMs) => sum + itemMs, 0)
+    const predictedMs = predicted.reduce((sum, itemMs) => sum + itemMs, 0)
     const task: SimTask = {
       predicted,
       predictedMs,
@@ -429,10 +426,11 @@ export class Simulation {
     const byId = new Map<string, SimLease>()
     for (const task of this.active) for (const lease of task.leases) byId.set(String(lease.id), lease)
     const requestById = new Map(requests.map((r) => [r.leaseId, r]))
-    for (const leaseId of grants.preempt) this.yieldLease(byId.get(leaseId)!)
-    for (const [leaseId, k] of grants.splits) this.applySplit(byId.get(leaseId)!, k, requestById.get(leaseId)!)
+    for (const leaseId of grants.preempt) this.yieldLease(valueFor(byId, leaseId))
+    for (const [leaseId, k] of grants.splits)
+      this.applySplit(valueFor(byId, leaseId), k, valueFor(requestById, leaseId))
     for (const leaseId of grants.starts) {
-      const lease = byId.get(leaseId)!
+      const lease = valueFor(byId, leaseId)
       if (lease.state !== 'pending' || !this.breakers.allows(lease.task.info.type, this.now)) continue
       this.spawn(lease)
     }
@@ -728,11 +726,12 @@ export class Simulation {
     const limit = this.machine.memoryMb - this.machine.supervisorMb
     let total = 0
     for (const process of this.processes) total += process.rss
-    while (total > limit && this.processes.size > 0) {
+    while (total > limit) {
       let victim: SimProcess | null = null
       for (const process of this.processes) if (!victim || process.rss > victim.rss) victim = process
-      total -= victim!.rss
-      this.crash(victim!, 'oom')
+      if (!victim) break
+      total -= victim.rss
+      this.crash(victim, 'oom')
     }
   }
 

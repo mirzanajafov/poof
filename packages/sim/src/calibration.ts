@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ConcurrencyRow, ItemCostSample } from '@poof/contracts'
+import { parseItemCosts, type ConcurrencyRow, type ItemCostSample } from '@poof/contracts'
 import { valueAt, type CostModel } from '@poof/core'
 import { linearFit, powerFit, quantile } from '@poof/core/stats'
 
@@ -22,24 +22,14 @@ export interface Calibration {
   curves: Curve[]
 }
 
-interface B1 {
-  samples: ItemCostSample[]
-}
-
 interface B2 {
   cpus: number
   knee: number
-  rows: Array<Pick<ConcurrencyRow, 'k' | 'effectiveCores' | 'medianPeakRssMb'> & { cgroupAnonPeakMb?: number | null }>
+  rows: ConcurrencyRow[]
 }
 
 interface B3 {
   warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number }; anonMb?: { p50: number } | null }
-}
-
-export function costModel(types: Readonly<Record<string, CostModel>>, type: string): CostModel {
-  const model = types[type]
-  if (!model) throw new Error(`no cost model for ${type}`)
-  return model
 }
 
 export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
@@ -49,12 +39,13 @@ function readJson(dir: string, name: string): unknown {
 }
 
 export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCostSample[] {
-  return (readJson(join(dir, label), 'b1-item-cost') as B1).samples
+  const path = join(dir, label, 'b1-item-cost.json')
+  return parseItemCosts(readFileSync(path, 'utf8'), path)
 }
 
-function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel> {
+function typeCosts(samples: readonly ItemCostSample[], sources: readonly string[]): Record<string, CostModel> {
   const byImage = new Map<string, { preset: string; mp: number; walls: number[] }>()
-  for (const s of b1.samples) {
+  for (const s of samples) {
     if (!sources.includes(s.source)) continue
     const key = `${s.preset}|${s.source}|${s.file}`
     const entry = byImage.get(key) ?? { preset: s.preset, mp: s.mp, walls: [] }
@@ -76,7 +67,6 @@ function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel
 export function loadCalibration(label: string, dir = defaultResultsDir, sources = ['synthetic', 'nasa']): Calibration {
   const base = join(dir, label)
   if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
-  const b1 = readJson(base, 'b1-item-cost') as B1
   const b3 = readJson(base, 'b3-spawn') as B3
   const b2s = mergeByCpus(
     readdirSync(base)
@@ -84,15 +74,15 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
       .map((file) => readJson(base, file.replace(/\.json$/, '')) as B2),
   )
   const measured = b2s.flatMap((b2) =>
-    b2.rows.filter(
-      (r) => r.k <= Math.ceil(3 * b2.cpus) && r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined,
+    b2.rows.flatMap(({ k, cgroupAnonPeakMb }) =>
+      k <= Math.ceil(3 * b2.cpus) && cgroupAnonPeakMb !== null ? [{ k, anonMb: cgroupAnonPeakMb }] : [],
     ),
   )
   const steadyRssMb =
     measured.length >= 3
       ? linearFit(
           measured.map((r) => r.k),
-          measured.map((r) => r.cgroupAnonPeakMb!),
+          measured.map((r) => r.anonMb),
         ).slope
       : quantile(
           b2s.flatMap((b2) => b2.rows.map((r) => r.medianPeakRssMb)),
@@ -100,7 +90,7 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
         )
   return {
     label,
-    types: typeCosts(b1, sources),
+    types: typeCosts(itemCostSamples(label, dir), sources),
     spawnMs: b3.warm.wallMs.p50,
     spawnCpuMs: b3.warm.cpuMs.p50,
     baseRssMb: b3.warm.anonMb?.p50 ?? b3.warm.rssMb.p50,

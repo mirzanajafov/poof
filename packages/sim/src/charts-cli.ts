@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util'
 import { highlight, hitRateChart, smoothed, timelineChart } from './charts.ts'
 import type { Sample } from './engine.ts'
 import type { Cell } from './report.ts'
-import { scenarios } from './scenarios.ts'
+import { mainPolicies, scenarios } from './scenarios.ts'
 
 const { values } = parseArgs({
   options: {
@@ -23,18 +23,7 @@ const series = JSON.parse(await readFile(join(dir, 'raw', 'series.json'), 'utf8'
   samples: Sample[]
 }>
 const machine = values.machine
-const policies = [
-  'never',
-  'static-4',
-  'pool-10',
-  'box',
-  'timer+budget',
-  'forecast',
-  'forecast+budget',
-  'perfect',
-  'forecast+idle',
-  'forecast+preempt',
-]
+const policies = mainPolicies.map((policy) => policy.name)
 await writeFile(
   join(dir, `hit-rate-${machine}.svg`),
   hitRateChart(summary.cells, machine, policies, `Deadline hit rate by policy (${machine})`),

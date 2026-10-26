@@ -1,5 +1,4 @@
-import { expectedCostMs, medianCostMs, Rng, valueAt, type CostModel } from '@poof/core'
-import { costModel } from './calibration.ts'
+import { costModelFor, expectedCostMs, medianCostMs, Rng, valueAt, type CostModel } from '@poof/core'
 
 export interface Window {
   from: number
@@ -91,7 +90,7 @@ export function workloadStats(scenario: Scenario, types: Record<string, CostMode
   let cost = 0
   const samples = 20_000
   for (let i = 0; i < samples; i++) {
-    const type = costModel(types, rng.weighted(scenario.types))
+    const type = costModelFor(types, rng.weighted(scenario.types))
     cost += expectedCostMs(type, rng.weighted(profiles).mp(rng))
   }
   return { meanTaskWorkMs: (cost / samples) * meanItems, meanItems }
@@ -149,7 +148,7 @@ export class Workload implements Arrivals {
     const rng = Rng.of(this.seed, this.scenario.name, 'task', index)
     const s = this.scenario
     const typeName = rng.weighted(s.types)
-    const type = costModel(this.types, typeName)
+    const type = costModelFor(this.types, typeName)
     const profile = rng.weighted(profiles)
     const items = Math.round(rng.logUniform(s.items[0], s.items[1]))
     const slack = rng.logUniform(s.slack[0], s.slack[1])

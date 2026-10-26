@@ -9,7 +9,7 @@ import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
-import { machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
+import { machines, mainPolicies, policyByName, scenarios, sweepPolicies } from './scenarios.ts'
 
 const { values } = parseArgs({
   options: {
@@ -29,15 +29,25 @@ function policyNames(spec: string): string[] {
   if (spec === 'main') return mainPolicies.map((p) => p.name)
   if (spec === 'sweep') return sweepPolicies.map((p) => p.name)
   if (spec === 'all') return [...mainPolicies, ...sweepPolicies].map((p) => p.name)
-  return spec.split(',')
+  return spec.split(',').map((name) => policyByName(name).name)
 }
 
+function knownNames(spec: string, known: Readonly<Record<string, unknown>>, kind: string): string[] {
+  const names = spec.split(',')
+  const unknown = names.filter((name) => !Object.hasOwn(known, name))
+  if (unknown.length > 0) throw new Error(`unknown ${kind} ${unknown.join(', ')}`)
+  return names
+}
+
+const machineNames = knownNames(values.machines, machines, 'machine')
+const scenarioNames = knownNames(values.scenarios, scenarios, 'scenario')
+const policies = policyNames(values.policies)
 const calibration = loadCalibration(values.calibration)
 const seeds = Number(values.seeds)
 const jobs: Job[] = []
-for (const machine of values.machines.split(',')) {
-  for (const scenario of values.scenarios.split(',')) {
-    for (const policy of policyNames(values.policies)) {
+for (const machine of machineNames) {
+  for (const scenario of scenarioNames) {
+    for (const policy of policies) {
       for (let seed = 1; seed <= seeds; seed++) {
         jobs.push({
           machine,
@@ -66,10 +76,9 @@ await new Promise<void>((resolve, reject) => {
   let idle = 0
   for (let i = 0; i < threads; i++) {
     const worker = new Worker(workerPath, { workerData: { calibration } })
-    let current: Job | undefined
     const next = () => {
-      current = queue.shift()
-      if (current) worker.postMessage(current)
+      const job = queue.shift()
+      if (job) worker.postMessage(job)
       else {
         void worker.terminate()
         if (++idle === threads) resolve()
@@ -77,13 +86,10 @@ await new Promise<void>((resolve, reject) => {
     }
     worker.on('message', (message: { metrics: RunMetrics; series: Sample[] | null; runMs: number }) => {
       metrics.push(message.metrics)
-      if (message.series)
-        series.push({
-          machine: current!.machine,
-          scenario: current!.scenario,
-          policy: current!.policy,
-          samples: message.series,
-        })
+      if (message.series) {
+        const { machine, scenario, policy } = message.metrics
+        series.push({ machine, scenario, policy, samples: message.series })
+      }
       runMs += message.runMs
       if (++finished % 100 === 0 || finished === jobs.length) {
         process.stdout.write(
@@ -99,8 +105,8 @@ await new Promise<void>((resolve, reject) => {
 
 const cells = summarize(metrics)
 const comparisons: Comparison[] = []
-for (const machine of values.machines.split(',')) {
-  for (const scenario of values.scenarios.split(',')) {
+for (const machine of machineNames) {
+  for (const scenario of scenarioNames) {
     const pairs: Array<[string, string, Parameters<typeof compare>[5]]> = [
       ['forecast+budget', 'timer+budget', 'hitRate'],
       ['forecast+budget', 'timer+budget', 'skewedHitRate'],

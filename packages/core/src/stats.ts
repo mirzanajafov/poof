@@ -1,4 +1,4 @@
-import { valueAt } from './arrays.ts'
+import { valueAt } from './lookup.ts'
 import { Rng } from './rng.ts'
 
 export interface Interval {

@@ -1,4 +1,4 @@
-import { valueAt } from './arrays.ts'
+import { valueAt } from './lookup.ts'
 
 export interface TimeoutRule {
   floorMs: number

@@ -10,14 +10,27 @@ interface Seen {
 const seconds = Number(process.argv[2] ?? 60)
 const everyMs = Number(process.argv[3] ?? 200)
 
-function cgroup(): Record<string, number> {
-  return Object.fromEntries(
+function cgroup() {
+  const stat = new Map(
     readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8')
       .trim()
       .split('\n')
-      .map((line) => line.split(' '))
-      .map(([k, v]) => [k!, Number(v)]),
+      .map((line): [string, number] => {
+        const space = line.indexOf(' ')
+        return [line.slice(0, space), Number(line.slice(space + 1))]
+      }),
   )
+  const field = (name: string) => {
+    const value = stat.get(name)
+    if (value === undefined) throw new Error(`cpu.stat has no ${name}`)
+    return value
+  }
+  return {
+    usageUsec: field('usage_usec'),
+    throttledUsec: field('throttled_usec'),
+    periods: field('nr_periods'),
+    throttledPeriods: field('nr_throttled'),
+  }
 }
 
 function afterName(stat: string): string[] {
@@ -83,10 +96,10 @@ setTimeout(() => {
       groups,
       samplerCpuMs: Math.round((self.user + self.system) / 1000),
       cgroup: {
-        usageMs: Math.round((end.usage_usec! - start.usage_usec!) / 1000),
-        throttledMs: Math.round((end.throttled_usec! - start.throttled_usec!) / 1000),
-        periods: end.nr_periods! - start.nr_periods!,
-        throttledPeriods: end.nr_throttled! - start.nr_throttled!,
+        usageMs: Math.round((end.usageUsec - start.usageUsec) / 1000),
+        throttledMs: Math.round((end.throttledUsec - start.throttledUsec) / 1000),
+        periods: end.periods - start.periods,
+        throttledPeriods: end.throttledPeriods - start.throttledPeriods,
       },
     }),
   )

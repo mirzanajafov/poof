@@ -1,4 +1,4 @@
-import { valueAt } from './arrays.ts'
+import { valueAt } from './lookup.ts'
 
 export function hashSeed(...parts: Array<string | number>): number {
   let hash = 0x811c9dc5

@@ -14,15 +14,15 @@ export interface Job {
   checkInvariants: boolean
 }
 
-const { calibration } = workerData as { calibration: Calibration }
-
 const port = parentPort
 if (!port) throw new Error('run-worker runs only as a worker thread')
+const { calibration } = workerData as { calibration: Calibration }
 
 port.on('message', (job: Job) => {
   const scenario = scenarios[job.scenario]
   const machine = machines[job.machine]
-  if (!scenario || !machine) throw new Error(`no scenario ${job.scenario} or machine ${job.machine}`)
+  if (!scenario) throw new Error(`no scenario ${job.scenario}`)
+  if (!machine) throw new Error(`no machine ${job.machine}`)
   const simulation = new Simulation({
     scenario,
     machine,
