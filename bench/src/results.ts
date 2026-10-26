@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { cpus, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseItemCosts, type ItemCostSample } from '@poof/contracts'
+import { itemCostsResult, parseItemCosts, type ItemCostSample } from '@poof/contracts'
 import sharp from 'sharp'
 
 const resultsRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'results')
@@ -30,6 +30,6 @@ export async function writeResult(label: string, name: string, data: unknown): P
 }
 
 export async function readItemCosts(label: string): Promise<ItemCostSample[]> {
-  const path = join(resultsRoot, label, 'b1-item-cost.json')
+  const path = join(resultsRoot, label, `${itemCostsResult}.json`)
   return parseItemCosts(await readFile(path, 'utf8'), path)
 }

@@ -1,7 +1,16 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseItemCosts, type ConcurrencyRow, type ItemCostSample } from '@poof/contracts'
+import {
+  concurrencyResultPrefix,
+  itemCostsResult,
+  parseConcurrencyRun,
+  parseItemCosts,
+  parseSpawnRun,
+  spawnResult,
+  type ConcurrencyRun,
+  type ItemCostSample,
+} from '@poof/contracts'
 import { valueAt, type CostModel } from '@poof/core'
 import { linearFit, powerFit, quantile } from '@poof/core/stats'
 
@@ -22,25 +31,15 @@ export interface Calibration {
   curves: Curve[]
 }
 
-interface B2 {
-  cpus: number
-  knee: number
-  rows: ConcurrencyRow[]
-}
-
-interface B3 {
-  warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number }; anonMb?: { p50: number } | null }
-}
-
 export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
 
-function readJson(dir: string, name: string): unknown {
-  return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'))
+function readResult<T>(dir: string, name: string, parse: (text: string, origin: string) => T): T {
+  const path = join(dir, `${name}.json`)
+  return parse(readFileSync(path, 'utf8'), path)
 }
 
 export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCostSample[] {
-  const path = join(dir, label, 'b1-item-cost.json')
-  return parseItemCosts(readFileSync(path, 'utf8'), path)
+  return readResult(join(dir, label), itemCostsResult, parseItemCosts)
 }
 
 function typeCosts(samples: readonly ItemCostSample[], sources: readonly string[]): Record<string, CostModel> {
@@ -67,11 +66,11 @@ function typeCosts(samples: readonly ItemCostSample[], sources: readonly string[
 export function loadCalibration(label: string, dir = defaultResultsDir, sources = ['synthetic', 'nasa']): Calibration {
   const base = join(dir, label)
   if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
-  const b3 = readJson(base, 'b3-spawn') as B3
+  const b3 = readResult(base, spawnResult, parseSpawnRun)
   const b2s = mergeByCpus(
     readdirSync(base)
-      .filter((file) => file.startsWith('b2-concurrency-c'))
-      .map((file) => readJson(base, file.replace(/\.json$/, '')) as B2),
+      .filter((file) => file.startsWith(concurrencyResultPrefix))
+      .map((file) => readResult(base, file.replace(/\.json$/, ''), parseConcurrencyRun)),
   )
   const measured = b2s.flatMap((b2) =>
     b2.rows.flatMap(({ k, cgroupAnonPeakMb }) =>
@@ -104,8 +103,8 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
   }
 }
 
-function mergeByCpus(files: B2[]): B2[] {
-  const byCpus = new Map<number, B2>()
+function mergeByCpus(files: ConcurrencyRun[]): ConcurrencyRun[] {
+  const byCpus = new Map<number, ConcurrencyRun>()
   for (const file of [...files].sort((a, b) => valueAt(a.rows, 0).k - valueAt(b.rows, 0).k)) {
     const known = byCpus.get(file.cpus)
     if (!known) {

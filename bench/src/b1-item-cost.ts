@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import type { ItemCostSample } from '@poof/contracts'
+import { itemCostsResult, type ItemCostSample } from '@poof/contracts'
 import { linearFit, median, round, summary } from '@poof/core/stats'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled, type DatasetItem } from './dataset.ts'
@@ -105,7 +105,7 @@ for (const name of values.presets.split(',')) {
   }
 }
 
-const path = await writeResult(values.label, 'b1-item-cost', {
+const path = await writeResult(values.label, itemCostsResult, {
   env: environment(values.label),
   baseRssMb: round(baseRssMb),
   fits,

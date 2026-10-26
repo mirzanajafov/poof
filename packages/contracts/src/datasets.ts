@@ -1,4 +1,4 @@
-import { isRecord } from './records.ts'
+import { isRecord, parseJson } from './records.ts'
 export const datasetNamePattern = /^[a-z0-9][a-z0-9-]{0,62}$/
 
 export interface TaskManifestItem {
@@ -36,12 +36,7 @@ function parseItems<T>(
   origin: string,
   toItem: (fields: Record<string, unknown>, file: string, at: string) => T,
 ): { source: unknown; items: T[] } {
-  let json: unknown
-  try {
-    json = JSON.parse(text)
-  } catch {
-    throw new Error(`${origin} is not valid JSON`)
-  }
+  const json = parseJson(text, origin)
   if (!isRecord(json) || !Array.isArray(json.items) || json.items.length === 0) {
     throw new Error(`${origin} lists no items`)
   }

@@ -3,7 +3,7 @@ import { availableParallelism } from 'node:os'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import type { ConcurrencyRow } from '@poof/contracts'
+import { concurrencyResultPrefix, type ConcurrencyRow } from '@poof/contracts'
 import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
 import { cgroupAnonMb } from './memory.ts'
@@ -116,7 +116,7 @@ const flat = rows.find((row, i) => {
 })
 const knee = flat ? flat.k : rows.length
 
-const name = values.name ?? `b2-concurrency-c${cpus}`
+const name = values.name ?? `${concurrencyResultPrefix}${cpus}`
 const path = await writeResult(values.label, name, {
   env: environment(values.label),
   cpus,
