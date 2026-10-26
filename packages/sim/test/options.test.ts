@@ -18,9 +18,10 @@ describe('positive', () => {
     expect(positive('dt', '2.5')).toBe(2.5)
   })
 
-  it('refuses zero and text, which would stall every simulation', () => {
-    expect(() => positive('dt', '0')).toThrow('--dt needs a number above zero, not 0')
-    expect(() => positive('dt', 'ten')).toThrow('--dt needs a number above zero, not ten')
+  it('refuses zero, infinity and text, which would stall or skip every simulation', () => {
+    expect(() => positive('dt', '0')).toThrow('--dt needs a finite number above zero, not 0')
+    expect(() => positive('dt', 'Infinity')).toThrow('--dt needs a finite number above zero, not Infinity')
+    expect(() => positive('dt', 'ten')).toThrow('--dt needs a finite number above zero, not ten')
   })
 })
 

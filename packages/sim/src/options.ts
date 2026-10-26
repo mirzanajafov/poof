@@ -6,7 +6,8 @@ export function count(option: string, text: string): number {
 
 export function positive(option: string, text: string): number {
   const value = Number(text)
-  if (!(value > 0)) throw new Error(`--${option} needs a number above zero, not ${text}`)
+  if (!Number.isFinite(value) || value <= 0)
+    throw new Error(`--${option} needs a finite number above zero, not ${text}`)
   return value
 }
 
