@@ -27,7 +27,7 @@ import { ListTasks } from './list-tasks.dto.js'
 import { SubmitTask } from './submit-task.dto.js'
 import { TaskQueries } from './task-queries.js'
 
-const extensions = [...new Set(Object.values(outputExtensions))]
+const extensions = Object.values(outputExtensions)
 
 @Controller('tasks')
 export class TasksController {
@@ -66,20 +66,25 @@ export class TasksController {
     @Next() next: NextFunction,
   ): void {
     const options = { root: outputDir(taskDir(this.env.DATA_DIR, id)), extensions, maxAge: '1d', immutable: true }
+    const before = new Set(res.getHeaderNames())
     res.sendFile(String(item), options, (error) => {
-      if (error) this.sendFailed(error, res, next)
+      if (error) this.sendFailed(error, res, next, before)
     })
   }
 
-  private sendFailed(error: Error, res: Response, next: NextFunction): void {
+  private sendFailed(error: Error, res: Response, next: NextFunction, before: ReadonlySet<string>): void {
     if (('code' in error && error.code === 'ECONNABORTED') || ('syscall' in error && error.syscall === 'write')) return
-    if (res.headersSent) {
-      res.destroy(error)
-      return
-    }
-    for (const name of res.getHeaderNames()) res.removeHeader(name)
     const status = 'status' in error && typeof error.status === 'number' ? error.status : 500
     if (status >= 500) this.logger.error(error)
+    if (res.headersSent) {
+      res.destroy()
+      return
+    }
+    for (const name of res.getHeaderNames()) if (!before.has(name)) res.removeHeader(name)
+    if ('headers' in error && typeof error.headers === 'object' && error.headers !== null) {
+      for (const [name, value] of Object.entries(error.headers))
+        if (typeof value === 'string') res.setHeader(name, value)
+    }
     next(new HttpException(STATUS_CODES[status] ?? 'Error', status))
   }
 }
