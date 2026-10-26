@@ -53,7 +53,9 @@ export class RedisStore implements OnApplicationShutdown {
   }
 
   subscribe(channel: string, onMessage: (message: string) => void): void {
-    this.subscriber ??= connectRedis(this.env.REDIS_URL, `${RedisStore.name} subscriber`, { maxRetriesPerRequest: null })
+    this.subscriber ??= connectRedis(this.env.REDIS_URL, `${RedisStore.name} subscriber`, {
+      maxRetriesPerRequest: null,
+    })
     this.subscriber.on('message', (received: string, message: string) => {
       if (received === channel) onMessage(message)
     })
