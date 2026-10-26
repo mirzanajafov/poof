@@ -7,6 +7,7 @@ import {
   type PresetName,
 } from '@poof/core'
 import { exhibitEnds, type ExhibitEnd, type ExhibitSnapshot, type ExhibitStats } from './exhibits.ts'
+import { hasFields, isRecord, type Checks } from './records.ts'
 import { exitReasons, type ExitReason } from './workers.ts'
 
 export const liveEventsChannel = 'poof:events'
@@ -30,25 +31,9 @@ export type LiveEventBody =
 
 export type LiveEvent = LiveEventBody & { at: number }
 
-type Check<T> = [T] extends [boolean]
-  ? 'boolean'
-  : [T] extends [number]
-    ? 'number'
-    : [T] extends [string]
-      ? string extends T
-        ? 'string'
-        : readonly T[]
-      : [T] extends [string | null]
-        ? 'string or null'
-        : 'object'
-
 type Body<K extends LiveEventBody['kind']> = Extract<LiveEventBody, { kind: K }>
 
-type Checks<K extends LiveEventBody['kind']> = { [F in Exclude<keyof Body<K>, 'kind'>]: Check<Body<K>[F]> }
-
-type AnyCheck = 'boolean' | 'number' | 'string' | 'string or null' | 'object' | readonly string[]
-
-const liveEventChecks: { [K in LiveEventBody['kind']]: Checks<K> } = {
+const liveEventChecks: { [K in LiveEventBody['kind']]: Checks<Omit<Body<K>, 'kind'>> } = {
   'task.accepted': { task: 'string', items: 'number', deadline: 'number' },
   'task.rejected': { task: 'string', exhibit: 'string or null' },
   'task.done': { task: 'string', met: 'boolean', dead: 'number' },
@@ -82,22 +67,15 @@ export function parseLiveEvent(text: string): LiveEvent | null {
 }
 
 function isLiveEvent(value: unknown): value is LiveEvent {
-  if (typeof value !== 'object' || value === null || !('kind' in value) || !('at' in value)) return false
-  if (typeof value.at !== 'number' || typeof value.kind !== 'string' || !isKind(value.kind)) return false
-  const fields = new Map<string, unknown>(Object.entries(value))
-  const checks: Record<string, AnyCheck> = liveEventChecks[value.kind]
-  return Object.entries(checks).every(([name, check]) => passes(fields.get(name), check))
+  if (!isRecord(value) || typeof value.at !== 'number' || typeof value.kind !== 'string' || !isKind(value.kind)) {
+    return false
+  }
+  const checks: Checks<object> = liveEventChecks[value.kind]
+  return hasFields(value, checks)
 }
 
 function isKind(kind: string): kind is LiveEventBody['kind'] {
   return Object.hasOwn(liveEventChecks, kind)
-}
-
-function passes(value: unknown, check: AnyCheck): boolean {
-  if (typeof check !== 'string') return check.some((allowed) => allowed === value)
-  if (check === 'string or null') return value === null || typeof value === 'string'
-  if (check === 'object') return typeof value === 'object' && value !== null
-  return typeof value === check
 }
 
 export interface PoolWorkerView {

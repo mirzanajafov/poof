@@ -12,6 +12,12 @@ export const serverCostModels: Record<PresetName, CostModel> = {
   'avif-1600': { coefMs: 3508.8, exponent: 0.183, logResidualSd: 0.497 },
 }
 
+export function costModelFor(models: Readonly<Record<string, CostModel>>, type: string): CostModel {
+  const model = Object.hasOwn(models, type) ? models[type] : undefined
+  if (!model) throw new Error(`no cost model for ${type}`)
+  return model
+}
+
 export function medianCostMs(model: CostModel, mp: number): number {
   return model.coefMs * mp ** model.exponent
 }

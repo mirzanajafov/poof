@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
+import { itemCostsResult, type ItemCostSample } from '@poof/contracts/bench'
+import { linearFit, median, round, summary } from '@poof/core/stats'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled, type DatasetItem } from './dataset.ts'
 import { cpuMsSince, peakRssMb, resetPeakRss, rssMb } from './memory.ts'
 import { environment, writeResult } from './results.ts'
-import { linearFit, median, round, summary } from './stats.ts'
 
 const { values } = parseArgs({
   options: {
@@ -17,26 +18,12 @@ const { values } = parseArgs({
   },
 })
 
-interface Sample {
-  source: string
-  file: string
-  mp: number
-  bytes: number
-  preset: string
-  pass: number
-  readMs: number
-  wallMs: number
-  cpuMs: number
-  peakRssMb: number
-  outBytes: number
-}
-
 configureSharp()
 const baseRssMb = rssMb()
-const datasets = await Promise.all(values.data!.map((dir) => loadDataset(dir)))
-const samples: Sample[] = []
+const datasets = await Promise.all(values.data.map((dir) => loadDataset(dir)))
+const samples: ItemCostSample[] = []
 
-for (const name of values.presets!.split(',')) {
+for (const name of values.presets.split(',')) {
   const preset = presetByName(name)
   const passes = Number(name.startsWith('avif') ? values['avif-passes'] : values.passes)
   for (const dataset of datasets) {
@@ -89,8 +76,9 @@ function perImage(preset: string, source: string) {
 }
 
 const fits: Record<string, Record<string, unknown>> = {}
-for (const name of values.presets!.split(',')) {
-  fits[name] = {}
+for (const name of values.presets.split(',')) {
+  const presetFits: Record<string, unknown> = {}
+  fits[name] = presetFits
   for (const dataset of datasets) {
     const images = perImage(name, dataset.source)
     const cost = linearFit(
@@ -101,7 +89,7 @@ for (const name of values.presets!.split(',')) {
       images.map((i) => i.mp),
       images.map((i) => i.peakRssMb),
     )
-    fits[name]![dataset.source] = {
+    presetFits[dataset.source] = {
       images: images.length,
       wallMs: summary(images.map((i) => i.wallMs)),
       msPerMp: summary(images.map((i) => i.wallMs / i.mp)),
@@ -113,12 +101,12 @@ for (const name of values.presets!.split(',')) {
       },
       rssFit: { interceptMb: round(memory.intercept), mbPerMp: round(memory.slope), r2: round(memory.r2) },
     }
-    console.log(name, dataset.source, JSON.stringify(fits[name]![dataset.source]))
+    console.log(name, dataset.source, JSON.stringify(presetFits[dataset.source]))
   }
 }
 
-const path = await writeResult(values.label!, 'b1-item-cost', {
-  env: environment(values.label!),
+const path = await writeResult(values.label, itemCostsResult, {
+  env: environment(values.label),
   baseRssMb: round(baseRssMb),
   fits,
   samples: samples.map((s) => ({

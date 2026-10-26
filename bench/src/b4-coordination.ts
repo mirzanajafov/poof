@@ -2,9 +2,9 @@ import { fork } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { round, summary } from '@poof/core/stats'
 import { Redis } from 'ioredis'
 import { environment, writeResult } from './results.ts'
-import { round, summary } from './stats.ts'
 
 const { values } = parseArgs({
   options: {
@@ -85,6 +85,6 @@ if (values.redis) {
   await client.quit()
 }
 
-const result = { env: environment(values.label!), reps, ipcRoundTripUs: micros(ipc), redis }
+const result = { env: environment(values.label), reps, ipcRoundTripUs: micros(ipc), redis }
 console.log(JSON.stringify(result, null, 2))
-console.log(`wrote ${await writeResult(values.label!, 'b4-coordination', result)}`)
+console.log(`wrote ${await writeResult(values.label, 'b4-coordination', result)}`)

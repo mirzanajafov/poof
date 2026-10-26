@@ -1,8 +1,11 @@
+import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { exhibitDefaults } from '@poof/contracts'
-import { isExhibitPolicyName } from '@poof/core'
+import { exhibitDefaults, exhibitEnds, hasFields, isRecord, type ExhibitDetail } from '@poof/contracts'
+import { exhibitRunSummary, type ExhibitRun } from '@poof/contracts/bench'
+import { isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
+import { recordedRun } from './recorded-run.ts'
 
 const { values } = parseArgs({
   options: {
@@ -17,49 +20,106 @@ const { values } = parseArgs({
   },
 })
 
-const policies = values.policies!.split(',')
-const invalid = policies.filter((policy) => !isExhibitPolicyName(policy))
-if (invalid.length > 0) throw new Error(`no exhibit policy ${invalid.join(', ')}`)
+const policies: ExhibitPolicyName[] = []
+const unknown: string[] = []
+for (const name of values.policies.split(',')) {
+  if (isExhibitPolicyName(name) && !policies.includes(name)) policies.push(name)
+  else unknown.push(name)
+}
+if (unknown.length > 0) throw new Error(`unknown or repeated exhibit policy ${unknown.join(', ')}`)
+const durationSeconds = Number(values.duration)
+const utilization = Number(values.utilization)
+const gapMs = Number(values.gap) * 1000
+const seeds = values.seeds.split(',').map(Number)
+if (!(durationSeconds > 0) || !(utilization > 0) || !(gapMs >= 0)) {
+  throw new Error('--duration and --utilization need numbers above zero and --gap a number of seconds')
+}
+if (!seeds.every((seed, i) => Number.isInteger(seed) && seeds.indexOf(seed) === i)) {
+  throw new Error('--seeds needs distinct whole numbers')
+}
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+const patienceMs = (2 * durationSeconds + 60) * 1000
+if (existsSync(values.out)) throw new Error(`${values.out} already holds runs, so pick another --out`)
 
-async function call(
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: Record<string, unknown> | null }> {
-  const res = await fetch(`${values.api}${path}`, init)
-  return { status: res.status, body: (await res.json().catch(() => null)) as Record<string, unknown> | null }
+async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${values.api}${path}`, { ...init, signal: AbortSignal.timeout(30_000) }).catch(
+    (error: unknown) => {
+      console.log(`no answer from ${values.api}${path}: ${error instanceof Error ? error.message : 'unknown error'}`)
+      return null
+    },
+  )
+  if (!res) return { status: 0, body: null }
+  const body: unknown = await res.json().catch(() => null)
+  return { status: res.status, body }
 }
 
-const runs: unknown[] = []
-for (const seed of values.seeds!.split(',').map(Number)) {
-  for (const policy of policies) {
-    while ((await call('/api/exhibits/current')).status === 200) await sleep(5000)
-    const started = await call('/api/exhibits', {
+function transient(status: number): boolean {
+  return status === 0 || status >= 500
+}
+
+function giveUpAfter(deadline: number, what: string): void {
+  if (Date.now() > deadline) throw new Error(`${what} for ${patienceMs / 1000} s, giving up`)
+}
+
+async function idle(): Promise<void> {
+  const deadline = Date.now() + patienceMs
+  while (true) {
+    const { status } = await call('/api/exhibits/current')
+    if (status === 404) return
+    if (status !== 200 && !transient(status)) throw new Error(`the API answered ${status} for the current exhibit`)
+    giveUpAfter(deadline, 'the box has not been free')
+    await sleep(5000)
+  }
+}
+
+async function start(policy: ExhibitPolicyName, seed: number): Promise<string> {
+  const deadline = Date.now() + patienceMs
+  while (true) {
+    await idle()
+    const { status, body } = await call('/api/exhibits', {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        policy,
-        seed,
-        durationSeconds: Number(values.duration),
-        utilization: Number(values.utilization),
-        dataset: values.dataset,
-      }),
+      body: JSON.stringify({ policy, seed, durationSeconds, utilization, dataset: values.dataset }),
     })
-    if (started.status !== 201) {
-      console.log(`${policy} seed ${seed}: could not start (${started.status} ${JSON.stringify(started.body)})`)
-      continue
+    if (status === 201 && isRecord(body) && typeof body.id === 'string') return body.id
+    if (status !== 409 && !transient(status)) {
+      throw new Error(`could not start ${policy} seed ${seed}: ${status} ${JSON.stringify(body)}`)
     }
-    const id = String(started.body!.id)
-    let detail: Record<string, unknown> | null = null
-    do {
-      await sleep(3000)
-      detail = (await call(`/api/exhibits/${id}`)).body
-    } while (!detail || detail.status === 'RUNNING')
-    runs.push({ id, policy, params: detail.params, stats: detail.stats, tasks: detail.tasks })
-    await writeFile(values.out!, `${JSON.stringify(runs, null, 2)}\n`)
-    console.log(`${policy} seed ${seed}: ${JSON.stringify(detail.stats)}`)
-    await sleep(Number(values.gap) * 1000)
+    giveUpAfter(deadline, `${policy} seed ${seed} could not start`)
+    console.log(`${policy} seed ${seed}: not started (${status}), trying again once the box is free`)
+    await sleep(5000)
+  }
+}
+
+async function ended(id: string): Promise<ExhibitDetail> {
+  const deadline = Date.now() + patienceMs
+  while (true) {
+    await sleep(3000)
+    giveUpAfter(deadline, `exhibit ${id} has not ended`)
+    const { status, body } = await call(`/api/exhibits/${id}`)
+    if (transient(status)) continue
+    if (status !== 200 || !hasFields<Pick<ExhibitDetail, 'status'>>(body, { status: ['RUNNING', ...exhibitEnds] })) {
+      throw new Error(`the API answered ${status} ${JSON.stringify(body)} for exhibit ${id}`)
+    }
+    if (body.status !== 'RUNNING') return body as ExhibitDetail
+  }
+}
+
+const runs: ExhibitRun[] = []
+for (const seed of seeds) {
+  for (const policy of policies) {
+    const detail = await ended(await start(policy, seed))
+    const run = recordedRun(detail)
+    if (run) {
+      exhibitRunSummary(run, `${values.api}/api/exhibits/${run.id}`)
+      runs.push(run)
+      await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
+      console.log(`${policy} seed ${seed}: ${JSON.stringify(run.stats)}`)
+    } else {
+      console.log(`${policy} seed ${seed}: ended ${detail.status}, not recorded`)
+    }
+    await sleep(gapMs)
   }
 }

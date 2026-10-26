@@ -1,8 +1,18 @@
-import type { CostModel } from '@poof/core'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { linearFit, powerFit, quantile } from './stats.ts'
+import {
+  concurrencyResultPrefix,
+  itemCostsResult,
+  parseConcurrencyRun,
+  parseItemCosts,
+  parseSpawnRun,
+  spawnResult,
+  type ConcurrencyRun,
+  type ItemCost,
+} from '@poof/contracts/bench'
+import { valueAt, type CostModel } from '@poof/core'
+import { linearFit, powerFit, quantile } from '@poof/core/stats'
 
 export interface Curve {
   cpus: number
@@ -21,29 +31,20 @@ export interface Calibration {
   curves: Curve[]
 }
 
-interface B1 {
-  samples: Array<{ source: string; file: string; preset: string; mp: number; wallMs: number; peakRssMb: number }>
+const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
+
+function readResult<T>(dir: string, name: string, parse: (text: string, origin: string) => T): T {
+  const path = join(dir, `${name}.json`)
+  return parse(readFileSync(path, 'utf8'), path)
 }
 
-interface B2 {
-  cpus: number
-  knee: number
-  rows: Array<{ k: number; effectiveCores: number; medianPeakRssMb: number; cgroupAnonPeakMb?: number | null }>
+export function itemCostSamples(label: string, dir = defaultResultsDir): ItemCost[] {
+  return readResult(join(dir, label), itemCostsResult, parseItemCosts)
 }
 
-interface B3 {
-  warm: { wallMs: { p50: number }; cpuMs: { p50: number }; rssMb: { p50: number }; anonMb?: { p50: number } | null }
-}
-
-export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
-
-function read<T>(dir: string, name: string): T {
-  return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8')) as T
-}
-
-function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel> {
+function typeCosts(samples: readonly ItemCost[], sources: readonly string[]): Record<string, CostModel> {
   const byImage = new Map<string, { preset: string; mp: number; walls: number[] }>()
-  for (const s of b1.samples) {
+  for (const s of samples) {
     if (!sources.includes(s.source)) continue
     const key = `${s.preset}|${s.source}|${s.file}`
     const entry = byImage.get(key) ?? { preset: s.preset, mp: s.mp, walls: [] }
@@ -65,23 +66,22 @@ function typeCosts(b1: B1, sources: readonly string[]): Record<string, CostModel
 export function loadCalibration(label: string, dir = defaultResultsDir, sources = ['synthetic', 'nasa']): Calibration {
   const base = join(dir, label)
   if (!existsSync(base)) throw new Error(`no calibration results in ${base}`)
-  const b1 = read<B1>(base, 'b1-item-cost')
-  const b3 = read<B3>(base, 'b3-spawn')
+  const b3 = readResult(base, spawnResult, parseSpawnRun)
   const b2s = mergeByCpus(
     readdirSync(base)
-      .filter((file) => file.startsWith('b2-concurrency-c'))
-      .map((file) => read<B2>(base, file.replace(/\.json$/, ''))),
+      .filter((file) => file.startsWith(concurrencyResultPrefix))
+      .map((file) => readResult(base, file.replace(/\.json$/, ''), parseConcurrencyRun)),
   )
   const measured = b2s.flatMap((b2) =>
-    b2.rows.filter(
-      (r) => r.k <= Math.ceil(3 * b2.cpus) && r.cgroupAnonPeakMb !== null && r.cgroupAnonPeakMb !== undefined,
+    b2.rows.flatMap(({ k, cgroupAnonPeakMb }) =>
+      k <= Math.ceil(3 * b2.cpus) && cgroupAnonPeakMb !== null ? [{ k, anonMb: cgroupAnonPeakMb }] : [],
     ),
   )
   const steadyRssMb =
     measured.length >= 3
       ? linearFit(
           measured.map((r) => r.k),
-          measured.map((r) => r.cgroupAnonPeakMb!),
+          measured.map((r) => r.anonMb),
         ).slope
       : quantile(
           b2s.flatMap((b2) => b2.rows.map((r) => r.medianPeakRssMb)),
@@ -89,7 +89,7 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
         )
   return {
     label,
-    types: typeCosts(b1, sources),
+    types: typeCosts(itemCostSamples(label, dir), sources),
     spawnMs: b3.warm.wallMs.p50,
     spawnCpuMs: b3.warm.cpuMs.p50,
     baseRssMb: b3.warm.anonMb?.p50 ?? b3.warm.rssMb.p50,
@@ -103,9 +103,9 @@ export function loadCalibration(label: string, dir = defaultResultsDir, sources 
   }
 }
 
-function mergeByCpus(files: B2[]): B2[] {
-  const byCpus = new Map<number, B2>()
-  for (const file of [...files].sort((a, b) => a.rows[0]!.k - b.rows[0]!.k)) {
+function mergeByCpus(files: ConcurrencyRun[]): ConcurrencyRun[] {
+  const byCpus = new Map<number, ConcurrencyRun>()
+  for (const file of [...files].sort((a, b) => valueAt(a.rows, 0).k - valueAt(b.rows, 0).k)) {
     const known = byCpus.get(file.cpus)
     if (!known) {
       byCpus.set(file.cpus, { ...file, rows: [...file.rows] })
@@ -117,39 +117,49 @@ function mergeByCpus(files: B2[]): B2[] {
   return [...byCpus.values()].sort((a, b) => a.cpus - b.cpus)
 }
 
-export function curveFor(calibration: Calibration, cpus: number): Curve {
-  let best = calibration.curves[0]!
+export interface FittedCurve extends Curve {
+  decline: number
+}
+
+export function nearestCurve(calibration: Calibration, cpus: number): Curve {
+  let best = valueAt(calibration.curves, 0)
   for (const curve of calibration.curves) {
     if (Math.abs(curve.cpus - cpus) < Math.abs(best.cpus - cpus)) best = curve
   }
   return best
 }
 
-function onCurve(curve: Curve, workers: number): number {
+export function curveFor(calibration: Calibration, cpus: number): FittedCurve {
+  const curve = nearestCurve(calibration, cpus)
+  return { ...curve, decline: decline(curve) }
+}
+
+function decline(curve: Curve): number {
+  const saturated = curve.points.filter((p) => p.workers >= Math.ceil(curve.cpus))
+  if (saturated.length < 2) return 0
+  const { slope } = linearFit(
+    saturated.map((p) => p.workers),
+    saturated.map((p) => p.effectiveCores),
+  )
+  return slope < 0 ? slope : 0
+}
+
+function onCurve(curve: FittedCurve, workers: number): number {
   const points = curve.points
-  const first = points[0]!
-  const last = points[points.length - 1]!
+  const first = valueAt(points, 0)
+  const last = valueAt(points, points.length - 1)
   if (workers <= first.workers) return (first.effectiveCores * workers) / first.workers
   if (workers <= last.workers) {
     const hi = points.findIndex((p) => p.workers >= workers)
-    const a = points[hi - 1]!
-    const b = points[hi]!
+    const a = valueAt(points, hi - 1)
+    const b = valueAt(points, hi)
     const t = (workers - a.workers) / (b.workers - a.workers)
     return a.effectiveCores + t * (b.effectiveCores - a.effectiveCores)
   }
-  const saturated = points.filter((p) => p.workers >= Math.ceil(curve.cpus))
-  const fit =
-    saturated.length >= 2
-      ? linearFit(
-          saturated.map((p) => p.workers),
-          saturated.map((p) => p.effectiveCores),
-        )
-      : null
-  const decline = fit && fit.slope < 0 ? fit.slope : 0
-  return Math.max(0.25 * last.effectiveCores, last.effectiveCores + decline * (workers - last.workers))
+  return Math.max(0.25 * last.effectiveCores, last.effectiveCores + curve.decline * (workers - last.workers))
 }
 
-export function effectiveCores(curve: Curve, workers: number, cpus: number): number {
+export function effectiveCores(curve: FittedCurve, workers: number, cpus: number): number {
   if (workers <= 0) return 0
   const scale = cpus / curve.cpus
   return onCurve(curve, workers / scale) * scale

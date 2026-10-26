@@ -1,14 +1,17 @@
 import {
   admits,
   Breakers,
+  costModelFor,
   decide,
-  emptyEstimate,
   defaultTimeoutRule,
+  emptyEstimate,
   expectedCostMs,
   grant,
   itemTimeoutMs,
   planSplit,
   updateEstimate,
+  valueAt,
+  valueFor,
   type Estimate,
   type Preemption,
   type RunningLease,
@@ -21,7 +24,7 @@ import {
   type TimeoutRule,
   type View,
 } from '@poof/core'
-import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
+import { curveFor, effectiveCores, nearestCurve, type Calibration, type FittedCurve } from './calibration.ts'
 import { inWindow, Workload, type Arrivals, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
@@ -162,7 +165,7 @@ const DEAD = 2
 export class Simulation {
   readonly options: Required<Omit<SimOptions, 'budget' | 'arrivals'>> & { budget: number }
   private readonly workload: Arrivals
-  private readonly curve: Curve
+  private readonly curve: FittedCurve
   private readonly policy: PolicyConfig
   private readonly machine: MachineSpec
   private now = 0
@@ -244,7 +247,7 @@ export class Simulation {
 
   private get cores(): number {
     const neighbour = this.workload.scenario.neighbour
-    return this.machine.cores * (inWindow(neighbour, this.now) ? neighbour!.capacity : 1)
+    return this.machine.cores * (neighbour && inWindow(neighbour, this.now) ? neighbour.capacity : 1)
   }
 
   private get spawnMs(): number {
@@ -259,15 +262,10 @@ export class Simulation {
   private arrive(at: number): void {
     const plan = this.workload.task(at)
     const items = plan.costs.length
-    const cost = this.options.calibration.types[plan.type]!
-    const predicted = new Float64Array(items)
-    let remainingMs = 0
-    let predictedMs = 0
-    for (let i = 0; i < items; i++) {
-      remainingMs += plan.costs[i]!
-      predicted[i] = expectedCostMs(cost, plan.mp[i]!)
-      predictedMs += predicted[i]!
-    }
+    const cost = costModelFor(this.options.calibration.types, plan.type)
+    const predicted = Float64Array.from(plan.mp, (mp) => expectedCostMs(cost, mp))
+    const remainingMs = plan.costs.reduce((sum, itemMs) => sum + itemMs, 0)
+    const predictedMs = predicted.reduce((sum, itemMs) => sum + itemMs, 0)
     const task: SimTask = {
       predicted,
       predictedMs,
@@ -391,7 +389,8 @@ export class Simulation {
         }
         if (this.policy.trigger === 'oracle') {
           let remaining = 0
-          for (let i = info.next; i < lease.hi; i++) if (task.state[i] === TODO) remaining += task.plan.costs[i]!
+          for (let i = info.next; i < lease.hi; i++)
+            if (task.state[i] === TODO) remaining += valueAt(task.plan.costs, i)
           info.trueRemainingMs = remaining / speed
         }
         leases.push(info)
@@ -427,10 +426,11 @@ export class Simulation {
     const byId = new Map<string, SimLease>()
     for (const task of this.active) for (const lease of task.leases) byId.set(String(lease.id), lease)
     const requestById = new Map(requests.map((r) => [r.leaseId, r]))
-    for (const leaseId of grants.preempt) this.yieldLease(byId.get(leaseId)!)
-    for (const [leaseId, k] of grants.splits) this.applySplit(byId.get(leaseId)!, k, requestById.get(leaseId)!)
+    for (const leaseId of grants.preempt) this.yieldLease(valueFor(byId, leaseId))
+    for (const [leaseId, k] of grants.splits)
+      this.applySplit(valueFor(byId, leaseId), k, valueFor(requestById, leaseId))
     for (const leaseId of grants.starts) {
-      const lease = byId.get(leaseId)!
+      const lease = valueFor(byId, leaseId)
       if (lease.state !== 'pending' || !this.breakers.allows(lease.task.info.type, this.now)) continue
       this.spawn(lease)
     }
@@ -512,7 +512,7 @@ export class Simulation {
       lease.cursor,
       lease.hi,
       scale,
-      (i) => task.attempts[i]!,
+      (i) => valueAt(task.attempts, i),
       this.options.timeoutRule,
     )
   }
@@ -547,7 +547,7 @@ export class Simulation {
       return
     }
     lease.inflight = true
-    lease.inflightLeft = task.plan.costs[lease.cursor]!
+    lease.inflightLeft = valueAt(task.plan.costs, lease.cursor)
     lease.inflightStart = this.now
   }
 
@@ -575,11 +575,11 @@ export class Simulation {
       this.crash(process, 'crash')
       return
     }
-    const cost = task.plan.costs[item]!
+    const cost = valueAt(task.plan.costs, item)
     task.state[item] = DONE
     task.done++
     task.remainingMs -= cost
-    task.predictedMs -= task.predicted[item]!
+    task.predictedMs -= valueAt(task.predicted, item)
     this.cpu.usefulMs += cost
     this.usefulSinceSample += cost
     lease.inflight = false
@@ -589,7 +589,7 @@ export class Simulation {
     process.rss = workerMemoryMb(this.options.calibration, process.items)
     lease.itemMs = updateEstimate(lease.itemMs, this.now - lease.inflightStart)
     const ratio = this.typeRatio.get(task.info.type) ?? emptyEstimate
-    this.typeRatio.set(task.info.type, updateEstimate(ratio, cost / task.predicted[item]!, 0.02))
+    this.typeRatio.set(task.info.type, updateEstimate(ratio, cost / valueAt(task.predicted, item), 0.02))
     this.breakers.record(task.info.type, true, this.now)
     this.settle(task)
     this.startItem(process, lease)
@@ -614,17 +614,17 @@ export class Simulation {
     }
     const task = lease.task
     const item = lease.cursor
-    this.cpu.lostMs += task.plan.costs[item]! - lease.inflightLeft
+    this.cpu.lostMs += valueAt(task.plan.costs, item) - lease.inflightLeft
     lease.inflight = false
-    task.attempts[item] = Math.min(255, task.attempts[item]! + 1)
+    task.attempts[item] = Math.min(255, valueAt(task.attempts, item) + 1)
     const opened = this.breakers.opened(task.info.type)
     this.breakers.record(task.info.type, false, this.now)
     this.counts.breakerOpened += this.breakers.opened(task.info.type) - opened
-    if (this.policy.deadLetter && task.attempts[item]! >= this.options.maxAttempts) {
+    if (this.policy.deadLetter && valueAt(task.attempts, item) >= this.options.maxAttempts) {
       task.state[item] = DEAD
       task.dead++
-      task.remainingMs -= task.plan.costs[item]!
-      task.predictedMs -= task.predicted[item]!
+      task.remainingMs -= valueAt(task.plan.costs, item)
+      task.predictedMs -= valueAt(task.predicted, item)
       this.counts.deadLettered++
       lease.cursor++
       if (task.dead > this.options.deadLetterShare * task.info.items) this.fail(task)
@@ -701,7 +701,7 @@ export class Simulation {
     for (const lease of task.leases) {
       const process = lease.process
       if (lease.state === 'running' && process) {
-        if (lease.inflight) this.cpu.lostMs += task.plan.costs[lease.cursor]! - lease.inflightLeft
+        if (lease.inflight) this.cpu.lostMs += valueAt(task.plan.costs, lease.cursor) - lease.inflightLeft
         lease.inflight = false
         this.finishLease(lease)
       } else if (lease.state === 'starting' && process) {
@@ -726,11 +726,12 @@ export class Simulation {
     const limit = this.machine.memoryMb - this.machine.supervisorMb
     let total = 0
     for (const process of this.processes) total += process.rss
-    while (total > limit && this.processes.size > 0) {
+    while (total > limit) {
       let victim: SimProcess | null = null
       for (const process of this.processes) if (!victim || process.rss > victim.rss) victim = process
-      total -= victim!.rss
-      this.crash(victim!, 'oom')
+      if (!victim) break
+      total -= victim.rss
+      this.crash(victim, 'oom')
     }
   }
 
@@ -825,7 +826,7 @@ export function workerMemoryMb(calibration: Calibration, items: number): number 
 }
 
 export function defaultBudget(calibration: Calibration, machine: MachineSpec): number {
-  const curve = curveFor(calibration, machine.cores)
+  const curve = nearestCurve(calibration, machine.cores)
   const knee = Math.round((curve.knee * machine.cores) / curve.cpus)
   const byMemory = Math.floor((machine.memoryMb - machine.supervisorMb) / calibration.steadyRssMb)
   return Math.max(1, Math.min(knee, byMemory, machine.maxProcesses))

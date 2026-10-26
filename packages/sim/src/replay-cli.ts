@@ -1,12 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { parseManifest, type ExhibitParams, type ExhibitStats } from '@poof/contracts'
-import { defaultTimeoutRule, isExhibitPolicyName, isPresetName } from '@poof/core'
-import { defaultResultsDir, loadCalibration } from './calibration.ts'
+import { parseManifest } from '@poof/contracts'
+import { itemCostMedians, parseExhibitRuns, type ExhibitRunStats } from '@poof/contracts/bench'
+import { defaultTimeoutRule } from '@poof/core'
+import { mean } from '@poof/core/stats'
+import { itemCostSamples, loadCalibration } from './calibration.ts'
 import type { RunResult } from './engine.ts'
 import { replay, replayItems } from './replay.ts'
-import { mean, quantile } from './stats.ts'
 
 const { values } = parseArgs({
   options: {
@@ -20,12 +20,6 @@ const { values } = parseArgs({
   },
 })
 
-interface RecordedRun {
-  id: string
-  params: Omit<ExhibitParams, 'policy' | 'preset'> & { policy: string; preset: string }
-  stats: ExhibitStats
-}
-
 interface Numbers {
   submitted: number
   rejected: number
@@ -36,28 +30,19 @@ interface Numbers {
   items: number
 }
 
-const calibration = loadCalibration(values.calibration!)
+if (!values.runs || !values.manifest) {
+  throw new Error('usage: replay --runs <exhibit runs file> --manifest <dataset manifest> [--calibration <label>]')
+}
+const calibration = loadCalibration(values.calibration)
 if (values['steady-rss']) calibration.steadyRssMb = Number(values['steady-rss'])
 const timeoutRule = { ...defaultTimeoutRule, growth: Number(values['timeout-growth']) }
 const speed = Number(values.speed)
-const b1 = JSON.parse(readFileSync(join(defaultResultsDir, values.calibration!, 'b1-item-cost.json'), 'utf8')) as {
-  samples: Array<{ source: string; preset: string; file: string; wallMs: number }>
-}
-const runs = (JSON.parse(readFileSync(values.runs!, 'utf8')) as RecordedRun[]).map(({ id, params, stats }) => {
-  const { policy, preset } = params
-  if (!isExhibitPolicyName(policy)) throw new Error(`run ${id} has no simulator policy for ${policy}`)
-  if (!isPresetName(preset)) throw new Error(`run ${id} has no cost model for ${preset}`)
-  return { id, params: { ...params, policy, preset }, stats }
-})
-const manifest = parseManifest(readFileSync(values.manifest!, 'utf8'), values.manifest!).items
+const samples = itemCostSamples(values.calibration)
+const runs = parseExhibitRuns(readFileSync(values.runs, 'utf8'), values.runs)
+const manifest = parseManifest(readFileSync(values.manifest, 'utf8'), values.manifest).items
 
 function measured(preset: string): Map<string, number> {
-  const walls = new Map<string, number[]>()
-  for (const s of b1.samples) {
-    if (s.preset !== preset || s.source !== 'synthetic') continue
-    walls.set(s.file, [...(walls.get(s.file) ?? []), s.wallMs])
-  }
-  return new Map([...walls].map(([file, w]) => [file, quantile(w, 0.5) / speed]))
+  return new Map([...itemCostMedians(samples, preset, 'synthetic')].map(([file, ms]) => [file, ms / speed]))
 }
 
 function simulated(result: RunResult): Numbers {
@@ -72,7 +57,7 @@ function simulated(result: RunResult): Numbers {
   }
 }
 
-function real(stats: ExhibitStats): Numbers {
+function real(stats: ExhibitRunStats): Numbers {
   return {
     submitted: stats.submitted,
     rejected: stats.rejected,

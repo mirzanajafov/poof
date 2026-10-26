@@ -14,13 +14,18 @@ export interface Job {
   checkInvariants: boolean
 }
 
+const port = parentPort
+if (!port) throw new Error('run-worker runs only as a worker thread')
 const { calibration } = workerData as { calibration: Calibration }
 
-parentPort!.on('message', (job: Job) => {
-  const scenario = scenarios[job.scenario]!
+port.on('message', (job: Job) => {
+  const scenario = scenarios[job.scenario]
+  const machine = machines[job.machine]
+  if (!scenario) throw new Error(`no scenario ${job.scenario}`)
+  if (!machine) throw new Error(`no machine ${job.machine}`)
   const simulation = new Simulation({
     scenario,
-    machine: machines[job.machine]!,
+    machine,
     policy: policyByName(job.policy),
     calibration,
     seed: job.seed,
@@ -31,7 +36,7 @@ parentPort!.on('message', (job: Job) => {
   })
   const started = performance.now()
   const result = simulation.run()
-  parentPort!.postMessage({
+  port.postMessage({
     metrics: derive(result, scenario),
     series: job.keepSeries ? result.series : null,
     runMs: performance.now() - started,

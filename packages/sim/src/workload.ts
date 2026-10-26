@@ -1,4 +1,4 @@
-import { expectedCostMs, medianCostMs, Rng, type CostModel } from '@poof/core'
+import { costModelFor, expectedCostMs, medianCostMs, Rng, valueAt, type CostModel } from '@poof/core'
 
 export interface Window {
   from: number
@@ -90,7 +90,7 @@ export function workloadStats(scenario: Scenario, types: Record<string, CostMode
   let cost = 0
   const samples = 20_000
   for (let i = 0; i < samples; i++) {
-    const type = types[rng.weighted(scenario.types)]!
+    const type = costModelFor(types, rng.weighted(scenario.types))
     cost += expectedCostMs(type, rng.weighted(profiles).mp(rng))
   }
   return { meanTaskWorkMs: (cost / samples) * meanItems, meanItems }
@@ -148,7 +148,7 @@ export class Workload implements Arrivals {
     const rng = Rng.of(this.seed, this.scenario.name, 'task', index)
     const s = this.scenario
     const typeName = rng.weighted(s.types)
-    const type = this.types[typeName]!
+    const type = costModelFor(this.types, typeName)
     const profile = rng.weighted(profiles)
     const items = Math.round(rng.logUniform(s.items[0], s.items[1]))
     const slack = rng.logUniform(s.slack[0], s.slack[1])
@@ -157,7 +157,7 @@ export class Workload implements Arrivals {
     const poison = new Uint8Array(items)
     for (let i = 0; i < items; i++) {
       mps[i] = profile.mp(rng)
-      costs[i] = itemCost(type, mps[i]!, rng)
+      costs[i] = itemCost(type, valueAt(mps, i), rng)
     }
     let skewed = false
     if (s.skew && rng.next() < s.skew.share) {
@@ -165,7 +165,7 @@ export class Workload implements Arrivals {
       const length = Math.max(1, Math.round(items * rng.uniform(s.skew.block[0], s.skew.block[1])))
       const start = rng.int(0, items - length)
       const factor = rng.uniform(s.skew.factor[0], s.skew.factor[1])
-      for (let i = start; i < start + length; i++) costs[i] = costs[i]! * factor
+      for (let i = start; i < start + length; i++) costs[i] = valueAt(costs, i) * factor
     }
     if (s.poison && rng.next() < s.poison.share) {
       const count = rng.int(s.poison.items[0], s.poison.items[1])

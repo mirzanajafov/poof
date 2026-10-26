@@ -43,8 +43,10 @@ function machine(name: string, cores: number, memoryMb: number, pidsLimit: numbe
   }
 }
 
+export const cage = machine('cage', 1.5, 1536, 512)
+
 export const machines: Record<string, MachineSpec> = {
-  cage: machine('cage', 1.5, 1536, 512),
+  cage,
   c2: machine('c2', 2, 2048, 512),
   c4: machine('c4', 4, 4096, 1024),
 }
@@ -70,8 +72,10 @@ export const sweepPolicies: PolicyConfig[] = [
   ...[1, 2].map((z) => variant(policies.forecastManaged, { name: `forecast+budget z=${z}`, z })),
 ]
 
+export const allPolicies: PolicyConfig[] = [...mainPolicies, ...sweepPolicies]
+
 export function policyByName(name: string): PolicyConfig {
-  const policy = [...mainPolicies, ...sweepPolicies].find((p) => p.name === name)
+  const policy = allPolicies.find((p) => p.name === name)
   if (!policy) throw new Error(`unknown policy ${name}`)
   return policy
 }

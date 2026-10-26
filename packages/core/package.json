@@ -8,6 +8,11 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./stats": {
+      "source": "./src/stats.ts",
+      "types": "./dist/stats.d.ts",
+      "default": "./dist/stats.js"
     }
   },
   "scripts": {

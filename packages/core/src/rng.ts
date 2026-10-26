@@ -1,3 +1,5 @@
+import { valueAt } from './lookup.ts'
+
 export function hashSeed(...parts: Array<string | number>): number {
   let hash = 0x811c9dc5
   for (const char of parts.join('|')) {
@@ -55,6 +57,6 @@ export class Rng {
       pick -= option.weight
       if (pick < 0) return option.value
     }
-    return options[options.length - 1]!.value
+    return valueAt(options, options.length - 1).value
   }
 }

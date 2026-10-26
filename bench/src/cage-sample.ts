@@ -10,13 +10,15 @@ interface Seen {
 const seconds = Number(process.argv[2] ?? 60)
 const everyMs = Number(process.argv[3] ?? 200)
 
-function cgroup(): Record<string, number> {
-  return Object.fromEntries(
+function cgroup(): Map<string, number> {
+  return new Map(
     readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8')
       .trim()
       .split('\n')
-      .map((line) => line.split(' '))
-      .map(([k, v]) => [k!, Number(v)]),
+      .map((line): [string, number] => {
+        const space = line.indexOf(' ')
+        return [line.slice(0, space), Number(line.slice(space + 1))]
+      }),
   )
 }
 
@@ -67,6 +69,11 @@ setTimeout(() => {
   clearInterval(timer)
   sample()
   const end = cgroup()
+  const grown = (field: string, scale = 1) => {
+    const from = start.get(field)
+    const to = end.get(field)
+    return from === undefined || to === undefined ? null : Math.round((to - from) / scale)
+  }
   const groups: Record<string, { processes: number; cpuMs: number; states: Record<string, number> }> = {}
   for (const entry of seen.values()) {
     const kind = entry.cmd.includes('dist/main.js') ? 'supervisor' : entry.cmd.includes('worker') ? 'workers' : 'other'
@@ -83,10 +90,10 @@ setTimeout(() => {
       groups,
       samplerCpuMs: Math.round((self.user + self.system) / 1000),
       cgroup: {
-        usageMs: Math.round((end.usage_usec! - start.usage_usec!) / 1000),
-        throttledMs: Math.round((end.throttled_usec! - start.throttled_usec!) / 1000),
-        periods: end.nr_periods! - start.nr_periods!,
-        throttledPeriods: end.nr_throttled! - start.nr_throttled!,
+        usageMs: grown('usage_usec', 1000),
+        throttledMs: grown('throttled_usec', 1000),
+        periods: grown('nr_periods'),
+        throttledPeriods: grown('nr_throttled'),
       },
     }),
   )

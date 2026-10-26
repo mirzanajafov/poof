@@ -3,10 +3,13 @@ import { availableParallelism } from 'node:os'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { concurrencyResultPrefix, itemCostMedians, type ConcurrencyRow } from '@poof/contracts/bench'
+import { valueFor } from '@poof/core'
+import { mean, median, round } from '@poof/core/stats'
 import { loadDataset } from './dataset.ts'
+import { kneeOf } from './knee.ts'
 import { cgroupAnonMb } from './memory.ts'
-import { environment, readResult, writeResult } from './results.ts'
-import { mean, median, round } from './stats.ts'
+import { environment, readItemCosts, writeResult } from './results.ts'
 
 const { values } = parseArgs({
   options: {
@@ -23,10 +26,6 @@ const { values } = parseArgs({
   },
 })
 
-interface B1 {
-  samples: Array<{ source: string; file: string; preset: string; wallMs: number }>
-}
-
 interface Done {
   type: 'done'
   completions: Array<{ file: string; at: number; wallMs: number }>
@@ -35,18 +34,21 @@ interface Done {
 }
 
 const cpus = Number(values.cpus ?? process.env.CPU_LIMIT ?? availableParallelism())
+if (!(cpus > 0))
+  throw new Error(`the CPU count needs to be a number above zero, not ${values.cpus ?? process.env.CPU_LIMIT}`)
 const kMax = Number(values['k-max'] ?? Math.ceil(3 * cpus))
 const durationMs = Number(values.duration) * 1000
 const warmupMs = Number(values.warmup) * 1000
-const dataset = await loadDataset(values.data!)
-const b1 = await readResult<B1>(values.label!, 'b1-item-cost')
+const dataset = await loadDataset(values.data)
+const samples = await readItemCosts(values.label)
 
-const costs = new Map<string, number[]>()
-for (const s of b1.samples) {
-  if (s.preset !== values.preset || s.source !== dataset.source) continue
-  costs.set(s.file, [...(costs.get(s.file) ?? []), s.wallMs])
+const cost = itemCostMedians(samples, values.preset, dataset.source)
+const uncosted = dataset.items.filter((item) => !cost.has(item.file))
+if (uncosted.length > 0) {
+  throw new Error(
+    `${values.label} has no ${values.preset} cost for ${uncosted.length} of the ${dataset.items.length} images in ${values.data}`,
+  )
 }
-const cost = new Map([...costs].map(([file, walls]) => [file, median(walls)]))
 
 const childPath = fileURLToPath(new URL('./b2-child.js', import.meta.url))
 
@@ -64,15 +66,22 @@ function nextMessage<T>(child: ChildProcess, type: string): Promise<T> {
   })
 }
 
-const rows = []
+const rows: ConcurrencyRow[] = []
 const ks = values.ks ? values.ks.split(',').map(Number) : Array.from({ length: kMax }, (_, i) => i + 1)
+if (
+  !Number.isInteger(kMax) ||
+  ks.length === 0 ||
+  ks.some((k, i) => !Number.isInteger(k) || k < 1 || ks.indexOf(k) !== i)
+) {
+  throw new Error('--ks and --k-max need distinct worker counts that are whole numbers above zero')
+}
 for (const k of ks) {
   const children = Array.from({ length: k }, (_, i) =>
     fork(childPath, [
       '--data',
-      values.data!,
+      values.data,
       '--preset',
-      values.preset!,
+      values.preset,
       '--seed',
       String(100 + i),
       ...(values.write ? ['--write'] : []),
@@ -96,14 +105,14 @@ for (const k of ks) {
   const from = goAt + warmupMs
   const to = from + durationMs
   const window = results.flatMap((r) => r.completions).filter((c) => c.at >= from && c.at < to)
-  const workMs = window.reduce((sum, c) => sum + (cost.get(c.file) ?? 0), 0)
+  const workMs = window.reduce((sum, c) => sum + valueFor(cost, c.file), 0)
   const effectiveCores = workMs / durationMs
-  const row = {
+  const row: ConcurrencyRow = {
     k,
     items: window.length,
     effectiveCores: round(effectiveCores),
     efficiency: round(effectiveCores / Math.min(k, cpus)),
-    wallInflation: round(mean(window.map((c) => c.wallMs / (cost.get(c.file) ?? c.wallMs)))),
+    wallInflation: round(mean(window.map((c) => c.wallMs / valueFor(cost, c.file)))),
     peakRssMb: round(Math.max(...results.map((r) => r.peakRssMb))),
     medianPeakRssMb: round(median(results.map((r) => r.peakRssMb))),
     cgroupAnonMeanMb: anon.length ? round(mean(anon)) : null,
@@ -113,17 +122,11 @@ for (const k of ks) {
   console.log(JSON.stringify(row))
 }
 
-let knee = rows.length
-for (let i = 0; i + 1 < rows.length; i++) {
-  if (rows[i + 1]!.effectiveCores < rows[i]!.effectiveCores * 1.05) {
-    knee = rows[i]!.k
-    break
-  }
-}
+const knee = kneeOf(rows)
 
-const name = values.name ?? `b2-concurrency-c${cpus}`
-const path = await writeResult(values.label!, name, {
-  env: environment(values.label!),
+const name = values.name ?? `${concurrencyResultPrefix}${cpus}`
+const path = await writeResult(values.label, name, {
+  env: environment(values.label),
   cpus,
   preset: values.preset,
   source: dataset.source,

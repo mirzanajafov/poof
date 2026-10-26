@@ -1,14 +1,18 @@
 import type { ExhibitParams, ManifestItem } from '@poof/contracts'
 import {
+  exhibitCapacityCores,
+  exhibitMaxProcesses,
   exhibitPolicies,
   exhibitSchedule,
   predictedCostMs,
+  valueAt,
   type Arrival,
   type PresetName,
   type TimeoutRule,
 } from '@poof/core'
 import type { Calibration } from './calibration.ts'
 import { Simulation, type MachineSpec, type RunResult } from './engine.ts'
+import { cage } from './scenarios.ts'
 import type { Arrivals, Scenario, TaskPlan } from './workload.ts'
 
 export interface ReplayItem {
@@ -18,15 +22,7 @@ export interface ReplayItem {
   predictedMs: number
 }
 
-export const replayMachine: MachineSpec = {
-  name: 'cage',
-  cores: 1.5,
-  memoryMb: 1536,
-  supervisorMb: 200,
-  maxProcesses: 35,
-}
-
-export const capacityCores = 1.32
+const replayMachine: MachineSpec = { ...cage, maxProcesses: exhibitMaxProcesses }
 
 export function replayItems(
   manifest: readonly ManifestItem[],
@@ -62,7 +58,7 @@ export class ReplayArrivals implements Arrivals {
       {
         durationMs: params.durationSeconds * 1000,
         utilization: params.utilization,
-        capacityCores,
+        capacityCores: exhibitCapacityCores,
         minItems: params.minItems,
         maxItems: params.maxItems,
         slackMin: params.slackMin,
@@ -76,16 +72,16 @@ export class ReplayArrivals implements Arrivals {
   nextArrival(): number | null {
     if (this.next >= this.arrivals.length) return null
     this.current = this.next++
-    return this.arrivals[this.current]!.at
+    return valueAt(this.arrivals, this.current).at
   }
 
   task(submittedAt: number): TaskPlan {
-    const arrival = this.arrivals[this.current]!
+    const arrival = valueAt(this.arrivals, this.current)
     const costs = new Float64Array(arrival.count)
     const mp = new Float32Array(arrival.count)
     let predictedMs = 0
     for (let i = 0; i < arrival.count; i++) {
-      const item = this.items[(arrival.offset + i) % this.items.length]!
+      const item = valueAt(this.items, (arrival.offset + i) % this.items.length)
       costs[i] = item.costMs
       mp[i] = item.mp
       predictedMs += item.predictedMs
@@ -93,7 +89,7 @@ export class ReplayArrivals implements Arrivals {
     return {
       index: this.current,
       id: `r${this.current}`,
-      type: this.scenario.types[0]!.value,
+      type: valueAt(this.scenario.types, 0).value,
       profile: 'dataset',
       submittedAt,
       deadline: submittedAt + arrival.slack * predictedMs,
@@ -111,9 +107,10 @@ export function replay(
   calibration: Calibration,
   timeoutRule?: TimeoutRule,
 ): RunResult {
+  const arrivals = new ReplayArrivals(params, items)
   return new Simulation({
-    scenario: new ReplayArrivals(params, items).scenario,
-    arrivals: new ReplayArrivals(params, items),
+    scenario: arrivals.scenario,
+    arrivals,
     machine: replayMachine,
     policy: exhibitPolicies[params.policy],
     calibration,

@@ -7,9 +7,10 @@ import { Worker } from 'node:worker_threads'
 import { loadCalibration } from './calibration.ts'
 import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
+import { count, knownNames, positive } from './options.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
-import { machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
+import { allPolicies, machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
 
 const { values } = parseArgs({
   options: {
@@ -28,25 +29,34 @@ const { values } = parseArgs({
 function policyNames(spec: string): string[] {
   if (spec === 'main') return mainPolicies.map((p) => p.name)
   if (spec === 'sweep') return sweepPolicies.map((p) => p.name)
-  if (spec === 'all') return [...mainPolicies, ...sweepPolicies].map((p) => p.name)
-  return spec.split(',')
+  if (spec === 'all') return allPolicies.map((p) => p.name)
+  return knownNames(
+    spec,
+    allPolicies.map((p) => p.name),
+    'policy',
+  )
 }
 
-const calibration = loadCalibration(values.calibration!)
-const seeds = Number(values.seeds)
+const machineNames = knownNames(values.machines, Object.keys(machines), 'machine')
+const scenarioNames = knownNames(values.scenarios, Object.keys(scenarios), 'scenario')
+const policies = policyNames(values.policies)
+const seeds = count('seeds', values.seeds)
+const threads = count('threads', values.threads)
+const dtMs = positive('dt', values.dt)
+const calibration = loadCalibration(values.calibration)
 const jobs: Job[] = []
-for (const machine of values.machines!.split(',')) {
-  for (const scenario of values.scenarios!.split(',')) {
-    for (const policy of policyNames(values.policies!)) {
+for (const machine of machineNames) {
+  for (const scenario of scenarioNames) {
+    for (const policy of policies) {
       for (let seed = 1; seed <= seeds; seed++) {
         jobs.push({
           machine,
           scenario,
           policy,
           seed,
-          dtMs: Number(values.dt),
+          dtMs,
           keepSeries: seed === 1,
-          checkInvariants: values.invariants!,
+          checkInvariants: values.invariants,
         })
       }
     }
@@ -62,28 +72,24 @@ const workerPath = fileURLToPath(new URL('./run-worker.js', import.meta.url))
 
 await new Promise<void>((resolve, reject) => {
   const queue = [...jobs]
-  const threads = Math.min(Number(values.threads), jobs.length)
+  const workers = Math.min(threads, jobs.length)
   let idle = 0
-  for (let i = 0; i < threads; i++) {
+  for (let i = 0; i < workers; i++) {
     const worker = new Worker(workerPath, { workerData: { calibration } })
-    let current: Job | undefined
     const next = () => {
-      current = queue.shift()
-      if (current) worker.postMessage(current)
+      const job = queue.shift()
+      if (job) worker.postMessage(job)
       else {
         void worker.terminate()
-        if (++idle === threads) resolve()
+        if (++idle === workers) resolve()
       }
     }
     worker.on('message', (message: { metrics: RunMetrics; series: Sample[] | null; runMs: number }) => {
       metrics.push(message.metrics)
-      if (message.series)
-        series.push({
-          machine: current!.machine,
-          scenario: current!.scenario,
-          policy: current!.policy,
-          samples: message.series,
-        })
+      if (message.series) {
+        const { machine, scenario, policy } = message.metrics
+        series.push({ machine, scenario, policy, samples: message.series })
+      }
       runMs += message.runMs
       if (++finished % 100 === 0 || finished === jobs.length) {
         process.stdout.write(
@@ -99,8 +105,8 @@ await new Promise<void>((resolve, reject) => {
 
 const cells = summarize(metrics)
 const comparisons: Comparison[] = []
-for (const machine of values.machines!.split(',')) {
-  for (const scenario of values.scenarios!.split(',')) {
+for (const machine of machineNames) {
+  for (const scenario of scenarioNames) {
     const pairs: Array<[string, string, Parameters<typeof compare>[5]]> = [
       ['forecast+budget', 'timer+budget', 'hitRate'],
       ['forecast+budget', 'timer+budget', 'skewedHitRate'],
@@ -129,6 +135,6 @@ await writeFile(join(out, 'raw', 'metrics.json'), JSON.stringify(metrics))
 await writeFile(join(out, 'raw', 'series.json'), JSON.stringify(series))
 await writeFile(
   join(out, 'summary.json'),
-  `${JSON.stringify({ calibration, seeds, dtMs: Number(values.dt), cells, comparisons }, null, 2)}\n`,
+  `${JSON.stringify({ calibration, seeds, dtMs, cells, comparisons }, null, 2)}\n`,
 )
 console.log(`wrote ${out}`)

@@ -1,5 +1,5 @@
+import { mean } from '@poof/core/stats'
 import type { RunResult, Sample } from './engine.ts'
-import { mean } from './stats.ts'
 import type { Scenario, Window } from './workload.ts'
 
 export interface RunMetrics {
