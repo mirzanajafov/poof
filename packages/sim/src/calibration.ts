@@ -117,15 +117,29 @@ function mergeByCpus(files: ConcurrencyRun[]): ConcurrencyRun[] {
   return [...byCpus.values()].sort((a, b) => a.cpus - b.cpus)
 }
 
-export function curveFor(calibration: Calibration, cpus: number): Curve {
+export interface FittedCurve extends Curve {
+  decline: number
+}
+
+export function curveFor(calibration: Calibration, cpus: number): FittedCurve {
   let best = valueAt(calibration.curves, 0)
   for (const curve of calibration.curves) {
     if (Math.abs(curve.cpus - cpus) < Math.abs(best.cpus - cpus)) best = curve
   }
-  return best
+  return { ...best, decline: decline(best) }
 }
 
-function onCurve(curve: Curve, workers: number): number {
+function decline(curve: Curve): number {
+  const saturated = curve.points.filter((p) => p.workers >= Math.ceil(curve.cpus))
+  if (saturated.length < 2) return 0
+  const { slope } = linearFit(
+    saturated.map((p) => p.workers),
+    saturated.map((p) => p.effectiveCores),
+  )
+  return slope < 0 ? slope : 0
+}
+
+function onCurve(curve: FittedCurve, workers: number): number {
   const points = curve.points
   const first = valueAt(points, 0)
   const last = valueAt(points, points.length - 1)
@@ -137,19 +151,10 @@ function onCurve(curve: Curve, workers: number): number {
     const t = (workers - a.workers) / (b.workers - a.workers)
     return a.effectiveCores + t * (b.effectiveCores - a.effectiveCores)
   }
-  const saturated = points.filter((p) => p.workers >= Math.ceil(curve.cpus))
-  const fit =
-    saturated.length >= 2
-      ? linearFit(
-          saturated.map((p) => p.workers),
-          saturated.map((p) => p.effectiveCores),
-        )
-      : null
-  const decline = fit && fit.slope < 0 ? fit.slope : 0
-  return Math.max(0.25 * last.effectiveCores, last.effectiveCores + decline * (workers - last.workers))
+  return Math.max(0.25 * last.effectiveCores, last.effectiveCores + curve.decline * (workers - last.workers))
 }
 
-export function effectiveCores(curve: Curve, workers: number, cpus: number): number {
+export function effectiveCores(curve: FittedCurve, workers: number, cpus: number): number {
   if (workers <= 0) return 0
   const scale = cpus / curve.cpus
   return onCurve(curve, workers / scale) * scale

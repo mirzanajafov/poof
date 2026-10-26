@@ -24,7 +24,7 @@ import {
   type TimeoutRule,
   type View,
 } from '@poof/core'
-import { curveFor, effectiveCores, type Calibration, type Curve } from './calibration.ts'
+import { curveFor, effectiveCores, type Calibration, type FittedCurve } from './calibration.ts'
 import { inWindow, Workload, type Arrivals, type Scenario, type TaskPlan } from './workload.ts'
 
 export interface MachineSpec {
@@ -165,7 +165,7 @@ const DEAD = 2
 export class Simulation {
   readonly options: Required<Omit<SimOptions, 'budget' | 'arrivals'>> & { budget: number }
   private readonly workload: Arrivals
-  private readonly curve: Curve
+  private readonly curve: FittedCurve
   private readonly policy: PolicyConfig
   private readonly machine: MachineSpec
   private now = 0
