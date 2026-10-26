@@ -68,10 +68,8 @@ export function powerFit(xs: readonly number[], ys: readonly number[]) {
 
 export function bootstrap(values: readonly number[], seed = 1, resamples = 2000): Interval {
   const rng = new Rng(seed)
-  const means: number[] = []
-  for (let r = 0; r < resamples; r++) {
-    means.push(mean(values.map(() => valueAt(values, Math.floor(rng.next() * values.length)))))
-  }
+  const draw = () => valueAt(values, Math.floor(rng.next() * values.length))
+  const means = Array.from({ length: resamples }, () => mean(Array.from({ length: values.length }, draw)))
   return { mean: mean(values), lo: quantile(means, 0.025), hi: quantile(means, 0.975) }
 }
 
