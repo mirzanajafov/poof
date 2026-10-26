@@ -21,4 +21,14 @@ describe('kneeOf', () => {
     ]
     expect(kneeOf(rows)).toBe(35)
   })
+
+  it('reads the rows in worker order whatever order they were measured in', () => {
+    const rows = [
+      { k: 4, effectiveCores: 1.43 },
+      { k: 1, effectiveCores: 0.95 },
+      { k: 3, effectiveCores: 1.42 },
+      { k: 2, effectiveCores: 1.4 },
+    ]
+    expect(kneeOf(rows)).toBe(2)
+  })
 })

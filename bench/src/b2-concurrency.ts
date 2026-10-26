@@ -34,6 +34,8 @@ interface Done {
 }
 
 const cpus = Number(values.cpus ?? process.env.CPU_LIMIT ?? availableParallelism())
+if (!(cpus > 0))
+  throw new Error(`the CPU count needs to be a number above zero, not ${values.cpus ?? process.env.CPU_LIMIT}`)
 const kMax = Number(values['k-max'] ?? Math.ceil(3 * cpus))
 const durationMs = Number(values.duration) * 1000
 const warmupMs = Number(values.warmup) * 1000
@@ -65,12 +67,7 @@ function nextMessage<T>(child: ChildProcess, type: string): Promise<T> {
 }
 
 const rows: ConcurrencyRow[] = []
-const ks = values.ks
-  ? values.ks
-      .split(',')
-      .map(Number)
-      .sort((a, b) => a - b)
-  : Array.from({ length: kMax }, (_, i) => i + 1)
+const ks = values.ks ? values.ks.split(',').map(Number) : Array.from({ length: kMax }, (_, i) => i + 1)
 if (ks.length === 0 || ks.some((k) => !Number.isInteger(k) || k < 1)) {
   throw new Error('--ks and --k-max need worker counts that are whole numbers above zero')
 }
