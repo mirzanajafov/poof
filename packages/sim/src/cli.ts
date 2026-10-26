@@ -9,7 +9,7 @@ import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
-import { machines, mainPolicies, policyByName, scenarios, sweepPolicies } from './scenarios.ts'
+import { machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
 
 const { values } = parseArgs({
   options: {
@@ -29,21 +29,27 @@ function policyNames(spec: string): string[] {
   if (spec === 'main') return mainPolicies.map((p) => p.name)
   if (spec === 'sweep') return sweepPolicies.map((p) => p.name)
   if (spec === 'all') return [...mainPolicies, ...sweepPolicies].map((p) => p.name)
-  return spec.split(',').map((name) => policyByName(name).name)
+  return knownNames(
+    spec,
+    [...mainPolicies, ...sweepPolicies].map((p) => p.name),
+    'policy',
+  )
 }
 
-function knownNames(spec: string, known: Readonly<Record<string, unknown>>, kind: string): string[] {
+function knownNames(spec: string, known: readonly string[], kind: string): string[] {
   const names = spec.split(',')
-  const unknown = names.filter((name) => !Object.hasOwn(known, name))
+  const unknown = names.filter((name) => !known.includes(name))
   if (unknown.length > 0) throw new Error(`unknown ${kind} ${unknown.join(', ')}`)
   return names
 }
 
-const machineNames = knownNames(values.machines, machines, 'machine')
-const scenarioNames = knownNames(values.scenarios, scenarios, 'scenario')
+const machineNames = knownNames(values.machines, Object.keys(machines), 'machine')
+const scenarioNames = knownNames(values.scenarios, Object.keys(scenarios), 'scenario')
 const policies = policyNames(values.policies)
-const calibration = loadCalibration(values.calibration)
 const seeds = Number(values.seeds)
+if (!Number.isInteger(seeds) || seeds < 1)
+  throw new Error(`--seeds needs a whole number above zero, not ${values.seeds}`)
+const calibration = loadCalibration(values.calibration)
 const jobs: Job[] = []
 for (const machine of machineNames) {
   for (const scenario of scenarioNames) {
