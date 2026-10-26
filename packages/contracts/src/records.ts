@@ -35,11 +35,11 @@ function passes(value: unknown, check: FieldCheck): boolean {
   if (typeof check !== 'string') return check.some((allowed) => allowed === value)
   if (check === 'number or null') return value === null || typeof value === 'number'
   if (check === 'string or null') return value === null || typeof value === 'string'
-  if (check === 'object') return typeof value === 'object' && value !== null
+  if (check === 'object') return isRecord(value)
   return typeof value === check
 }
 
-export function fieldProblem(value: unknown, checks: Readonly<Record<string, FieldCheck>>): string | null {
+function fieldProblem(value: unknown, checks: Readonly<Record<string, FieldCheck>>): string | null {
   if (!isRecord(value)) return 'is not an object'
   const failed = Object.entries(checks).find(([field, check]) => !passes(value[field], check))
   return failed ? `has no valid ${failed[0]}` : null
@@ -47,4 +47,9 @@ export function fieldProblem(value: unknown, checks: Readonly<Record<string, Fie
 
 export function hasFields<T>(value: unknown, checks: Checks<T>): value is T {
   return fieldProblem(value, checks) === null
+}
+
+export function assertFields<T>(value: unknown, checks: Checks<T>, what: string): asserts value is T {
+  const problem = fieldProblem(value, checks)
+  if (problem !== null) throw new Error(`${what} ${problem}`)
 }

@@ -94,7 +94,7 @@ describe('parseConcurrencyRun', () => {
       'b2.json: rows 0 has no valid cgroupAnonPeakMb',
     )
     expect(() => parseConcurrencyRun(JSON.stringify({ cpus: 2, rows: [row] }), 'b2.json')).toThrow(
-      'b2.json needs a number of cpus and a knee',
+      'b2.json has no valid knee',
     )
   })
 })
@@ -134,9 +134,9 @@ describe('parseExhibitRuns', () => {
   })
 
   it('names the run and the field when a policy, preset or count is not usable', () => {
-    const unknownPolicy = { ...run, params: { ...run.params, policy: 'storm' } }
+    const unknownPolicy = { ...run, id: 'e2', params: { ...run.params, policy: 'storm' } }
     expect(() => parseExhibitRuns(JSON.stringify([run, unknownPolicy]), 'runs.json')).toThrow(
-      'runs.json: run e1 params has no valid policy',
+      'runs.json: run e2 params has no valid policy',
     )
     const unknownPreset = { ...run, params: { ...run.params, preset: 'gif-64' } }
     expect(() => parseExhibitRuns(JSON.stringify([unknownPreset]), 'runs.json')).toThrow(

@@ -1,7 +1,7 @@
 import { exhibitPolicyNames, presetNames } from '@poof/core'
 import { median } from '@poof/core/stats'
 import type { ExhibitDetail, ExhibitParams, ExhibitStats } from './exhibits.ts'
-import { fieldProblem, hasFields, isRecord, parseJson, type Checks } from './records.ts'
+import { assertFields, hasFields, isRecord, parseJson, type Checks } from './records.ts'
 
 export const itemCostsResult = 'b1-item-cost'
 export const concurrencyResultPrefix = 'b2-concurrency-c'
@@ -53,15 +53,15 @@ export interface SpawnRun {
 
 export type ExhibitRun = Pick<ExhibitDetail, 'id' | 'policy' | 'params' | 'tasks'> & { stats: ExhibitStats }
 
-export type RecordedStats = Pick<
+export type ExhibitRunStats = Pick<
   ExhibitStats,
   'submitted' | 'rejected' | 'met' | 'peakProcesses' | 'spawns' | 'items' | 'exits'
 >
 
-export interface RecordedExhibit {
+export interface ExhibitRunSummary {
   id: string
   params: ExhibitParams
-  stats: RecordedStats
+  stats: ExhibitRunStats
 }
 
 const itemCostChecks: Checks<ItemCost> = {
@@ -94,7 +94,7 @@ const exhibitParamChecks: Checks<ExhibitParams> = {
   seed: 'number',
 }
 
-const recordedStatsChecks: Checks<RecordedStats> = {
+const exhibitRunStatsChecks: Checks<ExhibitRunStats> = {
   submitted: 'number',
   rejected: 'number',
   met: 'number',
@@ -107,7 +107,7 @@ const recordedStatsChecks: Checks<RecordedStats> = {
 function entries<T>(list: unknown, checks: Checks<T>, what: string, origin: string): T[] {
   if (!Array.isArray(list) || list.length === 0) throw new Error(`${origin} lists no ${what}`)
   return list.map((entry: unknown, index) => {
-    if (!hasFields(entry, checks)) throw new Error(`${origin}: ${what} ${index} ${fieldProblem(entry, checks) ?? ''}`)
+    assertFields<T>(entry, checks, `${origin}: ${what} ${index}`)
     return entry
   })
 }
@@ -129,9 +129,7 @@ export function itemCostMedians(costs: readonly ItemCost[], preset: string, sour
 export function parseConcurrencyRun(text: string, origin: string): ConcurrencyRun {
   const json = parseJson(text, origin)
   const rows = entries<ConcurrencyPoint>(isRecord(json) ? json.rows : undefined, concurrencyPointChecks, 'rows', origin)
-  if (!hasFields<Omit<ConcurrencyRun, 'rows'>>(json, { cpus: 'number', knee: 'number' })) {
-    throw new Error(`${origin} needs a number of cpus and a knee`)
-  }
+  assertFields<Omit<ConcurrencyRun, 'rows'>>(json, { cpus: 'number', knee: 'number' }, origin)
   return { cpus: json.cpus, knee: json.knee, rows }
 }
 
@@ -148,23 +146,23 @@ export function parseSpawnRun(text: string, origin: string): SpawnRun {
   return { warm: { wallMs: warm.wallMs, cpuMs: warm.cpuMs, rssMb: warm.rssMb, anonMb } }
 }
 
-export function parseExhibitRuns(text: string, origin: string): RecordedExhibit[] {
-  const runs = entries<{ id: string; params: object; stats: object }>(
-    parseJson(text, origin),
+export function exhibitRunSummary(run: unknown, origin: string): ExhibitRunSummary {
+  assertFields<{ id: string; params: object; stats: object }>(
+    run,
     { id: 'string', params: 'object', stats: 'object' },
-    'runs',
     origin,
   )
-  return runs.map(({ id, params, stats }) => {
-    if (!hasFields<ExhibitParams>(params, exhibitParamChecks)) {
-      throw new Error(`${origin}: run ${id} params ${fieldProblem(params, exhibitParamChecks) ?? ''}`)
-    }
-    if (!hasFields<RecordedStats>(stats, recordedStatsChecks)) {
-      throw new Error(`${origin}: run ${id} stats ${fieldProblem(stats, recordedStatsChecks) ?? ''}`)
-    }
-    if (!isRecord(stats.exits) || !Object.values<unknown>(stats.exits).every((count) => typeof count === 'number')) {
-      throw new Error(`${origin}: run ${id} stats has exit counts that are not numbers`)
-    }
-    return { id, params, stats }
-  })
+  const { id, params, stats } = run
+  assertFields<ExhibitParams>(params, exhibitParamChecks, `${origin}: run ${id} params`)
+  assertFields<ExhibitRunStats>(stats, exhibitRunStatsChecks, `${origin}: run ${id} stats`)
+  if (!Object.values<unknown>(stats.exits).every((count) => typeof count === 'number')) {
+    throw new Error(`${origin}: run ${id} stats has exit counts that are not numbers`)
+  }
+  return { id, params, stats }
+}
+
+export function parseExhibitRuns(text: string, origin: string): ExhibitRunSummary[] {
+  const runs = parseJson(text, origin)
+  if (!Array.isArray(runs) || runs.length === 0) throw new Error(`${origin} lists no runs`)
+  return runs.map((run: unknown) => exhibitRunSummary(run, origin))
 }

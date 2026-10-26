@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { parseManifest } from '@poof/contracts'
-import { itemCostMedians, parseExhibitRuns, type RecordedStats } from '@poof/contracts/bench'
+import { itemCostMedians, parseExhibitRuns, type ExhibitRunStats } from '@poof/contracts/bench'
 import { defaultTimeoutRule } from '@poof/core'
 import { mean } from '@poof/core/stats'
 import { itemCostSamples, loadCalibration } from './calibration.ts'
@@ -57,7 +57,7 @@ function simulated(result: RunResult): Numbers {
   }
 }
 
-function real(stats: RecordedStats): Numbers {
+function real(stats: ExhibitRunStats): Numbers {
   return {
     submitted: stats.submitted,
     rejected: stats.rejected,
