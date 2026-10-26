@@ -58,29 +58,35 @@ export class TaskStore {
 
   started(taskId: string): void {
     const startedAt = new Date()
-    this.write(() => this.db.client.task.update({ where: { id: taskId }, data: { status: 'RUNNING', startedAt } }))
+    this.write(`task ${taskId} started`, () =>
+      this.db.client.task.update({ where: { id: taskId }, data: { status: 'RUNNING', startedAt } }),
+    )
   }
 
   leaseCreated(taskId: string, lease: LeaseRow): void {
-    this.write(() => this.db.client.lease.create({ data: { ...lease, taskId, cursor: lease.lo } }))
+    this.write(`lease ${lease.id} created`, () =>
+      this.db.client.lease.create({ data: { ...lease, taskId, cursor: lease.lo } }),
+    )
   }
 
   leaseRunning(leaseId: string, workerId: string, cursor: number): void {
-    this.write(() =>
+    this.write(`lease ${leaseId} running`, () =>
       this.db.client.lease.update({ where: { id: leaseId }, data: { state: 'RUNNING', workerId, cursor } }),
     )
   }
 
   leaseDone(leaseId: string, cursor: number): void {
-    this.write(() => this.db.client.lease.update({ where: { id: leaseId }, data: { state: 'DONE', cursor } }))
+    this.write(`lease ${leaseId} done`, () =>
+      this.db.client.lease.update({ where: { id: leaseId }, data: { state: 'DONE', cursor } }),
+    )
   }
 
   leaseShrunk(leaseId: string, hi: number): void {
-    this.write(() => this.db.client.lease.update({ where: { id: leaseId }, data: { hi } }))
+    this.write(`lease ${leaseId} shrunk`, () => this.db.client.lease.update({ where: { id: leaseId }, data: { hi } }))
   }
 
   leaseReleased(leaseId: string, state: LeaseState, cursor: number): void {
-    this.write(() =>
+    this.write(`lease ${leaseId} released`, () =>
       this.db.client.lease.update({
         where: { id: leaseId },
         data: { state: leaseColumn[state], cursor, workerId: null },
@@ -90,31 +96,37 @@ export class TaskStore {
 
   workerStarted(workerId: string, pid: number): void {
     const startedAt = new Date()
-    this.write(() => this.db.client.worker.create({ data: { id: workerId, pid, startedAt } }))
+    this.write(`worker ${workerId} started`, () =>
+      this.db.client.worker.create({ data: { id: workerId, pid, startedAt } }),
+    )
   }
 
   workerExited(workerId: string, reason: ExitReason, items: number): void {
     const endedAt = new Date()
-    this.write(() =>
+    this.write(`worker ${workerId} exited`, () =>
       this.db.client.worker.update({ where: { id: workerId }, data: { endedAt, exit: exitColumn[reason], items } }),
     )
   }
 
   deadLettered(taskId: string, item: number, attempts: number, error: string): void {
-    this.write(() => this.db.client.deadLetter.create({ data: { taskId, item, attempts, error: error.slice(0, 500) } }))
+    this.write(`dead letter ${taskId}/${item}`, () =>
+      this.db.client.deadLetter.create({ data: { taskId, item, attempts, error: error.slice(0, 500) } }),
+    )
   }
 
   decided(taskId: string, kind: 'worker-exit' | 'split', detail: Prisma.InputJsonObject): void {
-    this.write(() => this.db.client.decision.create({ data: { kind, taskId, detail } }))
+    this.write(`${kind} decision for task ${taskId}`, () =>
+      this.db.client.decision.create({ data: { kind, taskId, detail } }),
+    )
   }
 
   breakerChanged(type: PresetName, state: BreakerState): void {
-    this.write(() => this.db.client.breakerEvent.create({ data: { type, state } }))
+    this.write(`breaker ${type} ${state}`, () => this.db.client.breakerEvent.create({ data: { type, state } }))
   }
 
   finished({ id, done, dead }: Progress, leases: ReadonlyArray<{ id: string; hi: number }>, at: Date): void {
     const cursors = leases.map((lease) => ({ id: lease.id, cursor: lease.hi }))
-    this.write(() =>
+    this.write(`task ${id} finished`, () =>
       this.db.client.$transaction([
         this.db.client.task.update({
           where: { id },
@@ -128,7 +140,7 @@ export class TaskStore {
   }
 
   failed({ id, done, dead }: Progress, kind: 'fail' | 'cancel', reason: string, at: Date): void {
-    this.write(() =>
+    this.write(`task ${id} failed`, () =>
       this.db.client.$transaction([
         this.db.client.task.update({
           where: { id },
@@ -142,7 +154,7 @@ export class TaskStore {
 
   checkpoint(leases: ReadonlyArray<{ id: string; cursor: number }>, tasks: readonly Progress[]): void {
     if (leases.length === 0 && tasks.length === 0) return
-    this.write(() =>
+    this.write(`checkpoint of ${leases.length} leases and ${tasks.length} tasks`, () =>
       this.db.client.$transaction([
         ...leases.map((l) => this.db.client.lease.update({ where: { id: l.id }, data: { cursor: l.cursor } })),
         ...tasks.map((t) =>
@@ -168,7 +180,9 @@ export class TaskStore {
     })
   }
 
-  private write(write: () => Promise<unknown>): void {
-    this.writes = this.writes.then(write).catch((error: unknown) => this.logger.error(error))
+  private write(what: string, write: () => Promise<unknown>): void {
+    this.writes = this.writes.then(write).catch((error: unknown) => {
+      this.logger.error(`could not write ${what}: ${String(error)}`)
+    })
   }
 }

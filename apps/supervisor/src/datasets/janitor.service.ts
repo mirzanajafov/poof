@@ -21,7 +21,14 @@ export class Janitor implements OnApplicationBootstrap, OnApplicationShutdown {
   }
 
   onApplicationBootstrap(): void {
-    this.timer = setInterval(() => void this.sweep(), Math.min(10 * 60_000, this.ttlMs / 4))
+    this.timer = setInterval(
+      () => {
+        this.sweep().catch((error: unknown) => {
+          this.logger.error(error)
+        })
+      },
+      Math.min(10 * 60_000, this.ttlMs / 4),
+    )
     this.timer.unref()
   }
 

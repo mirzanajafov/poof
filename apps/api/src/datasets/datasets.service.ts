@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import {
   datasetDir,
   datasetNamePattern,
@@ -8,14 +8,20 @@ import {
   parseManifest,
   type DatasetSummary,
 } from '@poof/contracts'
+import { isMissingFile } from '@poof/nest'
 import { Env } from '../config/env.js'
 
 @Injectable()
 export class Datasets {
+  private readonly logger = new Logger(Datasets.name)
+
   constructor(private readonly env: Env) {}
 
   async list(): Promise<DatasetSummary[]> {
-    const names = await readdir(datasetsDir(this.env.DATA_DIR)).catch(() => [] as string[])
+    const names = await readdir(datasetsDir(this.env.DATA_DIR)).catch((error: unknown) => {
+      if (isMissingFile(error)) return []
+      throw error
+    })
     const valid = names.filter((name) => datasetNamePattern.test(name)).sort()
     const summaries = await Promise.all(valid.map((name) => this.summary(name)))
     return summaries.filter((summary) => summary !== null)
@@ -25,7 +31,10 @@ export class Datasets {
     const path = manifestPath(datasetDir(this.env.DATA_DIR, name))
     const manifest = await readFile(path, 'utf8')
       .then((text) => parseManifest(text, path))
-      .catch(() => null)
+      .catch((error: unknown) => {
+        if (!isMissingFile(error)) this.logger.warn(`skipping dataset ${name}: ${String(error)}`)
+        return null
+      })
     if (!manifest) return null
     const mp = manifest.items.map((i) => (i.width * i.height) / 1e6)
     return {
