@@ -22,7 +22,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
       stdio: 'pipe',
     })
   } catch (error) {
-    await drop()
+    await drop().catch(() => undefined)
     throw error
   }
   return { url: url.toString(), drop }
