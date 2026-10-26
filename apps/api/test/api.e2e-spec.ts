@@ -12,7 +12,7 @@ import {
 } from '@poof/contracts'
 import { io, type Socket } from 'socket.io-client'
 import request from 'supertest'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { adminToken, start, StubSupervisor, type Running } from './harness.js'
 
 const supervisor = new StubSupervisor()
@@ -27,6 +27,7 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   if (running) {
     await running.close()
     await rm(running.dataDir, { recursive: true, force: true })
@@ -155,6 +156,7 @@ describe('submissions', () => {
   })
 
   it('counts each forwarded address on its own behind a trusted proxy', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-26T12:00:30Z') })
     running = await start(supervisor.url, { TRUST_PROXY: 'loopback, uniquelocal', TASKS_PER_MINUTE: '1' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
     const from = (address: string) => http().post('/api/tasks').set('X-Forwarded-For', address).send(body)
