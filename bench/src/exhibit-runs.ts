@@ -18,10 +18,9 @@ const { values } = parseArgs({
 })
 
 const names = values.policies.split(',')
+const unknown = names.filter((name) => !isExhibitPolicyName(name))
+if (unknown.length > 0) throw new Error(`no exhibit policy ${unknown.join(', ')}`)
 const policies = names.filter(isExhibitPolicyName)
-if (policies.length !== names.length) {
-  throw new Error(`no exhibit policy ${names.filter((name) => !isExhibitPolicyName(name)).join(', ')}`)
-}
 const token = process.env.ADMIN_TOKEN
 if (!token) throw new Error('ADMIN_TOKEN is not set')
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
@@ -36,6 +35,7 @@ async function ended(id: string): Promise<ExhibitDetail> {
   while (true) {
     await sleep(3000)
     const { status, body } = await call(`/api/exhibits/${id}`)
+    if (status >= 400 && status < 500) throw new Error(`the API answered ${status} for exhibit ${id}`)
     if (status !== 200) continue
     const detail = body as ExhibitDetail
     if (detail.status !== 'RUNNING') return detail
@@ -62,13 +62,13 @@ for (const seed of values.seeds.split(',').map(Number)) {
       console.log(`${policy} seed ${seed}: could not start (${started.status} ${JSON.stringify(started.body)})`)
       continue
     }
-    const { params, stats, tasks } = await ended(id)
-    if (stats) {
+    const { status, params, stats, tasks } = await ended(id)
+    if (status === 'DONE' && stats) {
       runs.push({ id, policy, params, stats, tasks })
       await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
       console.log(`${policy} seed ${seed}: ${JSON.stringify(stats)}`)
     } else {
-      console.log(`${policy} seed ${seed}: ended without stats`)
+      console.log(`${policy} seed ${seed}: ended ${status}, not recorded`)
     }
     await sleep(Number(values.gap) * 1000)
   }
