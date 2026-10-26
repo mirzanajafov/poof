@@ -1,4 +1,4 @@
-import { outputFileName } from '@poof/contracts'
+import { outputFileName } from '@poof/contracts/layout'
 import { presetNames } from '@poof/core'
 import { presets, processItem } from '@poof/imaging'
 import sharp from 'sharp'

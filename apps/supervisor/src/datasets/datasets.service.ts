@@ -1,18 +1,8 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable } from '@nestjs/common'
-import {
-  datasetDir,
-  datasetNamePattern,
-  inputDir,
-  manifestPath,
-  outputDir,
-  parseManifest,
-  taskDir,
-  tasksDir,
-  type ManifestItem,
-  type TaskManifest,
-} from '@poof/contracts'
+import { datasetNamePattern, parseManifest, type ManifestItem, type TaskManifest } from '@poof/contracts'
+import { datasetDir, inputDir, manifestPath, outputDir, taskDir, tasksDir } from '@poof/contracts/layout'
 import { isMissingFile, NotFoundError, readDirIfPresent } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { linkOrCopy } from './files.js'

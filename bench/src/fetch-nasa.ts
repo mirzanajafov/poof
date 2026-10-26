@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { manifestPath } from '@poof/contracts'
+import { manifestPath } from '@poof/contracts/layout'
 import sharp from 'sharp'
 import type { DatasetItem } from './dataset.ts'
 
