@@ -40,6 +40,7 @@ afterEach(async () => {
 const http = () => request(running!.app.getHttpServer())
 const poolSnapshot = (): PoolSnapshot => ({ at: 0, budget: 2, workers: [], tasks: [], breakers: {} })
 const admin = { Authorization: `Bearer ${adminToken}` }
+const midWindow = new Date('2026-10-26T12:30:30Z')
 
 async function seedTask() {
   const id = randomUUID()
@@ -156,7 +157,7 @@ describe('submissions', () => {
   })
 
   it('counts each forwarded address on its own behind a trusted proxy', async () => {
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-26T12:00:30Z') })
+    vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { TRUST_PROXY: 'loopback, uniquelocal', TASKS_PER_MINUTE: '1' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
     const from = (address: string) => http().post('/api/tasks').set('X-Forwarded-For', address).send(body)
@@ -166,6 +167,7 @@ describe('submissions', () => {
   })
 
   it('rate-limits submissions per address, except for the admin token', async () => {
+    vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { TASKS_PER_MINUTE: '3' })
     const body = { dataset: 'synthetic', preset: 'webp-1600', deadlineSeconds: 60 }
     for (let i = 0; i < 3; i++) expect((await http().post('/api/tasks').send(body)).status).toBe(201)
@@ -196,6 +198,7 @@ describe('exhibits', () => {
   })
 
   it('lets one address start three public exhibits an hour', async () => {
+    vi.setSystemTime(midWindow)
     running = await start(supervisor.url, { EXHIBIT_COOLDOWN_SECONDS: '0' })
     supervisor.reply = () => ({ status: 201, body: { id: 'e1', endsAt: 1 } })
     for (let i = 0; i < 3; i++)
