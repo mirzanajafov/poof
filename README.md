@@ -112,7 +112,7 @@ Raw runs and replays are in `packages/sim/results/real/`.
 - The synthetic image generator striped every image: a one-channel noise layer came back from `resize` with three channels and was read as one. Caught by looking at a crop, not by a test.
 - On Windows, git doesn't record the executable bit, so the deploy script arrived on the server as a plain file.
 - The server user is uid 1001 and the images run as 1000, so the supervisor couldn't write its own data folder until the containers ran as the host user.
-- The API is the one poof container on the server's shared proxy network, and Compose puts every service name into that network's DNS. The service was called `api`, so on 5 October the web apps of my portfolio site and matchium, which call their own `api`, got poof's API instead. It's `poof-api` now, the same as its container name, and it reaches Postgres, Redis and the supervisor by container name too, so neither side depends on what the other apps call their services.
+- Compose puts every service name into the DNS of each network the service is on, and the server's proxy network is shared by every app. The API's service was called `api`, so on 5 October the web apps of my portfolio site and matchium, which call their own `api`, got poof's API instead. It's `poof-api` now. The web app had been on that network as `web` since the first deploy, the same trap, and it's `poof-web` now. Every poof container reaches the others by their `poof-` names, so nothing depends on what the other apps call their services.
 - Every healthcheck is a `docker exec`. With six apps checking every five or ten seconds, dockerd was using most of a core, so poof checks every 30 seconds in production.
 - The API and supervisor images were 860-880 MB. `@prisma/client` declares the Prisma CLI and TypeScript as optional peers, pnpm satisfied them from the database package's dev dependencies, and a production install carried the CLI, Prisma Studio and a copy of PGlite. A small pnpm hook that drops those peers, plus deleting the query compilers for databases I don't use, took them to 430-460 MB. The migrate image had the pnpm store baked in. It went from 1.39 GB to 780 MB.
 - Ending an exhibit of the box takes about 20 seconds, because the engine waits for its write queue, and a storm leaves hundreds of lease and worker rows in it. The pool stays paused for those seconds.
@@ -131,10 +131,10 @@ Raw runs and replays are in `packages/sim/results/real/`.
 Everything in Docker:
 
 ```bash
-docker compose --profile app up -d --build
+docker compose --profile app up -d --build --remove-orphans
 ```
 
-That starts Postgres (5447), Redis (6387), the supervisor (3110, with the cage limits), the API (3111) and the web app (http://localhost:3113). With `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318` in the environment and `--profile tracing` added, it also starts Jaeger, at http://localhost:3116. The supervisor needs photos in `data/poof/datasets`. To make them:
+That starts Postgres (5447), Redis (6387), the supervisor (3110, with the cage limits), the API (3111) and the web app (http://localhost:3113). With `OTEL_EXPORTER_OTLP_ENDPOINT=http://poof-jaeger:4318` in the environment and `--profile tracing` added, it also starts Jaeger, at http://localhost:3116. The supervisor needs photos in `data/poof/datasets`. To make them:
 
 ```bash
 pnpm install && pnpm -r build
