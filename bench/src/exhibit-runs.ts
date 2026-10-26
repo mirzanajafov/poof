@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { exhibitDefaults, exhibitEnds, hasFields, isRecord, type ExhibitDetail } from '@poof/contracts'
-import type { ExhibitRun } from '@poof/contracts/bench'
+import { exhibitRunSummary, type ExhibitRun } from '@poof/contracts/bench'
 import { isExhibitPolicyName, type ExhibitPolicyName } from '@poof/core'
 import { recordedRun } from './recorded-run.ts'
 
@@ -32,7 +32,9 @@ const headers = { authorization: `Bearer ${token}`, 'content-type': 'application
 const patienceMs = (2 * Number(values.duration) + 60) * 1000
 
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
-  const res = await fetch(`${values.api}${path}`, init)
+  const res = await fetch(`${values.api}${path}`, init).catch((error: unknown) => {
+    throw new Error(`could not reach ${values.api}${path}`, { cause: error })
+  })
   const body: unknown = await res.json().catch(() => null)
   return { status: res.status, body }
 }
@@ -86,6 +88,7 @@ for (const seed of values.seeds.split(',').map(Number)) {
     const detail = await ended(await start(policy, seed))
     const run = recordedRun(detail)
     if (run) {
+      exhibitRunSummary(run, `${values.api}/api/exhibits/${run.id}`)
       runs.push(run)
       await writeFile(values.out, `${JSON.stringify(runs, null, 2)}\n`)
       console.log(`${policy} seed ${seed}: ${JSON.stringify(run.stats)}`)
