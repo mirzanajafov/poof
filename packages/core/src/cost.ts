@@ -13,7 +13,7 @@ export const serverCostModels: Record<PresetName, CostModel> = {
 }
 
 export function costModelFor(models: Readonly<Record<string, CostModel>>, type: string): CostModel {
-  const model = models[type]
+  const model = Object.hasOwn(models, type) ? models[type] : undefined
   if (!model) throw new Error(`no cost model for ${type}`)
   return model
 }
