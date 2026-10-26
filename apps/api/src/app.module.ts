@@ -1,16 +1,18 @@
 import { Module } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import { applyDefaults } from '@poof/nest'
-import { ConfigModule } from './config/config.module.js'
+import { applyDefaults, EnvModule } from '@poof/nest'
 import { Env } from './config/env.js'
 import { DatasetsModule } from './datasets/datasets.module.js'
 import { ExhibitsModule } from './exhibits/exhibits.module.js'
+import { HealthModule } from './health/health.module.js'
 import { InfraModule } from './infra/infra.module.js'
 import { LiveAdapter } from './live/live.adapter.js'
 import { LiveModule } from './live/live.module.js'
 import { TasksModule } from './tasks/tasks.module.js'
 
-@Module({ imports: [ConfigModule, InfraModule, TasksModule, ExhibitsModule, DatasetsModule, LiveModule] })
+@Module({
+  imports: [EnvModule.forRoot(Env), InfraModule, TasksModule, ExhibitsModule, DatasetsModule, LiveModule, HealthModule],
+})
 export class AppModule {}
 
 export function configureApp(app: NestExpressApplication): NestExpressApplication {

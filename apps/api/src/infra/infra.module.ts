@@ -2,11 +2,9 @@ import { Global, Module } from '@nestjs/common'
 import { Database, Traces } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { Cache } from './cache.js'
-import { HealthController } from './health.controller.js'
 
 @Global()
 @Module({
-  controllers: [HealthController],
   providers: [
     { provide: Database, useFactory: (env: Env) => new Database(env.DATABASE_URL), inject: [Env] },
     {

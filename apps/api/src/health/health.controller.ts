@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
 import { Database } from '@poof/nest'
-import { Cache } from './cache.js'
+import { Cache } from '../infra/cache.js'
 
 @Controller('health')
 export class HealthController {

@@ -12,18 +12,15 @@ export interface Dataset {
 
 @Injectable()
 export class Datasets {
-  private readonly root: string
   private readonly cache = new Map<string, Dataset>()
 
-  constructor(env: Env) {
-    this.root = env.DATA_DIR
-  }
+  constructor(private readonly env: Env) {}
 
   async get(name: string): Promise<Dataset> {
     if (!datasetNamePattern.test(name)) throw new NotFoundException(`no dataset ${name}`)
     const cached = this.cache.get(name)
     if (cached) return cached
-    const path = join(this.root, 'datasets', name, 'manifest.json')
+    const path = join(this.env.DATA_DIR, 'datasets', name, 'manifest.json')
     let text: string
     try {
       text = await readFile(path, 'utf8')
@@ -45,7 +42,7 @@ export class Datasets {
   }
 
   taskDir(taskId: string): string {
-    return join(this.root, 'tasks', taskId)
+    return join(this.env.DATA_DIR, 'tasks', taskId)
   }
 
   async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {
@@ -55,7 +52,7 @@ export class Datasets {
     const manifest: TaskManifest = { items: [] }
     for (const [i, item] of items.entries()) {
       const file = `${i}-${item.file}`
-      await linkOrCopy(join(this.root, 'datasets', dataset.name, item.file), join(dir, 'input', file))
+      await linkOrCopy(join(this.env.DATA_DIR, 'datasets', dataset.name, item.file), join(dir, 'input', file))
       manifest.items.push({ file })
     }
     await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest))

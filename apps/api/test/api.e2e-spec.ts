@@ -83,6 +83,11 @@ describe('read model', () => {
     expect((await http().get('/api/tasks?limit=1000')).status).toBe(400)
   })
 
+  it('reports that Redis and Postgres answer', async () => {
+    running = await start(supervisor.url)
+    expect((await http().get('/api/health')).body).toEqual({ ok: true, redis: true, db: true })
+  })
+
   it('lists the datasets on disk that the supervisor would serve', async () => {
     running = await start(supervisor.url)
     const items = [
@@ -224,6 +229,14 @@ describe('live view', () => {
     const received = await batch
     expect(received.events.map((e) => e.kind)).toContain('item')
     socket.close()
+  })
+
+  it('answers the live snapshot over HTTP too', async () => {
+    running = await start(supervisor.url)
+    expect((await http().get('/api/state')).body).toEqual({ live: null, exhibit: null })
+    const pool: PoolSnapshot = { at: 0, budget: 2, workers: [], tasks: [], breakers: {} }
+    await running.redis.set(poolSnapshotKey, JSON.stringify(pool))
+    expect((await http().get('/api/state')).body).toEqual({ live: pool, exhibit: null })
   })
 
   it('lets only the configured web origin read the polling handshake', async () => {

@@ -6,15 +6,11 @@ import { Env } from '../config/env.js'
 
 @Controller('datasets')
 export class DatasetsController {
-  private readonly dataDir: string
-
-  constructor(env: Env) {
-    this.dataDir = env.DATA_DIR
-  }
+  constructor(private readonly env: Env) {}
 
   @Get()
   async datasets(): Promise<DatasetSummary[]> {
-    const root = join(this.dataDir, 'datasets')
+    const root = join(this.env.DATA_DIR, 'datasets')
     const names = await readdir(root).catch(() => [] as string[])
     const out: DatasetSummary[] = []
     for (const name of names.filter((n) => datasetNamePattern.test(n)).sort()) {

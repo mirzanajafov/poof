@@ -52,19 +52,13 @@ export class StartExhibit {
 
 @Controller('exhibits')
 export class ExhibitsController {
-  private readonly cooldownSeconds: number
-  private readonly publicSeconds: number
-
   constructor(
     private readonly db: Database,
     private readonly cache: Cache,
     private readonly supervisor: Supervisor,
     private readonly admin: Admin,
-    env: Env,
-  ) {
-    this.cooldownSeconds = env.EXHIBIT_COOLDOWN_SECONDS
-    this.publicSeconds = env.PUBLIC_EXHIBIT_SECONDS
-  }
+    private readonly env: Env,
+  ) {}
 
   @Get()
   async list() {
@@ -106,15 +100,15 @@ export class ExhibitsController {
   @RateLimit({ name: 'exhibits', setting: 'EXHIBITS_PER_HOUR', windowSeconds: 3600 })
   async start(@Body() body: StartExhibit, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     if (!this.admin.is(req)) {
-      if (body.durationSeconds > this.publicSeconds) {
-        throw new BadRequestException(`exhibits are limited to ${this.publicSeconds} s`)
+      if (body.durationSeconds > this.env.PUBLIC_EXHIBIT_SECONDS) {
+        throw new BadRequestException(`exhibits are limited to ${this.env.PUBLIC_EXHIBIT_SECONDS} s`)
       }
-      if (this.cooldownSeconds > 0) {
+      if (this.env.EXHIBIT_COOLDOWN_SECONDS > 0) {
         const started = await this.cache.redis.set(
           'poof:exhibit-cooldown',
           '1',
           'EX',
-          this.cooldownSeconds + body.durationSeconds,
+          this.env.EXHIBIT_COOLDOWN_SECONDS + body.durationSeconds,
           'NX',
         )
         if (!started) {

@@ -71,15 +71,11 @@ const contentTypes: Array<[string, string]> = [
 
 @Controller('tasks')
 export class TasksController {
-  private readonly dataDir: string
-
   constructor(
     private readonly db: Database,
     private readonly supervisor: Supervisor,
-    env: Env,
-  ) {
-    this.dataDir = env.DATA_DIR
-  }
+    private readonly env: Env,
+  ) {}
 
   @Get()
   list(@Query() query: ListTasks) {
@@ -118,7 +114,7 @@ export class TasksController {
     @Res() res: Response,
   ) {
     for (const [ext, type] of contentTypes) {
-      const path = join(this.dataDir, 'tasks', id, 'out', `${item}.${ext}`)
+      const path = join(this.env.DATA_DIR, 'tasks', id, 'out', `${item}.${ext}`)
       const found = await stat(path).catch(() => null)
       if (!found?.isFile()) continue
       res.setHeader('Content-Type', type)

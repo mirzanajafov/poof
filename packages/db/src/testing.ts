@@ -10,16 +10,22 @@ export interface TestDatabase {
 }
 
 export async function createTestDatabase(): Promise<TestDatabase> {
-  const name = `poof_test_${Date.now()}`
+  const name = `poof_test_${process.pid}_${Date.now()}`
+  const drop = () => run(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
   await run(`CREATE DATABASE ${name}`)
   const url = new URL(adminUrl)
   url.pathname = `/${name}`
-  execSync('npx prisma migrate deploy', {
-    cwd: fileURLToPath(new URL('../', import.meta.url)),
-    env: { ...process.env, DATABASE_URL: url.toString() },
-    stdio: 'ignore',
-  })
-  return { url: url.toString(), drop: () => run(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`) }
+  try {
+    execSync('npx prisma migrate deploy', {
+      cwd: fileURLToPath(new URL('../', import.meta.url)),
+      env: { ...process.env, DATABASE_URL: url.toString() },
+      stdio: 'pipe',
+    })
+  } catch (error) {
+    await drop()
+    throw error
+  }
+  return { url: url.toString(), drop }
 }
 
 async function run(sql: string): Promise<void> {
