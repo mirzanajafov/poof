@@ -31,7 +31,7 @@ export interface Calibration {
   curves: Curve[]
 }
 
-export const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
+const defaultResultsDir = fileURLToPath(new URL('../../../bench/results/', import.meta.url))
 
 function readResult<T>(dir: string, name: string, parse: (text: string, origin: string) => T): T {
   const path = join(dir, `${name}.json`)
