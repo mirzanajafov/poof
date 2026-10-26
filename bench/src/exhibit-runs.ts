@@ -1,7 +1,8 @@
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { exhibitDefaults, isRecord, type ExhibitDetail, type ExhibitRun } from '@poof/contracts'
+import { exhibitDefaults, isRecord, type ExhibitDetail } from '@poof/contracts'
+import type { ExhibitRun } from '@poof/contracts/bench'
 import { isExhibitPolicyName } from '@poof/core'
 
 const { values } = parseArgs({

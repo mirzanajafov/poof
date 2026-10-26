@@ -10,7 +10,7 @@ import {
   spawnResult,
   type ConcurrencyRun,
   type ItemCost,
-} from '@poof/contracts'
+} from '@poof/contracts/bench'
 import { valueAt, type CostModel } from '@poof/core'
 import { linearFit, powerFit, quantile } from '@poof/core/stats'
 

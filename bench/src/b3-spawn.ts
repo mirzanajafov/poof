@@ -2,7 +2,7 @@ import { fork } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { spawnResult } from '@poof/contracts'
+import { spawnResult } from '@poof/contracts/bench'
 import { round, summary } from '@poof/core/stats'
 import { environment, writeResult } from './results.ts'
 

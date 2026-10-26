@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { itemCostsResult, type ItemCostSample } from '@poof/contracts'
+import { itemCostsResult, type ItemCostSample } from '@poof/contracts/bench'
 import { linearFit, median, round, summary } from '@poof/core/stats'
 import { configureSharp, presetByName, processItem } from '@poof/imaging'
 import { itemPath, loadDataset, shuffled, type DatasetItem } from './dataset.ts'

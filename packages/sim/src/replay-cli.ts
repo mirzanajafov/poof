@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { itemCostMedians, parseExhibitRuns, parseManifest, type RecordedStats } from '@poof/contracts'
+import { parseManifest } from '@poof/contracts'
+import { itemCostMedians, parseExhibitRuns, type RecordedStats } from '@poof/contracts/bench'
 import { defaultTimeoutRule } from '@poof/core'
 import { mean } from '@poof/core/stats'
 import { itemCostSamples, loadCalibration } from './calibration.ts'

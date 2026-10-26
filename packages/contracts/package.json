@@ -13,6 +13,11 @@
       "source": "./src/layout.ts",
       "types": "./dist/layout.d.ts",
       "default": "./dist/layout.js"
+    },
+    "./bench": {
+      "source": "./src/bench.ts",
+      "types": "./dist/bench.d.ts",
+      "default": "./dist/bench.js"
     }
   },
   "scripts": {

@@ -51,13 +51,13 @@ describe('parseItemCosts', () => {
     expect(() => parseItemCosts(JSON.stringify({ samples: [] }), 'b1.json')).toThrow('b1.json lists no samples')
   })
 
-  it('names the sample that misses a field it uses or has one of the wrong type', () => {
+  it('names the sample and the field it uses that is missing or of the wrong type', () => {
     const withoutWall = { ...sample, wallMs: undefined }
     expect(() => parseItemCosts(JSON.stringify({ samples: [sample, withoutWall] }), 'b1.json')).toThrow(
-      'b1.json: samples 1 misses a field or has a wrong type',
+      'b1.json: samples 1 has no valid wallMs',
     )
     expect(() => parseItemCosts(JSON.stringify({ samples: [{ ...sample, mp: '12.4' }] }), 'b1.json')).toThrow(
-      'b1.json: samples 0 misses a field or has a wrong type',
+      'b1.json: samples 0 has no valid mp',
     )
   })
 })
@@ -91,7 +91,7 @@ describe('parseConcurrencyRun', () => {
   it('refuses a row without the cgroup memory field and a run without a knee', () => {
     const withoutPeak = { ...row, cgroupAnonPeakMb: undefined }
     expect(() => parseConcurrencyRun(JSON.stringify({ cpus: 2, knee: 2, rows: [withoutPeak] }), 'b2.json')).toThrow(
-      'b2.json: rows 0 misses a field or has a wrong type',
+      'b2.json: rows 0 has no valid cgroupAnonPeakMb',
     )
     expect(() => parseConcurrencyRun(JSON.stringify({ cpus: 2, rows: [row] }), 'b2.json')).toThrow(
       'b2.json needs a number of cpus and a knee',
@@ -133,14 +133,18 @@ describe('parseExhibitRuns', () => {
     ])
   })
 
-  it('refuses a run with a policy or preset the simulator does not know', () => {
+  it('names the run and the field when a policy, preset or count is not usable', () => {
     const unknownPolicy = { ...run, params: { ...run.params, policy: 'storm' } }
     expect(() => parseExhibitRuns(JSON.stringify([run, unknownPolicy]), 'runs.json')).toThrow(
-      'runs.json: run 1 has params or stats that miss a field or have a wrong type',
+      'runs.json: run e1 params has no valid policy',
     )
     const unknownPreset = { ...run, params: { ...run.params, preset: 'gif-64' } }
     expect(() => parseExhibitRuns(JSON.stringify([unknownPreset]), 'runs.json')).toThrow(
-      'runs.json: run 0 has params or stats that miss a field or have a wrong type',
+      'runs.json: run e1 params has no valid preset',
+    )
+    const withoutSpawns = { ...run, stats: { ...run.stats, spawns: undefined } }
+    expect(() => parseExhibitRuns(JSON.stringify([withoutSpawns]), 'runs.json')).toThrow(
+      'runs.json: run e1 stats has no valid spawns',
     )
   })
 })

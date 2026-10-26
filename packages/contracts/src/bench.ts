@@ -1,7 +1,7 @@
 import { exhibitPolicyNames, presetNames } from '@poof/core'
 import { median } from '@poof/core/stats'
 import type { ExhibitDetail, ExhibitParams, ExhibitStats } from './exhibits.ts'
-import { hasFields, isRecord, parseJson, type Checks } from './records.ts'
+import { fieldProblem, hasFields, isRecord, parseJson, type Checks } from './records.ts'
 
 export const itemCostsResult = 'b1-item-cost'
 export const concurrencyResultPrefix = 'b2-concurrency-c'
@@ -28,7 +28,7 @@ export interface ConcurrencyRow {
   items: number
   effectiveCores: number
   efficiency: number
-  wallInflation: number
+  wallInflation: number | null
   peakRssMb: number
   medianPeakRssMb: number
   cgroupAnonMeanMb: number | null
@@ -107,7 +107,7 @@ const recordedStatsChecks: Checks<RecordedStats> = {
 function entries<T>(list: unknown, checks: Checks<T>, what: string, origin: string): T[] {
   if (!Array.isArray(list) || list.length === 0) throw new Error(`${origin} lists no ${what}`)
   return list.map((entry: unknown, index) => {
-    if (!hasFields(entry, checks)) throw new Error(`${origin}: ${what} ${index} misses a field or has a wrong type`)
+    if (!hasFields(entry, checks)) throw new Error(`${origin}: ${what} ${index} ${fieldProblem(entry, checks) ?? ''}`)
     return entry
   })
 }
@@ -149,18 +149,18 @@ export function parseSpawnRun(text: string, origin: string): SpawnRun {
 }
 
 export function parseExhibitRuns(text: string, origin: string): RecordedExhibit[] {
-  const runs = entries<{ id: string; params: unknown; stats: unknown }>(
+  const runs = entries<{ id: string; params: object; stats: object }>(
     parseJson(text, origin),
     { id: 'string', params: 'object', stats: 'object' },
     'runs',
     origin,
   )
-  return runs.map(({ id, params, stats }, index) => {
-    if (
-      !hasFields<ExhibitParams>(params, exhibitParamChecks) ||
-      !hasFields<RecordedStats>(stats, recordedStatsChecks)
-    ) {
-      throw new Error(`${origin}: run ${index} has params or stats that miss a field or have a wrong type`)
+  return runs.map(({ id, params, stats }) => {
+    if (!hasFields<ExhibitParams>(params, exhibitParamChecks)) {
+      throw new Error(`${origin}: run ${id} params ${fieldProblem(params, exhibitParamChecks) ?? ''}`)
+    }
+    if (!hasFields<RecordedStats>(stats, recordedStatsChecks)) {
+      throw new Error(`${origin}: run ${id} stats ${fieldProblem(stats, recordedStatsChecks) ?? ''}`)
     }
     return { id, params, stats }
   })

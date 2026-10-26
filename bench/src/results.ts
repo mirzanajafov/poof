@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { cpus, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { itemCostsResult, parseItemCosts, type ItemCost } from '@poof/contracts'
+import { itemCostsResult, parseItemCosts, type ItemCost } from '@poof/contracts/bench'
 import sharp from 'sharp'
 
 const resultsRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'results')

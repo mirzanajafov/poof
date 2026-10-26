@@ -22,13 +22,16 @@ export type Check<T> = [T] extends [boolean]
         ? 'number or null'
         : [T] extends [string | null]
           ? 'string or null'
-          : 'object'
+          : [T] extends [object]
+            ? 'object'
+            : never
 
 export type Checks<T> = { [F in keyof T]-?: Check<T[F]> }
 
-type AnyCheck = 'boolean' | 'number' | 'string' | 'number or null' | 'string or null' | 'object' | readonly unknown[]
+export type FieldCheck =
+  'boolean' | 'number' | 'string' | 'number or null' | 'string or null' | 'object' | readonly unknown[]
 
-function passes(value: unknown, check: AnyCheck): boolean {
+function passes(value: unknown, check: FieldCheck): boolean {
   if (typeof check !== 'string') return check.some((allowed) => allowed === value)
   if (check === 'number or null') return value === null || typeof value === 'number'
   if (check === 'string or null') return value === null || typeof value === 'string'
@@ -36,7 +39,12 @@ function passes(value: unknown, check: AnyCheck): boolean {
   return typeof value === check
 }
 
+export function fieldProblem(value: unknown, checks: Readonly<Record<string, FieldCheck>>): string | null {
+  if (!isRecord(value)) return 'is not an object'
+  const failed = Object.entries(checks).find(([field, check]) => !passes(value[field], check))
+  return failed ? `has no valid ${failed[0]}` : null
+}
+
 export function hasFields<T>(value: unknown, checks: Checks<T>): value is T {
-  const table: Readonly<Record<string, AnyCheck>> = checks
-  return isRecord(value) && Object.entries(table).every(([field, check]) => passes(value[field], check))
+  return fieldProblem(value, checks) === null
 }
