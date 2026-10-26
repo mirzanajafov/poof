@@ -162,6 +162,9 @@ export function parseExhibitRuns(text: string, origin: string): RecordedExhibit[
     if (!hasFields<RecordedStats>(stats, recordedStatsChecks)) {
       throw new Error(`${origin}: run ${id} stats ${fieldProblem(stats, recordedStatsChecks) ?? ''}`)
     }
+    if (!isRecord(stats.exits) || !Object.values<unknown>(stats.exits).every((count) => typeof count === 'number')) {
+      throw new Error(`${origin}: run ${id} stats has exit counts that are not numbers`)
+    }
     return { id, params, stats }
   })
 }

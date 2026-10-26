@@ -142,6 +142,10 @@ describe('parseExhibitRuns', () => {
     expect(() => parseExhibitRuns(JSON.stringify([unknownPreset]), 'runs.json')).toThrow(
       'runs.json: run e1 params has no valid preset',
     )
+    const textExits = { ...run, stats: { ...run.stats, exits: { timeout: '2' } } }
+    expect(() => parseExhibitRuns(JSON.stringify([textExits]), 'runs.json')).toThrow(
+      'runs.json: run e1 stats has exit counts that are not numbers',
+    )
     const withoutSpawns = { ...run, stats: { ...run.stats, spawns: undefined } }
     expect(() => parseExhibitRuns(JSON.stringify([withoutSpawns]), 'runs.json')).toThrow(
       'runs.json: run e1 stats has no valid spawns',
