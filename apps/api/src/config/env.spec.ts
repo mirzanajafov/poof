@@ -12,7 +12,12 @@ const base = {
 
 describe('Env', () => {
   it('applies defaults', () => {
-    expect(parseEnv(Env, base)).toMatchObject({ PORT: 3111, TASKS_PER_MINUTE: 10, PUBLIC_EXHIBIT_SECONDS: 60 })
+    expect(parseEnv(Env, base)).toMatchObject({
+      PORT: 3111,
+      TRUST_PROXY: 'loopback',
+      TASKS_PER_MINUTE: 10,
+      PUBLIC_EXHIBIT_SECONDS: 60,
+    })
   })
 
   it('reads TRUST_PROXY as a switch, a hop count or a list of addresses', () => {
