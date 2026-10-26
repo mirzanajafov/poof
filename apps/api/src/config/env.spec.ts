@@ -28,8 +28,9 @@ describe('Env', () => {
     expect(trust('loopback, uniquelocal')).toBe('loopback, uniquelocal')
   })
 
-  it('refuses a short admin token and missing settings', () => {
+  it('refuses a short admin token, missing settings and a public limit shorter than the public exhibit', () => {
     expect(() => parseEnv(Env, { ...base, ADMIN_TOKEN: 'short' })).toThrow(/ADMIN_TOKEN/)
     expect(() => parseEnv(Env, { ...base, SUPERVISOR_URL: undefined })).toThrow(/SUPERVISOR_URL/)
+    expect(() => parseEnv(Env, { ...base, PUBLIC_EXHIBIT_SECONDS: '30' })).toThrow(/PUBLIC_EXHIBIT_SECONDS/)
   })
 })
