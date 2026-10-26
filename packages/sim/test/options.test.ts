@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { count, knownNames } from '../src/options.ts'
+import { count, knownNames, positive } from '../src/options.ts'
 
 describe('count', () => {
   it('reads a whole number above zero', () => {
@@ -9,7 +9,18 @@ describe('count', () => {
   it('refuses zero, fractions and text, which used to leave the worker pool waiting forever', () => {
     expect(() => count('seeds', '0')).toThrow('--seeds needs a whole number above zero, not 0')
     expect(() => count('threads', '1.5')).toThrow('--threads needs a whole number above zero, not 1.5')
-    expect(() => count('dt', 'ten')).toThrow('--dt needs a whole number above zero, not ten')
+    expect(() => count('seeds', 'ten')).toThrow('--seeds needs a whole number above zero, not ten')
+  })
+})
+
+describe('positive', () => {
+  it('reads a step length that need not be whole', () => {
+    expect(positive('dt', '2.5')).toBe(2.5)
+  })
+
+  it('refuses zero and text, which would stall every simulation', () => {
+    expect(() => positive('dt', '0')).toThrow('--dt needs a number above zero, not 0')
+    expect(() => positive('dt', 'ten')).toThrow('--dt needs a number above zero, not ten')
   })
 })
 

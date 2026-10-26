@@ -7,7 +7,7 @@ import { Worker } from 'node:worker_threads'
 import { loadCalibration } from './calibration.ts'
 import type { Sample } from './engine.ts'
 import type { RunMetrics } from './metrics.ts'
-import { count, knownNames } from './options.ts'
+import { count, knownNames, positive } from './options.ts'
 import { compare, summarize, table, type Comparison } from './report.ts'
 import type { Job } from './run-worker.ts'
 import { allPolicies, machines, mainPolicies, scenarios, sweepPolicies } from './scenarios.ts'
@@ -42,7 +42,7 @@ const scenarioNames = knownNames(values.scenarios, Object.keys(scenarios), 'scen
 const policies = policyNames(values.policies)
 const seeds = count('seeds', values.seeds)
 const threads = count('threads', values.threads)
-const dtMs = count('dt', values.dt)
+const dtMs = positive('dt', values.dt)
 const calibration = loadCalibration(values.calibration)
 const jobs: Job[] = []
 for (const machine of machineNames) {

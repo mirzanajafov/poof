@@ -4,6 +4,12 @@ export function count(option: string, text: string): number {
   return value
 }
 
+export function positive(option: string, text: string): number {
+  const value = Number(text)
+  if (!(value > 0)) throw new Error(`--${option} needs a number above zero, not ${text}`)
+  return value
+}
+
 export function knownNames(spec: string, known: readonly string[], kind: string): string[] {
   const names = spec.split(',')
   const unknown = names.filter((name) => !known.includes(name))
