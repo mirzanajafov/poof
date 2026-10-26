@@ -1,6 +1,8 @@
 import {
+  BadGatewayException,
   Catch,
   ConflictException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   type ArgumentsHost,
@@ -13,11 +15,17 @@ export class ConflictError extends Error {}
 
 export class UnavailableError extends Error {}
 
-type DomainError = NotFoundError | ConflictError | UnavailableError
+export class UpstreamError extends Error {}
 
-@Catch(NotFoundError, ConflictError, UnavailableError)
+type DomainError = NotFoundError | ConflictError | UnavailableError | UpstreamError
+
+@Catch(NotFoundError, ConflictError, UnavailableError, UpstreamError)
 export class DomainErrorFilter extends BaseExceptionFilter {
+  private readonly logger = new Logger(DomainErrorFilter.name)
+
   override catch(error: DomainError, host: ArgumentsHost): void {
+    if (error instanceof UnavailableError || error instanceof UpstreamError)
+      this.logger.error(error.message, error.cause)
     super.catch(toHttp(error), host)
   }
 }
@@ -25,9 +33,6 @@ export class DomainErrorFilter extends BaseExceptionFilter {
 function toHttp(error: DomainError) {
   if (error instanceof NotFoundError) return new NotFoundException(error.message)
   if (error instanceof ConflictError) return new ConflictException(error.message)
+  if (error instanceof UpstreamError) return new BadGatewayException(error.message)
   return new ServiceUnavailableException(error.message)
-}
-
-export function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }

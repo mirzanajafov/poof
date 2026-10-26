@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Injectable } from '@nestjs/common'
 import {
@@ -13,7 +13,7 @@ import {
   type ManifestItem,
   type TaskManifest,
 } from '@poof/contracts'
-import { isMissingFile, NotFoundError } from '@poof/nest'
+import { isMissingFile, NotFoundError, readDirIfPresent } from '@poof/nest'
 import { Env } from '../config/env.js'
 import { linkOrCopy } from './files.js'
 
@@ -55,10 +55,7 @@ export class Datasets {
   }
 
   taskFolders(): Promise<string[]> {
-    return readdir(tasksDir(this.env.DATA_DIR)).catch((error: unknown) => {
-      if (isMissingFile(error)) return []
-      throw error
-    })
+    return readDirIfPresent(tasksDir(this.env.DATA_DIR))
   }
 
   async createTask(taskId: string, dataset: Dataset, items: ManifestItem[]): Promise<void> {

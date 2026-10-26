@@ -1,5 +1,5 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
-import { Traces } from '@poof/nest'
+import { Injectable } from '@nestjs/common'
+import { Traces, UpstreamError } from '@poof/nest'
 import { extract, inject, SpanKind, SpanStatusCode, within } from '@poof/tracing'
 import { Env } from '../config/env.js'
 
@@ -45,10 +45,10 @@ export class Supervisor {
         retryAfter: upstream.headers.get('retry-after'),
         body: text ? JSON.parse(text) : undefined,
       }
-    } catch {
+    } catch (error) {
       span.setStatus({ code: SpanStatusCode.ERROR, message: 'the supervisor did not answer' })
       span.end()
-      throw new BadGatewayException('the supervisor did not answer')
+      throw new UpstreamError('the supervisor did not answer', { cause: error })
     }
     span.setAttribute('http.response.status_code', reply.status)
     span.end()
