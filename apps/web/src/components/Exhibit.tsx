@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { capitalized, exitCounts, shortId } from '@/lib/format'
 import { post, refusal } from '@/lib/post'
 import { layoutLeases } from '@/lib/tree'
+import { reportStep } from '@/lib/visit'
 import { Remaining } from './Remaining'
 import { Stats } from './Stats'
 
@@ -44,7 +45,7 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
     try {
       const answer = await post('/api/exhibits', { policy })
       if (answer.status === 201) {
-        document.dispatchEvent(new CustomEvent('najafov:action', { detail: 'ran-exhibit' }))
+        reportStep('ran-exhibit')
       } else {
         const retry = answer.retryAfter ? `. Try again in ${answer.retryAfter} s.` : '.'
         setMessage(`${capitalized(refusal(answer))}${retry}`)

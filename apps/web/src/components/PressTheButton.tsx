@@ -5,6 +5,7 @@ import { isPresetName, type PresetName } from '@poof/core'
 import Link from 'next/link'
 import { useState } from 'react'
 import { post, refusal } from '@/lib/post'
+import { reportStep } from '@/lib/visit'
 
 type Outcome =
   | { kind: 'accepted'; task: Extract<SubmitResult, { accepted: true }> }
@@ -30,7 +31,7 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
       const result = parseSubmitResult(answer.body)
       if (result?.accepted) {
         setOutcome({ kind: 'accepted', task: result })
-        document.dispatchEvent(new CustomEvent('najafov:action', { detail: 'poofed' }))
+        reportStep('poofed')
       } else if (result) {
         setOutcome({ kind: 'refused', message: result.reason, retryAfter: result.retryAfterSeconds })
       } else {
