@@ -43,7 +43,9 @@ export function ExhibitPanel({ exhibit, processes }: { exhibit: ExhibitSnapshot 
     setMessage(null)
     try {
       const answer = await post('/api/exhibits', { policy })
-      if (answer.status !== 201) {
+      if (answer.status === 201) {
+        document.dispatchEvent(new CustomEvent('najafov:action', { detail: 'ran-exhibit' }))
+      } else {
         const retry = answer.retryAfter ? `. Try again in ${answer.retryAfter} s.` : '.'
         setMessage(`${capitalized(refusal(answer))}${retry}`)
       }

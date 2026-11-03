@@ -28,9 +28,14 @@ export function PressTheButton({ datasets }: { datasets: DatasetSummary[] }) {
     try {
       const answer = await post('/api/tasks', { dataset, preset, count, deadlineSeconds: deadline })
       const result = parseSubmitResult(answer.body)
-      if (result?.accepted) setOutcome({ kind: 'accepted', task: result })
-      else if (result) setOutcome({ kind: 'refused', message: result.reason, retryAfter: result.retryAfterSeconds })
-      else setOutcome({ kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter })
+      if (result?.accepted) {
+        setOutcome({ kind: 'accepted', task: result })
+        document.dispatchEvent(new CustomEvent('najafov:action', { detail: 'poofed' }))
+      } else if (result) {
+        setOutcome({ kind: 'refused', message: result.reason, retryAfter: result.retryAfterSeconds })
+      } else {
+        setOutcome({ kind: 'refused', message: refusal(answer), retryAfter: answer.retryAfter })
+      }
     } catch {
       setOutcome({ kind: 'refused', message: 'the box did not answer', retryAfter: null })
     } finally {
