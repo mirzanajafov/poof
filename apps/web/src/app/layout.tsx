@@ -22,6 +22,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
+      <script async src="https://najafov.dev/visit.js" />
       <body className="flex min-h-full flex-col font-sans">
         <header className="border-b border-line bg-surface">
           <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3 sm:px-6">
@@ -40,7 +41,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">{children}</main>
         <footer className="border-t border-line px-4 py-4 text-center text-xs text-faint">
-          One small server, one box of workers, and everything measured.
+          One small server, one box of workers, and everything measured.{' '}
+          <a href="https://najafov.dev/privacy#demos" className="underline hover:text-foreground">
+            What this demo records
+          </a>
         </footer>
       </body>
     </html>

@@ -4,7 +4,7 @@ Inspired by the Meeseeks box from Rick and Morty: you press a button, a helper a
 
 poof resizes batches of photos against deadlines on one small server. You send a batch with a deadline, it predicts the work from the image sizes, and it either finishes in time or tells you up front that it can't. Next to it you can hand the box to the naive version for a minute and watch a worker that falls behind call helpers, who call helpers, inside a cage of 1.5 CPUs, 1.5 GB and 35 processes.
 
-It's running at **[poof.najafov.dev](https://poof.najafov.dev)**. Press the button, or pick "The box" at the bottom and run it.
+It's running at **[poof.najafov.dev](https://poof.najafov.dev)**. Press the button, or pick "The box" at the bottom and run it. The live demo loads a small script from najafov.dev that records visits the way my site does, with less detail, and whether a batch someone sent was taken or a policy they started ran for a minute. What it records and why is at [najafov.dev/privacy#demos](https://najafov.dev/privacy#demos).
 
 ![The live page 30 seconds into a run of the box: 35 processes, workers killed for taking too long, and the tree of who called whom](docs/screenshots/live.png)
 
